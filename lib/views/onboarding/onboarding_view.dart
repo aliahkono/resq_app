@@ -54,6 +54,12 @@ class _OnboardingViewState extends State<OnboardingView> {
               return OnboardingPage(
                 data: _onboardingData[index],
                 isFirst: index == 0,
+                onBack: () {
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                  );
+                },
               );
             },
           ),
@@ -152,44 +158,62 @@ class _OnboardingViewState extends State<OnboardingView> {
 class OnboardingPage extends StatelessWidget {
   final Map<String, String> data;
   final bool isFirst;
+  final VoidCallback onBack;
 
   const OnboardingPage({
     super.key,
     required this.data,
     required this.isFirst,
+    required this.onBack,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(height: 80),
+        const SizedBox(height: 60),
         
         // Header Text
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  if (!isFirst) 
-                    const Icon(Icons.arrow_back_ios, size: 16, color: ResQTheme.textDark),
-                  Text(
-                    ' How ResQ Works',
-                    style: ResQTheme.heading2.copyWith(color: ResQTheme.textDark),
-                  ),
-                ],
+              GestureDetector(
+                onTap: isFirst ? null : onBack,
+                child: Row(
+                  children: [
+                    if (!isFirst) 
+                      const Padding(
+                        padding: EdgeInsets.only(right: 8.0),
+                        child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: ResQTheme.textDark),
+                      ),
+                    Text(
+                      'How ResQ Works',
+                      style: ResQTheme.heading2.copyWith(
+                        color: ResQTheme.textDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               if (isFirst) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   'Every Drop Counts',
-                  style: ResQTheme.heading3.copyWith(color: ResQTheme.textDark, fontSize: 16),
+                  style: ResQTheme.heading3.copyWith(
+                    color: ResQTheme.textDark, 
+                    fontSize: 15,
+                  ),
                 ),
                 Text(
                   'Your donation journey in 4 simple steps.',
-                  style: ResQTheme.subText.copyWith(fontSize: 12),
+                  style: ResQTheme.subText.copyWith(
+                    fontSize: 11,
+                    color: ResQTheme.textMuted,
+                  ),
                 ),
               ],
             ],
@@ -202,11 +226,11 @@ class OnboardingPage extends StatelessWidget {
         Stack(
           alignment: Alignment.center,
           children: [
-            // Wavy Background (Simulating the wavy banner in Figma)
+            // Wavy Background Band
             ClipPath(
               clipper: WavyClipper(),
               child: Container(
-                height: 280,
+                height: 240,
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   gradient: ResQTheme.howItWorksGradient,
@@ -214,18 +238,24 @@ class OnboardingPage extends StatelessWidget {
               ),
             ),
             
-            // Illustration Placeholder Container
+            // Illustration Container with Soft Glow
             Container(
-              width: 220,
-              height: 220,
+              width: 200,
+              height: 200,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+                    color: ResQTheme.primaryCrimson.withOpacity(0.15),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 15),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
@@ -235,13 +265,16 @@ class OnboardingPage extends StatelessWidget {
                   children: [
                     Icon(
                       _getIconForTitle(data['title']!),
-                      size: 80,
+                      size: 70,
                       color: ResQTheme.primaryCrimson,
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      '[ Illustration ]',
-                      style: TextStyle(color: ResQTheme.textMuted, fontSize: 10),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Stage ${isFirst ? 1 : 2 /* Simple logic for demo */}',
+                      style: ResQTheme.subText.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: ResQTheme.primaryCrimson.withOpacity(0.5),
+                      ),
                     ),
                   ],
                 ),
@@ -261,16 +294,16 @@ class OnboardingPage extends StatelessWidget {
                 data['title']!,
                 textAlign: TextAlign.center,
                 style: ResQTheme.heading1.copyWith(
-                  fontSize: 28,
+                  fontSize: 22,
                   color: ResQTheme.textDark,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 data['description']!,
                 textAlign: TextAlign.center,
                 style: ResQTheme.bodyText.copyWith(
-                  fontSize: 15,
+                  fontSize: 13,
                   color: ResQTheme.textMuted,
                   height: 1.5,
                 ),
@@ -279,7 +312,7 @@ class OnboardingPage extends StatelessWidget {
           ),
         ),
         
-        const SizedBox(height: 160), // Space for buttons and indicator
+        const SizedBox(height: 140), 
       ],
     );
   }
@@ -304,29 +337,27 @@ class WavyClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     Path path = Path();
-    path.moveTo(0, size.height * 0.3);
+    double h = size.height;
+    double w = size.width;
+
+    path.moveTo(0, h * 0.4);
     
-    var firstControlPoint = Offset(size.width * 0.25, size.height * 0.1);
-    var firstEndPoint = Offset(size.width * 0.5, size.height * 0.3);
-    path.quadraticBezierTo(firstControlPoint.dx, firstControlPoint.dy,
-        firstEndPoint.dx, firstEndPoint.dy);
+    // Smooth S-curve top
+    path.cubicTo(
+      w * 0.3, h * 0.1, 
+      w * 0.7, h * 0.6, 
+      w, h * 0.3
+    );
     
-    var secondControlPoint = Offset(size.width * 0.75, size.height * 0.5);
-    var secondEndPoint = Offset(size.width, size.height * 0.35);
-    path.quadraticBezierTo(secondControlPoint.dx, secondControlPoint.dy,
-        secondEndPoint.dx, secondEndPoint.dy);
+    // Right side down
+    path.lineTo(w, h * 0.7);
     
-    path.lineTo(size.width, size.height * 0.7);
-    
-    var thirdControlPoint = Offset(size.width * 0.75, size.height * 0.9);
-    var thirdEndPoint = Offset(size.width * 0.5, size.height * 0.7);
-    path.quadraticBezierTo(thirdControlPoint.dx, thirdControlPoint.dy,
-        thirdEndPoint.dx, thirdEndPoint.dy);
-    
-    var fourthControlPoint = Offset(size.width * 0.25, size.height * 0.5);
-    var fourthEndPoint = Offset(0, size.height * 0.65);
-    path.quadraticBezierTo(fourthControlPoint.dx, fourthControlPoint.dy,
-        fourthEndPoint.dx, fourthEndPoint.dy);
+    // Smooth S-curve bottom
+    path.cubicTo(
+      w * 0.7, h, 
+      w * 0.3, h * 0.5, 
+      0, h * 0.8
+    );
     
     path.close();
     return path;
