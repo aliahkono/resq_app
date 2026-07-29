@@ -1,0 +1,5 @@
+- [x] Update `.idea/pubspec.yaml` with mandatory fields and SDK constraint
+- [x] Move `pubspec.yaml` to project root
+- [x] Move `lib` directory to project root
+- [x] Move `assets` directory to project root
+- [x] Verify structure and attempt `dart pub get`

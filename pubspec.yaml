@@ -1,0 +1,30 @@
+name: resq
+description: "A blood donation management and emergency response app."
+publish_to: 'none' # Prevents accidental publishing to pub.dev
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.7.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+
+# Flutter configuration and assets
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
+# Configure the app icon generator settings
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/appicon.png"
+  min_sdk_android: 21
