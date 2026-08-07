@@ -1,4 +1,4 @@
-import 'package:resq/utils/algo/decisionTree_class.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
 
 /// This focus on the clinical standards and rule parameters based on Department of Health (DOH) and Philippine Red Cross (PRC) Voluntary Blood Donation guidelines.
 class EligibilityRules {

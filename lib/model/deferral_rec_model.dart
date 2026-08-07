@@ -1,4 +1,4 @@
-import 'package:resq/utils/algo/decisionTree_class.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
 
 class DeferralRecModel {
   final String id;

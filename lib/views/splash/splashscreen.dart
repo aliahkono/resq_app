@@ -59,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     // Phase 4: Logo shifts left, Slogan slides out (0.50 - 0.85)
-    _logoShiftLeft = Tween<double>(begin: 0.0, end: -110).animate(
+    _logoShiftLeft = Tween<double>(begin: 0.0, end: -100).animate(
       CurvedAnimation(
         parent: _controller, 
         curve: const Interval(0.55, 0.75, curve: Curves.easeInOutCubic)
@@ -130,75 +130,69 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    // The combined unit (Logo + Slogan)
+                    // 1. Logo Unit
+                    // Transitions from center (0,0) to left (-100, 0)
                     Transform.translate(
                       offset: Offset(_logoShiftLeft.value, _logoSlideDown.value),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Logo Unit
-                          Transform.scale(
-                            scale: _logoScale.value,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Opacity(
-                                  opacity: (1.0 - _logoCrossFade.value).clamp(0.0, 1.0),
-                                  child: Image.asset(
-                                    'assets/images/rq_logo_white.png',
-                                    width: 200,
-                                  ),
-                                ),
-                                Opacity(
-                                  opacity: _logoCrossFade.value.clamp(0.0, 1.0),
-                                  child: Image.asset(
-                                    'assets/images/rq_coloredLogo.png',
-                                    width: 200,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          // Slogan Text (Slide out from behind the logo)
-                          if (_controller.value > 0.50)
+                      child: Transform.scale(
+                        scale: _logoScale.value,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
                             Opacity(
-                              opacity: _textOpacity.value,
-                              child: Transform.translate(
-                                offset: Offset(_textSlide.value, 0),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: SizedBox(
-                                    width: 220,
-                                    child: RichText(
-                                      text: TextSpan(
-                                        children: [
-                                          TextSpan(
-                                            text: 'ResQ ',
-                                            style: ResQTheme.heading2.copyWith(
-                                              color: ResQTheme.primaryCrimson,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          TextSpan(
-                                            text: '| Real-Time Blood Query, Queue, & Resource Management',
-                                            style: ResQTheme.bodyText.copyWith(
-                                              color: ResQTheme.textDark,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              opacity: (1.0 - _logoCrossFade.value).clamp(0.0, 1.0),
+                              child: Image.asset(
+                                'assets/images/rq_logo_white.png',
+                                width: 200,
                               ),
                             ),
-                        ],
+                            Opacity(
+                              opacity: _logoCrossFade.value.clamp(0.0, 1.0),
+                              child: Image.asset(
+                                'assets/images/rq_coloredLogo.png',
+                                width: 200,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                    
+                    // 2. Slogan Text Unit
+                    // Appears to the right of the logo. 
+                    // When logo is at -100, text center at 50 provides a balanced centered look.
+                    if (_controller.value > 0.50)
+                      Transform.translate(
+                        offset: Offset(50 + _textSlide.value, _logoSlideDown.value),
+                        child: Opacity(
+                          opacity: _textOpacity.value,
+                          child: SizedBox(
+                            width: 200, // Reduced for better device compatibility
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'ResQ ',
+                                    style: ResQTheme.heading2.copyWith(
+                                      color: ResQTheme.primaryCrimson,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '| Real-Time Blood Query, Queue, & Resource Management',
+                                    style: ResQTheme.bodyText.copyWith(
+                                      color: ResQTheme.textDark,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

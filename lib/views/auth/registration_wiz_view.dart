@@ -10,22 +10,22 @@ class RegistrationWizView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Registration'),
       ),
-      body: Center(
+      body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.app_registration_rounded,
               size: 100,
               color: ResQTheme.primaryCrimson,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             Text(
               'Registration Wizard',
               style: ResQTheme.heading1,
             ),
-            const SizedBox(height: 10),
-            const Text('This is a placeholder for your registration flow.'),
+            SizedBox(height: 10),
+            Text('This is a placeholder for your registration flow.'),
           ],
         ),
       ),

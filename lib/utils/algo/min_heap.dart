@@ -54,7 +54,10 @@ class MinHeap<T> {
     final sortedList = <T>[];
 
     while (_heap.isNotEmpty) {
-      sortedList.add(extractMin()!);
+      final min = extractMin();
+      if (min != null) {
+        sortedList.add(min);
+      }
     }
 
     // Restore original heap state
