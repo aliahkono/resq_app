@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
-import 'package:resq/views/auth/registration_wiz_view.dart';
+import 'package:resq/views/auth/auth_landing_view.dart';
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});
@@ -218,7 +218,7 @@ class _OnboardingViewState extends State<OnboardingView>
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-        const RegistrationWizView(),
+        const AuthLandingView(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
