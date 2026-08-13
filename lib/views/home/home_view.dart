@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
-import 'package:resq/utils/helpers/eligibility_rules.dart';
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+  final ScreenNPTModel? screeningModel;
+  final ClassificationResult? classificationResult;
+  final bool isFirstTimeDonor;
+
+  const HomeView({
+    super.key,
+    this.screeningModel,
+    this.classificationResult,
+    this.isFirstTimeDonor = true,
+  });
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -12,8 +22,8 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   bool _isLoading = true;
-  bool _isEligible = false;
-  int _daysRemaining = 0; // Days until eligible if deferred
+  late ClassificationResult _effectiveResult;
+  late bool _isFirstTime;
 
   @override
   void initState() {
@@ -22,19 +32,22 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _evaluateEligibility() async {
-    // 1. Fetch donor screening data & last donation date
-    // 2. Pass data to your Decision Tree / Eligibility Algorithm
-    // (Simulating assessment calculation delay)
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Example logic check:
-    bool eligibleResult = true; // Replace with result from your decision tree algorithm
-    int deferralDays = 45;       // Replace with remaining recovery days if deferred
+    // 1. If explicit result was passed during registration/login, use it
+    if (widget.classificationResult != null) {
+      _effectiveResult = widget.classificationResult!;
+      _isFirstTime = widget.isFirstTimeDonor;
+    } else if (widget.screeningModel != null) {
+      _effectiveResult = widget.screeningModel!.evaluateEligibility();
+      _isFirstTime = widget.screeningModel!.screensNPT.isFirstTimeDonor;
+    } else {
+      // 2. Default fallback or simulate fetching stored profile screening state
+      await Future.delayed(const Duration(milliseconds: 300));
+      _effectiveResult = ClassificationResult(status: EligibleStats.eligible);
+      _isFirstTime = widget.isFirstTimeDonor;
+    }
 
     if (mounted) {
       setState(() {
-        _isEligible = eligibleResult;
-        _daysRemaining = deferralDays;
         _isLoading = false;
       });
     }
@@ -50,9 +63,14 @@ class _HomeViewState extends State<HomeView> {
       );
     }
 
-    // Dynamic Routing based on Algorithm Output
-    return _isEligible
-        ? const EligibleHomeView()
-        : IneligibleHomeView(daysRemaining: _daysRemaining);
+    // Route to Eligible or Ineligible Home View based on Decision Tree classification
+    return _effectiveResult.isEligible
+        ? EligibleHomeView(
+      isFirstTimeDonor: _isFirstTime,
+    )
+        : IneligibleHomeView(
+      classificationResult: _effectiveResult,
+      isFirstTimeDonor: _isFirstTime,
+    );
   }
 }
