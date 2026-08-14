@@ -91,7 +91,7 @@ class DonorProfileView extends StatelessWidget {
   Widget _buildDonorCard(BuildContext context, bool isEligible, bool isFirstTime) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -103,114 +103,130 @@ class DonorProfileView extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: ResQTheme.primaryCrimson.withValues(alpha: 0.1),
-                child: Text(
-                  donorName.isNotEmpty ? donorName[0].toUpperCase() : 'D',
-                  style: TextStyle(
-                    fontSize: 26,
+          // Avatar
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: ResQTheme.primaryCrimson.withValues(alpha: 0.1),
+            child: Text(
+              donorName.isNotEmpty ? donorName[0].toUpperCase() : 'D',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: ResQTheme.primaryCrimson,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Name, Role & Status Pill
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  donorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: ResQTheme.primaryCrimson,
+                    color: ResQTheme.textDark,
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      donorName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: ResQTheme.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isFirstTime ? 'First-Time Volunteer Donor' : 'Active Regular Donor',
-                      style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
+                const SizedBox(height: 2),
+                Text(
+                  isFirstTime ? 'First-Time Volunteer Donor' : 'Active Regular Donor',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: isEligible
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isEligible
+                            ? Icons.verified_user_rounded
+                            : Icons.schedule_rounded,
+                        size: 13,
                         color: isEligible
-                            ? const Color(0xFFE8F5E9)
-                            : const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(8),
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFE65100),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isEligible
-                                ? Icons.verified_user_rounded
-                                : Icons.schedule_rounded,
-                            size: 13,
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isEligible ? 'Verified Eligible' : 'Temporarily Deferred',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
                             color: isEligible
                                 ? const Color(0xFF2E7D32)
                                 : const Color(0xFFE65100),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            isEligible ? 'Verified Eligible' : 'Temporarily Deferred',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isEligible
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFE65100),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              InkWell(
-                onTap: () {
-                  QrPassModalView.show(
-                    context,
-                    donorName: donorName,
-                    bloodType: bloodType,
-                    donorId: donorId,
-                    isEligible: isEligible,
-                  );
-                },
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: ResQTheme.primaryCrimson,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'BLOOD',
-                        style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        bloodType,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
                 ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // Blood Type Badge
+          InkWell(
+            onTap: () {
+              QrPassModalView.show(
+                context,
+                donorName: donorName,
+                bloodType: bloodType,
+                donorId: donorId,
+                isEligible: isEligible,
+              );
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: ResQTheme.primaryCrimson,
+                borderRadius: BorderRadius.circular(14),
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'BLOOD',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    bloodType,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
