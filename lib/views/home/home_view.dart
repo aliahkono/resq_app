@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
+import 'package:resq/views/appointment/eligible_appoint_view.dart';
+import 'package:resq/views/appointment/ineligible_appoint_view.dart';
+import 'package:resq/views/appointment/no_active_sched_view.dart';
+import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
@@ -55,6 +59,7 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildBody() {
     switch (_currentTabIndex) {
+    // TAB 0: Home Dashboard
       case 0:
         return _effectiveResult.isEligible
             ? EligibleHomeView(isFirstTimeDonor: _isFirstTime)
@@ -62,10 +67,48 @@ class _HomeViewState extends State<HomeView> {
           classificationResult: _effectiveResult,
           isFirstTimeDonor: _isFirstTime,
         );
+
+    // TAB 1: Schedule / Appointment View (INTEGRATED HERE)
       case 1:
-        return const Center(child: Text('Donation Appointments & Schedule'));
+        return _effectiveResult.isEligible
+            ? NoActiveSchedView(
+          isFirstTimeDonor: _isFirstTime,
+          onBookAppointment: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => EligibleAppointView(
+                  isFirstTimeDonor: _isFirstTime,
+                  onBookingCompleted: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Appointment slot confirmed successfully!'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        )
+            : IneligibleAppointView(
+          isFirstTimeDonor: _isFirstTime,
+          daysRemaining: _effectiveResult.daysRemaining,
+          onRefreshScreening: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const RegistrationWizView(),
+              ),
+            );
+          },
+        );
+
+    // TAB 2: Profile & Settings
       case 2:
         return const Center(child: Text('Donor Profile & Settings'));
+
       default:
         return const SizedBox.shrink();
     }
