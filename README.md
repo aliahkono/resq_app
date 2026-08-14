@@ -39,5 +39,6 @@ lib/
     ├── home/          # Active (eligible) & deferred (ineligible) donor dashboards
     ├── onboarding/    # Interactive onboarding walkthrough
     ├── profile/       # Impact statistics & QR check-in pass modal
-    ├── settings/      # App preferences & notification controls
+    ├── settings/      # App preferences & notification controls    
+    ├── widgets/       # App custom bottom navigation bar
     └── splash/        # 5-phase animated SplashScreen
