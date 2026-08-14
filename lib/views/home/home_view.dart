@@ -7,15 +7,22 @@ import 'package:resq/views/appointment/no_active_sched_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
+import 'package:resq/views/profile/donor_profile_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
 
 class HomeView extends StatefulWidget {
+  final String donorName;
+  final String bloodType;
+  final String donorId;
   final ScreenNPTModel? screeningModel;
   final ClassificationResult? classificationResult;
   final bool isFirstTimeDonor;
 
   const HomeView({
     super.key,
+    this.donorName = '',
+    this.bloodType = '',
+    this.donorId = '',
     this.screeningModel,
     this.classificationResult,
     this.isFirstTimeDonor = true,
@@ -59,7 +66,6 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildBody() {
     switch (_currentTabIndex) {
-    // TAB 0: Home Dashboard
       case 0:
         return _effectiveResult.isEligible
             ? EligibleHomeView(isFirstTimeDonor: _isFirstTime)
@@ -68,7 +74,6 @@ class _HomeViewState extends State<HomeView> {
           isFirstTimeDonor: _isFirstTime,
         );
 
-    // TAB 1: Schedule / Appointment View (INTEGRATED HERE)
       case 1:
         return _effectiveResult.isEligible
             ? NoActiveSchedView(
@@ -105,9 +110,15 @@ class _HomeViewState extends State<HomeView> {
           },
         );
 
-    // TAB 2: Profile & Settings
       case 2:
-        return const Center(child: Text('Donor Profile & Settings'));
+        return DonorProfileView(
+          screeningModel: widget.screeningModel,
+          classificationResult: _effectiveResult,
+          isFirstTimeDonor: _isFirstTime,
+          donorName: widget.donorName,
+          bloodType: widget.bloodType,
+          donorId: widget.donorId,
+        );
 
       default:
         return const SizedBox.shrink();

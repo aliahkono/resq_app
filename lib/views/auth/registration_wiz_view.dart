@@ -110,17 +110,22 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     // 1. Construct screening model from user inputs
     final screeningModel = _buildScreeningModel();
 
-    // 2. Evaluate eligibility directly using model's method
+    // 2. Evaluate eligibility using model's decision tree classifier
     final classificationResult = screeningModel.evaluateEligibility();
 
-    // 3. Navigate to OTP view passing model and evaluation results
+    // 3. Generate a dynamic Donor ID based on timestamp
+    final String generatedDonorId =
+        'RESQ-PH-${DateTime.now().year}-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
+
+    // 4. Navigate to OTP passing user's real registration data
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => OtpVerView(
-          phoneNumber: _phoneController.text.isEmpty
-              ? '09123456789'
-              : _phoneController.text,
-          email: _emailController.text,
+          phoneNumber: _phoneController.text.trim(),
+          email: _emailController.text.trim(),
+          donorName: _fullNameController.text.trim(),
+          bloodType: _selectedBloodType,
+          donorId: generatedDonorId,
           screeningModel: screeningModel,
           classificationResult: classificationResult,
         ),
@@ -172,7 +177,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                       ),
                       Text(
                         _getStepTitle(_currentStep),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: ResQTheme.textMuted,

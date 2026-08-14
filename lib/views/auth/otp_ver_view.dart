@@ -10,13 +10,19 @@ enum OtpVerificationMode { phone, email }
 class OtpVerView extends StatefulWidget {
   final String phoneNumber;
   final String email;
+  final String donorName;
+  final String bloodType;
+  final String donorId;
   final ScreenNPTModel? screeningModel;
   final ClassificationResult? classificationResult;
 
   const OtpVerView({
     super.key,
     required this.phoneNumber,
-    this.email = 'donor@resq.ph',
+    required this.email,
+    required this.donorName,
+    required this.bloodType,
+    required this.donorId,
     this.screeningModel,
     this.classificationResult,
   });
@@ -45,8 +51,8 @@ class _OtpVerViewState extends State<OtpVerView> {
   void initState() {
     super.initState();
     _verificationMode = OtpVerificationMode.phone;
-    _phoneNumber = widget.phoneNumber.isEmpty ? '09123456789' : widget.phoneNumber;
-    _email = widget.email.isEmpty ? 'donor@resq.ph' : widget.email;
+    _phoneNumber = widget.phoneNumber;
+    _email = widget.email;
     _startResendTimer();
   }
 
@@ -146,7 +152,6 @@ class _OtpVerViewState extends State<OtpVerView> {
     );
   }
 
-  // --- Modal to Change Contact Details ---
   void _showChangeContactModal() {
     final isPhone = _verificationMode == OtpVerificationMode.phone;
     final editController = TextEditingController(text: isPhone ? _phoneNumber : _email);
@@ -250,7 +255,6 @@ class _OtpVerViewState extends State<OtpVerView> {
     );
   }
 
-  // --- Success Modal ---
   void _showSuccessDialog() {
     showDialog(
       context: context,
@@ -306,10 +310,12 @@ class _OtpVerViewState extends State<OtpVerView> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pop();
-                    // FIXED: Pass screening parameters forward to HomeView router
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
                         builder: (context) => HomeView(
+                          donorName: widget.donorName,
+                          bloodType: widget.bloodType,
+                          donorId: widget.donorId,
                           screeningModel: widget.screeningModel,
                           classificationResult: widget.classificationResult,
                           isFirstTimeDonor:
@@ -366,8 +372,6 @@ class _OtpVerViewState extends State<OtpVerView> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 8),
-
-              // Shield Badge
               Container(
                 width: 72,
                 height: 72,
@@ -383,9 +387,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               Text(
                 'Verification Code',
                 style: ResQTheme.heading1.copyWith(
@@ -394,10 +396,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   color: ResQTheme.textDark,
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // VERIFICATION METHOD TOGGLE SWITCH
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -499,10 +498,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // Contact Target Text & Change Link
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
@@ -527,9 +523,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 4),
-
               TextButton.icon(
                 onPressed: _showChangeContactModal,
                 icon: Icon(Icons.edit_outlined, size: 14, color: ResQTheme.primaryCrimson),
@@ -550,10 +544,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
-
               const SizedBox(height: 28),
-
-              // 6-Digit Code Inputs
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(
@@ -612,7 +603,6 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ),
                 ),
               ),
-
               if (_hasError) ...[
                 const SizedBox(height: 12),
                 Row(
@@ -631,9 +621,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ],
                 ),
               ],
-
               const SizedBox(height: 24),
-
               _canResend
                   ? TextButton(
                 onPressed: _resendCode,
@@ -655,9 +643,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-
               const SizedBox(height: 28),
-
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -691,7 +677,6 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
             ],
           ),
