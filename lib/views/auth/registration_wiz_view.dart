@@ -220,22 +220,22 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 12),
+
+            // ResQ Logo Badge with rq_logo_white.png
             Container(
-              width: 100,
-              height: 100,
-              decoration: const BoxDecoration(color: Color(0xFF7D2229), shape: BoxShape.circle),
-              child: Center(
-                child: RichText(
-                  text: const TextSpan(
-                    style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white),
-                    children: [
-                      TextSpan(text: 'R'),
-                      TextSpan(text: 'Q', style: TextStyle(color: Color(0xFFFFA726))),
-                    ],
-                  ),
-                ),
+              width: 96,
+              height: 96,
+              decoration: const BoxDecoration(
+                color: Color(0xFF7D2229),
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(18),
+              child: Image.asset(
+                'assets/images/rq_logo_white.png',
+                fit: BoxFit.contain,
               ),
             ),
+
             const SizedBox(height: 20),
             Text('Create Your Account', style: ResQTheme.heading1.copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
@@ -1049,11 +1049,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // --- Helpers ---
+  // --- Header with rq_logo_white.png ---
   Widget _buildCurvedHeader(String title) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 48, bottom: 20, left: 24, right: 24),
+      padding: const EdgeInsets.only(top: 48, bottom: 20, left: 20, right: 24),
       decoration: const BoxDecoration(
         color: Color(0xFF7D2229),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
@@ -1064,21 +1064,20 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
             onPressed: _previousPage,
           ),
-          const SizedBox(width: 8),
-          RichText(
-            text: const TextSpan(
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-              children: [
-                TextSpan(text: 'R'),
-                TextSpan(text: 'Q', style: TextStyle(color: Color(0xFFFFA726))),
-              ],
-            ),
+          const SizedBox(width: 4),
+          Image.asset(
+            'assets/images/rq_logo_white.png',
+            height: 32,
+            fit: BoxFit.contain,
           ),
           const SizedBox(width: 12),
           Container(width: 1.5, height: 24, color: Colors.white70),
           const SizedBox(width: 12),
           const Expanded(
-            child: Text('Connect, Save Lives, On time.', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+            child: Text(
+              'Connect, Save Lives, On time.',
+              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+            ),
           ),
         ],
       ),
