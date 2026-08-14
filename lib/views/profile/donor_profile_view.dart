@@ -5,6 +5,7 @@ import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/utils/helpers/eligibility_rules.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
+import 'package:resq/views/settings/settings_view.dart';
 
 class DonorProfileView extends StatelessWidget {
   final ScreenNPTModel? screeningModel;
@@ -59,7 +60,7 @@ class DonorProfileView extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // 2. Status & Metric Section
+              // 2. Status & Metric Section (Figma branches)
               if (isEligible && !isFirstTimeDonor)
                 _buildActiveEligibleStats()
               else if (isEligible && isFirstTimeDonor)
@@ -77,7 +78,7 @@ class DonorProfileView extends StatelessWidget {
               const SizedBox(height: 24),
 
               // 4. Settings & Account Actions
-              _buildProfileActionsList(context),
+              _buildProfileActionsList(context, isEligible),
 
               const SizedBox(height: 24),
             ],
@@ -397,7 +398,7 @@ class DonorProfileView extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileActionsList(BuildContext context) {
+  Widget _buildProfileActionsList(BuildContext context, bool isEligible) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -415,7 +416,7 @@ class DonorProfileView extends StatelessWidget {
                 donorName: donorName,
                 bloodType: bloodType,
                 donorId: donorId,
-                isEligible: classificationResult?.isEligible ?? true,
+                isEligible: isEligible,
               );
             },
           ),
@@ -437,15 +438,13 @@ class DonorProfileView extends StatelessWidget {
           ),
           const Divider(height: 1),
           _buildActionTile(
-            Icons.health_and_safety_outlined,
-            'NVBSP Donor Guidelines',
-                () {},
-          ),
-          const Divider(height: 1),
-          _buildActionTile(
-            Icons.lock_outline_rounded,
-            'Account Security',
-                () {},
+            Icons.settings_outlined,
+            'Account Settings & Preferences',
+                () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SettingsView()),
+              );
+            },
           ),
         ],
       ),
