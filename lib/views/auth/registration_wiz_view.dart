@@ -29,7 +29,7 @@ class RegistrationWizView extends StatefulWidget {
 class _RegistrationWizViewState extends State<RegistrationWizView> {
   late PageController _pageController;
   late int _currentStep;
-  late int _totalSteps;
+  final int _totalSteps = 4; // 1: Account, 2: Physical Metrics, 3: Sex Screening, 4: Final Confirmation
 
   // STEP 1: Account Credentials
   late final TextEditingController _fullNameController;
@@ -68,7 +68,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   void initState() {
     super.initState();
     _currentStep = widget.isRetake ? 1 : 0;
-    _totalSteps = 3;
     _pageController = PageController(initialPage: _currentStep);
 
     _fullNameController = TextEditingController(text: widget.donorName);
@@ -203,9 +202,70 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           _buildStep1Account(),
           _buildStep2PhysicalMetrics(),
           _buildStep3FinalScreening(),
+          _buildStep4AlmostReady(),
         ],
       ),
     );
+  }
+
+  // --- Step Indicator Bar ---
+  Widget _buildStepProgressBar() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'STEP ${_currentStep + 1} OF $_totalSteps',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                  color: Color(0xFF7D2229),
+                ),
+              ),
+              Text(
+                _getStepTitle(_currentStep),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(_totalSteps, (index) {
+            final isCompletedOrCurrent = index <= _currentStep;
+            return Expanded(
+              child: Container(
+                height: 4,
+                margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 6.0 : 0.0),
+                decoration: BoxDecoration(
+                  color: isCompletedOrCurrent ? const Color(0xFF7D2229) : const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  String _getStepTitle(int step) {
+    switch (step) {
+      case 0:
+        return 'Account Setup';
+      case 1:
+        return 'Physical Metrics';
+      case 2:
+        return 'Health Screening';
+      case 3:
+        return 'Review & Confirm';
+      default:
+        return '';
+    }
   }
 
   // ===========================================================================
@@ -219,33 +279,34 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 12),
+            _buildStepProgressBar(),
+            const SizedBox(height: 16),
 
-            // ResQ Logo Badge with rq_logo_white.png
+            // Logo Asset
             Container(
-              width: 96,
-              height: 96,
+              width: 90,
+              height: 90,
               decoration: const BoxDecoration(
                 color: Color(0xFF7D2229),
                 shape: BoxShape.circle,
               ),
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               child: Image.asset(
                 'assets/images/rq_logo_white.png',
                 fit: BoxFit.contain,
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Text('Create Your Account', style: ResQTheme.heading1.copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text('Join our community of lifesaving donors.', style: TextStyle(color: ResQTheme.textMuted, fontSize: 13)),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             _buildCustomInput(controller: _fullNameController, hint: 'Full Name', icon: Icons.person_outline_rounded),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             _buildCustomInput(controller: _emailController, hint: 'Email', icon: Icons.mail_outline_rounded, keyboardType: TextInputType.emailAddress),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             Container(
               decoration: BoxDecoration(
@@ -274,21 +335,21 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Icon(Icons.info_outline, color: Color(0xFF7D2229), size: 16),
+                Icon(Icons.info_outline, color: Color(0xFF7D2229), size: 15),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    "We'll send a 6-digit verification code via SMS to this number. Standard rates may apply.",
+                    "We'll send a 6-digit verification code via SMS to this number.",
                     style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.3),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             _buildCustomInput(
               controller: _passwordController,
@@ -305,7 +366,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               alignment: Alignment.centerLeft,
               child: Text('Must be at least 8 characters with a number & symbol.', style: TextStyle(fontSize: 10.5, color: Colors.black54)),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             _buildCustomInput(
               controller: _confirmPasswordController,
@@ -317,10 +378,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
@@ -334,26 +395,19 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                       color: const Color(0xFF7D2229).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.shield_outlined, color: Color(0xFF7D2229), size: 20),
+                    child: const Icon(Icons.shield_outlined, color: Color(0xFF7D2229), size: 18),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7D2229))),
-                        SizedBox(height: 2),
-                        Text(
-                          'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
-                          style: TextStyle(fontSize: 10.5, color: Colors.black54, height: 1.3),
-                        ),
-                      ],
+                    child: Text(
+                      'Privacy Guaranteed: Encrypted strictly for medical eligibility checks.',
+                      style: TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -365,11 +419,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton(
                 onPressed: _nextPage,
                 style: ElevatedButton.styleFrom(
@@ -380,14 +434,14 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
-                    Text('Continue to Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text('Continue to Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                     SizedBox(width: 8),
                     Icon(Icons.arrow_forward_rounded, size: 18),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -404,10 +458,13 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildStepProgressBar(),
+                const SizedBox(height: 16),
+
                 Text(widget.isRetake ? 'Update Physical Metrics' : 'Physical Metrics', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 const Text(
@@ -716,7 +773,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('CONTINUE TO FINAL SCREENING', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    child: const Text('CONTINUE TO HEALTH SCREENING', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -729,22 +786,25 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   }
 
   // ===========================================================================
-  // STEP 3: Final Screening
+  // STEP 3: Sex-Specific Screening
   // ===========================================================================
   Widget _buildStep3FinalScreening() {
     return Column(
       children: [
-        _buildCurvedHeader(widget.isRetake ? 'Retake Final Screening' : 'Final Screening'),
+        _buildCurvedHeader(widget.isRetake ? 'Retake Health Screening' : 'Health Screening'),
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Final Screening', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                _buildStepProgressBar(),
+                const SizedBox(height: 16),
+
+                const Text('Health Screening', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text('Additional questions based on the biological sex.', style: TextStyle(color: Colors.black54, fontSize: 12.5)),
+                const Text('Additional questions based on biological sex.', style: TextStyle(color: Colors.black54, fontSize: 12.5)),
                 const SizedBox(height: 16),
 
                 if (_selectedGender == BioSex.female) ...[
@@ -992,37 +1052,111 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _nextPage,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7D2229),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('PROCEED TO CONFIRMATION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // STEP 4: Review & Almost Ready Confirmation
+  // ===========================================================================
+  Widget _buildStep4AlmostReady() {
+    final double weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
+    final sex = _selectedGender == BioSex.female ? 'Female' : 'Male';
+
+    return Column(
+      children: [
+        _buildCurvedHeader(widget.isRetake ? 'Review & Update' : 'Almost Ready'),
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStepProgressBar(),
                 const SizedBox(height: 20),
 
+                // Shield Icon & Banner
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: ResQTheme.lightBorder),
                   ),
                   child: Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(12),
                         decoration: const BoxDecoration(color: Color(0xFF7D2229), shape: BoxShape.circle),
-                        child: const Icon(Icons.shield_outlined, color: Colors.white, size: 24),
+                        child: const Icon(Icons.shield_outlined, color: Colors.white, size: 28),
                       ),
-                      const SizedBox(height: 8),
-                      Text(widget.isRetake ? 'Update Assessment' : 'Almost Ready', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.isRetake ? 'Update Assessment' : 'Almost Ready',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
                         widget.isRetake
-                            ? 'Submitting these updated details will re-evaluate your donor eligibility status in real-time.'
+                            ? 'Review your updated metrics below. Submitting will evaluate your donor eligibility status in real-time.'
                             : 'Completing this registration will book your appointment slot at the Downtown Clinical Center.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 11.5, color: Colors.black54, height: 1.3),
+                        style: const TextStyle(fontSize: 12, color: Colors.black54, height: 1.35),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+
+                const SizedBox(height: 20),
+
+                // Summary Card
+                const Text('Screening Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: ResQTheme.lightBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildSummaryRow('Blood Type', _selectedBloodType.isEmpty ? 'Not sure' : _selectedBloodType),
+                      const Divider(height: 16),
+                      _buildSummaryRow('Biological Sex', sex),
+                      const Divider(height: 16),
+                      _buildSummaryRow('Weight', '$weight kg'),
+                      const Divider(height: 16),
+                      _buildSummaryRow('Age', '$_calculatedAge years old'),
+                      const Divider(height: 16),
+                      _buildSummaryRow('First Time Donor', _isFirstTimeDonating ? 'Yes' : 'No'),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 28),
 
                 SizedBox(
                   width: double.infinity,
@@ -1036,7 +1170,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                     ),
                     child: Text(
                       widget.isRetake ? 'EVALUATE ELIGIBILITY' : 'COMPLETE REGISTRATION',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.6),
                     ),
                   ),
                 ),
@@ -1045,6 +1179,16 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12.5)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7D2229))),
       ],
     );
   }
