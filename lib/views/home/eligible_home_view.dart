@@ -1,12 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 
+class EmergencyBloodRequest {
+  final String id;
+  final String hospital;
+  final String bloodType;
+  final String urgency;
+  final String distance;
+  final int unitsNeeded;
+  final String timeAgo;
+
+  EmergencyBloodRequest({
+    required this.id,
+    required this.hospital,
+    required this.bloodType,
+    required this.urgency,
+    required this.distance,
+    required this.unitsNeeded,
+    required this.timeAgo,
+  });
+}
+
 class EligibleHomeView extends StatelessWidget {
   final bool isFirstTimeDonor;
+  final String donorName;
+  final List<EmergencyBloodRequest> activeRequests;
+  final Function(EmergencyBloodRequest)? onAcceptRequest;
 
   const EligibleHomeView({
     super.key,
     this.isFirstTimeDonor = false,
+    this.donorName = 'Donor',
+    this.activeRequests = const [],
+    this.onAcceptRequest,
   });
 
   @override
@@ -38,7 +64,7 @@ class EligibleHomeView extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // Urgent Emergency Broadcast Request Feed
+              // Requests Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -50,40 +76,33 @@ class EligibleHomeView extends StatelessWidget {
                       color: ResQTheme.textDark,
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'View All',
-                      style: TextStyle(
-                        color: ResQTheme.primaryCrimson,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                  if (activeRequests.isNotEmpty)
+                    TextButton(
+                      onPressed: () {},
+                      child: Text(
+                        'View All (${activeRequests.length})',
+                        style: TextStyle(
+                          color: ResQTheme.primaryCrimson,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
 
               const SizedBox(height: 12),
 
-              // Emergency Feed Cards
-              _buildRequestCard(
-                hospital: 'St. Jude Medical Center',
-                bloodType: 'O-',
-                urgency: 'CODE RED EMERGENCY',
-                distance: '1.2 km away',
-                unitsNeeded: 3,
-                timeAgo: '12m ago',
-              ),
-              const SizedBox(height: 12),
-              _buildRequestCard(
-                hospital: 'Quezon Medical Center',
-                bloodType: 'A+',
-                urgency: 'URGENT REQUIREMENT',
-                distance: '3.5 km away',
-                unitsNeeded: 2,
-                timeAgo: '28m ago',
-              ),
+              // Dynamic Content: Empty State vs Live Broadcast Requests
+              if (activeRequests.isEmpty)
+                _buildNoRequestsEmptyState()
+              else
+                ...activeRequests.map(
+                      (request) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: _buildRequestCard(request),
+                  ),
+                ),
 
               const SizedBox(height: 24),
             ],
@@ -101,15 +120,22 @@ class EligibleHomeView extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: ResQTheme.primaryCrimson.withOpacity(0.1),
-              child: Icon(Icons.person, color: ResQTheme.primaryCrimson),
+              backgroundColor: ResQTheme.primaryCrimson.withValues(alpha: 0.1),
+              child: Text(
+                donorName.isNotEmpty ? donorName[0].toUpperCase() : 'D',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: ResQTheme.primaryCrimson,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hello, Donor!',
+                  'Hello, $donorName!',
                   style: ResQTheme.heading2.copyWith(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -117,7 +143,7 @@ class EligibleHomeView extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  isFirstTimeDonor ? 'First-Time Hero' : 'Life Saver • 4 Donations',
+                  isFirstTimeDonor ? 'First-Time Hero' : 'Life Saver • Verified Donor',
                   style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
                 ),
               ],
@@ -157,7 +183,7 @@ class EligibleHomeView extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Ready for immediate slot reservation',
+                  'Active on standby for emergency hospital broadcasts',
                   style: TextStyle(color: Color(0xFF388E3C), fontSize: 11.5),
                 ),
               ],
@@ -183,23 +209,13 @@ class EligibleHomeView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Welcome to Your 1st Donation!',
+            'Ready for Your 1st Contribution!',
             style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Complete your donor profile and complete quick physical screening at the hospital to save up to 3 lives today.',
+            'You are registered and fully eligible. When local hospitals broadcast urgent blood needs matching your blood type, you will be notified immediately.',
             style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: ResQTheme.primaryCrimson,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('VIEW DONOR CHECKLIST', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ],
       ),
@@ -213,23 +229,23 @@ class EligibleHomeView extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your Lifetime Impact',
+            'Donor Status & Readiness',
             style: ResQTheme.heading3.copyWith(fontSize: 15, fontWeight: FontWeight.bold, color: ResQTheme.textDark),
           ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildMetric('Donations', '4x', Icons.water_drop_rounded),
-              _buildMetric('Lives Saved', '12', Icons.favorite_rounded),
-              _buildMetric('Rank', 'Hero', Icons.verified_rounded),
+              _buildMetric('Readiness', 'Active', Icons.bolt_rounded),
+              _buildMetric('Queue Priority', 'High', Icons.priority_high_rounded),
+              _buildMetric('Status', 'Verified', Icons.verified_rounded),
             ],
           ),
         ],
@@ -242,27 +258,70 @@ class EligibleHomeView extends StatelessWidget {
       children: [
         Icon(icon, color: ResQTheme.primaryCrimson, size: 24),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         Text(label, style: TextStyle(color: ResQTheme.textMuted, fontSize: 11)),
       ],
     );
   }
 
-  Widget _buildRequestCard({
-    required String hospital,
-    required String bloodType,
-    required String urgency,
-    required String distance,
-    required int unitsNeeded,
-    required String timeAgo,
-  }) {
+  // Empty State when no hospital admin has broadcasted a blood request
+  Widget _buildNoRequestsEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ResQTheme.lightBorder),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: ResQTheme.primaryCrimson.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.notifications_active_outlined,
+              size: 36,
+              color: ResQTheme.primaryCrimson,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Active Blood Requests',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: ResQTheme.textDark,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Nearby hospitals currently have adequate supplies. You will receive an instant push notification when an emergency request is pinged.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: ResQTheme.textMuted,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Dynamic Emergency Request Card
+  Widget _buildRequestCard(EmergencyBloodRequest request) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -274,15 +333,15 @@ class EligibleHomeView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: ResQTheme.primaryCrimson.withOpacity(0.1),
+                  color: ResQTheme.primaryCrimson.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  urgency,
+                  request.urgency,
                   style: TextStyle(color: ResQTheme.primaryCrimson, fontWeight: FontWeight.bold, fontSize: 11),
                 ),
               ),
-              Text(timeAgo, style: TextStyle(color: ResQTheme.textMuted, fontSize: 11)),
+              Text(request.timeAgo, style: TextStyle(color: ResQTheme.textMuted, fontSize: 11)),
             ],
           ),
           const SizedBox(height: 12),
@@ -297,7 +356,7 @@ class EligibleHomeView extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    bloodType,
+                    request.bloodType,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -307,8 +366,8 @@ class EligibleHomeView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(hospital, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text('$distance • $unitsNeeded Units Needed', style: TextStyle(color: ResQTheme.textMuted, fontSize: 12)),
+                    Text(request.hospital, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text('${request.distance} • ${request.unitsNeeded} Units Needed', style: TextStyle(color: ResQTheme.textMuted, fontSize: 12)),
                   ],
                 ),
               ),
@@ -318,7 +377,7 @@ class EligibleHomeView extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: onAcceptRequest != null ? () => onAcceptRequest!(request) : () {},
               style: ElevatedButton.styleFrom(
                 backgroundColor: ResQTheme.primaryCrimson,
                 foregroundColor: Colors.white,
