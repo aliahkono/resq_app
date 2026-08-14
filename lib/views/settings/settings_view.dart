@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 
 class SettingsView extends StatefulWidget {
-  const SettingsView({super.key});
+  final ScreenNPTModel? screeningModel;
+  final String donorName;
+  final String bloodType;
+  final String donorId;
+  final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
+
+  const SettingsView({
+    super.key,
+    this.screeningModel,
+    this.donorName = '',
+    this.bloodType = '',
+    this.donorId = '',
+    this.onRetakeCompleted,
+  });
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -80,7 +95,7 @@ class _SettingsViewState extends State<SettingsView> {
 
               const SizedBox(height: 24),
 
-              // SECTION 2: Account & Security
+              // SECTION 2: Account & Security (Retake Screening linked here)
               _buildSectionHeader('Account & Security'),
               const SizedBox(height: 8),
               _buildSettingsCard([
@@ -108,7 +123,31 @@ class _SettingsViewState extends State<SettingsView> {
                   subtitle: 'Re-evaluate clinical donor parameters',
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const RegistrationWizView()),
+                      MaterialPageRoute(
+                        builder: (context) => RegistrationWizView(
+                          isRetake: true,
+                          initialScreening: widget.screeningModel,
+                          donorName: widget.donorName,
+                          bloodType: widget.bloodType,
+                          donorId: widget.donorId,
+                          onRetakeCompleted: (updatedModel, result) {
+                            if (widget.onRetakeCompleted != null) {
+                              widget.onRetakeCompleted!(updatedModel, result);
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result.isEligible
+                                      ? 'Assessment updated: You are now verified eligible!'
+                                      : 'Assessment updated: Deferred (${result.status.name})',
+                                ),
+                                backgroundColor: result.isEligible ? Colors.green : Colors.orange,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     );
                   },
                 ),

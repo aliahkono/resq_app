@@ -14,6 +14,7 @@ class DonorProfileView extends StatelessWidget {
   final String donorName;
   final String bloodType;
   final String donorId;
+  final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onProfileUpdated;
 
   const DonorProfileView({
     super.key,
@@ -23,6 +24,7 @@ class DonorProfileView extends StatelessWidget {
     required this.donorName,
     required this.bloodType,
     required this.donorId,
+    this.onProfileUpdated,
   });
 
   @override
@@ -55,7 +57,7 @@ class DonorProfileView extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // 1. Digital Donor Card
+              // 1. Digital Donor Card (With Overflow Protection)
               _buildDonorCard(context, isEligible, isFirstTimeDonor),
 
               const SizedBox(height: 20),
@@ -105,7 +107,6 @@ class DonorProfileView extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Avatar
           CircleAvatar(
             radius: 28,
             backgroundColor: ResQTheme.primaryCrimson.withValues(alpha: 0.1),
@@ -119,14 +120,12 @@ class DonorProfileView extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-
-          // Name, Role & Status Pill
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  donorName,
+                  donorName.isNotEmpty ? donorName : 'Volunteer Donor',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -184,10 +183,7 @@ class DonorProfileView extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(width: 10),
-
-          // Blood Type Badge
           InkWell(
             onTap: () {
               QrPassModalView.show(
@@ -217,7 +213,7 @@ class DonorProfileView extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    bloodType,
+                    bloodType.isNotEmpty ? bloodType : 'N/A',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,
@@ -395,8 +391,8 @@ class DonorProfileView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildClinicalItem('Biological Sex', sex),
-              _buildClinicalItem('Age', '$age yrs'),
-              _buildClinicalItem('Weight', '$weight kg'),
+              _buildClinicalItem('Age', age > 0 ? '$age yrs' : 'N/A'),
+              _buildClinicalItem('Weight', weight > 0 ? '$weight kg' : 'N/A'),
             ],
           ),
         ],
@@ -448,7 +444,16 @@ class DonorProfileView extends StatelessWidget {
             'Retake Health Assessment',
                 () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const RegistrationWizView()),
+                MaterialPageRoute(
+                  builder: (context) => RegistrationWizView(
+                    isRetake: true,
+                    initialScreening: screeningModel,
+                    donorName: donorName,
+                    bloodType: bloodType,
+                    donorId: donorId,
+                    onRetakeCompleted: onProfileUpdated,
+                  ),
+                ),
               );
             },
           ),
@@ -458,7 +463,15 @@ class DonorProfileView extends StatelessWidget {
             'Account Settings & Preferences',
                 () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const SettingsView()),
+                MaterialPageRoute(
+                  builder: (context) => SettingsView(
+                    screeningModel: screeningModel,
+                    donorName: donorName,
+                    bloodType: bloodType,
+                    donorId: donorId,
+                    onRetakeCompleted: onProfileUpdated,
+                  ),
+                ),
               );
             },
           ),
