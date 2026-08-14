@@ -3,6 +3,7 @@ import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
+import 'package:resq/widgets/custom_bot_nav_bar.dart';
 
 class HomeView extends StatefulWidget {
   final ScreenNPTModel? screeningModel;
@@ -21,6 +22,7 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
+  int _currentTabIndex = 0;
   bool _isLoading = true;
   late ClassificationResult _effectiveResult;
   late bool _isFirstTime;
@@ -32,7 +34,6 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _evaluateEligibility() async {
-    // 1. If explicit result was passed during registration/login, use it
     if (widget.classificationResult != null) {
       _effectiveResult = widget.classificationResult!;
       _isFirstTime = widget.isFirstTimeDonor;
@@ -40,7 +41,6 @@ class _HomeViewState extends State<HomeView> {
       _effectiveResult = widget.screeningModel!.evaluateEligibility();
       _isFirstTime = widget.screeningModel!.screensNPT.isFirstTimeDonor;
     } else {
-      // 2. Default fallback or simulate fetching stored profile screening state
       await Future.delayed(const Duration(milliseconds: 300));
       _effectiveResult = ClassificationResult(status: EligibleStats.eligible);
       _isFirstTime = widget.isFirstTimeDonor;
@@ -50,6 +50,24 @@ class _HomeViewState extends State<HomeView> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Widget _buildBody() {
+    switch (_currentTabIndex) {
+      case 0:
+        return _effectiveResult.isEligible
+            ? EligibleHomeView(isFirstTimeDonor: _isFirstTime)
+            : IneligibleHomeView(
+          classificationResult: _effectiveResult,
+          isFirstTimeDonor: _isFirstTime,
+        );
+      case 1:
+        return const Center(child: Text('Donation Appointments & Schedule'));
+      case 2:
+        return const Center(child: Text('Donor Profile & Settings'));
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -63,14 +81,16 @@ class _HomeViewState extends State<HomeView> {
       );
     }
 
-    // Route to Eligible or Ineligible Home View based on Decision Tree classification
-    return _effectiveResult.isEligible
-        ? EligibleHomeView(
-      isFirstTimeDonor: _isFirstTime,
-    )
-        : IneligibleHomeView(
-      classificationResult: _effectiveResult,
-      isFirstTimeDonor: _isFirstTime,
+    return Scaffold(
+      body: _buildBody(),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: _currentTabIndex,
+        onTap: (index) {
+          setState(() {
+            _currentTabIndex = index;
+          });
+        },
+      ),
     );
   }
 }
