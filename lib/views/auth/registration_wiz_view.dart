@@ -3,6 +3,7 @@ import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/otp_ver_view.dart';
+import 'package:resq/views/auth/login_view.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
@@ -414,8 +415,20 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               children: [
                 const Text('Already have an account? ', style: TextStyle(fontSize: 12, color: Colors.black54)),
                 InkWell(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const Text('Log In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7D2229))),
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginView()),
+                    );
+                  },
+                  child: const Text(
+                    'Log In',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF7D2229),
+                    ),
+                  ),
                 ),
               ],
             ),
