@@ -33,8 +33,8 @@ class EligibleHomeView extends StatelessWidget {
   const EligibleHomeView({
     super.key,
     this.isFirstTimeDonor = false,
-    this.donorName = 'Donor',
-    this.bloodType = 'O+',
+    this.donorName = '',
+    this.bloodType = '',
     this.activeRequests = const [],
     this.onAcceptRequest,
   });
