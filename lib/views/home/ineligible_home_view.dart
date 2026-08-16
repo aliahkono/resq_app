@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/utils/helpers/eligibility_rules.dart';
+import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 
@@ -54,24 +55,150 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     final String clearanceDateStr = _formatClearanceDate(effectiveDays);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEBEBEB),
+      backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
           children: [
             _buildTopHeader(context),
+            _buildIneligibilityBanner(reasonTitle),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                child: widget.isFirstTimeDonor
-                    ? _buildFirstTimeDonorLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr)
-                    : _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr),
+                child: Column(
+                  children: [
+                    if (widget.isFirstTimeDonor)
+                      _buildFirstTimeDonorLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr)
+                    else
+                      _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr),
+                    
+                    const SizedBox(height: 20),
+                    _buildActionCard(context, status),
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildIneligibilityBanner(String reason) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFEF2F2),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'CURRENT STATUS: TEMPORARILY DEFERRED ($reason)',
+              style: const TextStyle(
+                color: Color(0xFF991B1B),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(BuildContext context, EligibleStats status) {
+    bool canRetake = status == EligibleStats.deferredAlcohol || 
+                    status == EligibleStats.deferredMensCycle || 
+                    status == EligibleStats.deferredMedical;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Recommended Action',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _getRecommendedAction(status),
+            style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+          ),
+          const SizedBox(height: 20),
+          if (canRetake)
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RegistrationWizView(isRetake: true),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7D1B22),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: const Text('Update My Health Status', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                   _showInfoModal(context, 'Deferral Policy', 'This deferral is based on clinical safety guidelines. Our team is here to help you return to eligibility safely.');
+                },
+                icon: const Icon(Icons.info_outline, size: 18),
+                label: const Text('Understand Deferral Policy'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF7D1B22),
+                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _getRecommendedAction(EligibleStats status) {
+    switch (status) {
+      case EligibleStats.deferredWeight:
+        return "Focus on a balanced diet rich in proteins and iron. We recommend consulting a nutritionist to reach the 50kg threshold safely.";
+      case EligibleStats.deferredAlcohol:
+        return "Please refrain from alcohol for at least 24 hours. Hydrate well with water and fruit juices before your next attempt.";
+      case EligibleStats.deferredTattsPierce:
+        return "Wait for the mandatory 6-month healing period to conclude. This ensures zero risk of blood-borne transmissions.";
+      case EligibleStats.deferredInterval:
+        return "Your body needs time to replenish its iron stores. Use this period to maintain a healthy lifestyle for your next donation.";
+      default:
+        return "Follow the guidance provided in your screening details. You can update your status once the deferral period has passed.";
+    }
   }
 
   Widget _buildTopHeader(BuildContext context) {

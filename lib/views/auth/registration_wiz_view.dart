@@ -5,6 +5,8 @@ import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/login_view.dart';
 import 'package:resq/views/home/home_view.dart';
 import 'package:resq/widgets/custom_input_field.dart';
+import 'package:resq/model/user_model.dart';
+import 'package:resq/model/donor_profile_model.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
@@ -29,6 +31,7 @@ class RegistrationWizView extends StatefulWidget {
 }
 
 class _RegistrationWizViewState extends State<RegistrationWizView> {
+  final _formKey = GlobalKey<FormState>();
   int _currentStep = 1;
   final int _totalSteps = 3;
   bool _isLoading = false;
@@ -203,18 +206,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
   bool _validateStep() {
     if (_currentStep == 1 && !widget.isRetake) {
-      if (_nameController.text.trim().isEmpty ||
-          _emailController.text.trim().isEmpty ||
-          _passwordController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please complete all required fields.')),
-        );
-        return false;
-      }
-      if (_passwordController.text != _confirmPasswordController.text && _confirmPasswordController.text.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match.')),
-        );
+      if (!(_formKey.currentState?.validate() ?? false)) {
         return false;
       }
     } else if (_currentStep == 2) {
@@ -240,7 +232,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
   Future<void> _finishAssessment() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 900));
+    
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 1200));
 
     final double weight = double.tryParse(_weightController.text.trim()) ?? 52.0;
     int calculatedAge = 22;
@@ -270,22 +264,59 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,
     );
 
-    final String assignedDonorId = widget.donorId ?? 'BD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final String activeDonorName = widget.isRetake
-        ? (widget.donorName ?? 'Donor')
-        : (_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Donor');
-    final String activeBloodType = _selectedBloodType == "I'm not sure" ? 'Unknown' : _selectedBloodType;
+    // 1. Generate / Retrieve IDs
+    final String timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+    final String activeUserId = 'USR-$timestamp';
+    final String activeProfId = widget.donorId ?? 'PRF-$timestamp';
 
+    // 2. Prepare Screening Model
     final ScreenNPTModel finalModel = ScreenNPTModel(
-      donorProfId: assignedDonorId,
+      donorProfId: activeProfId,
       submissionDate: DateTime.now(),
       screensNPT: evaluatedParams,
     );
 
     final ClassificationResult result = finalModel.evaluateEligibility();
 
+    // 3. Permanent Logic: Construct Models for Persistence
+    if (!widget.isRetake) {
+      // Logic for NEW USER Registration
+      final UserModel newUser = UserModel(
+        id: activeUserId,
+        email: _emailController.text.trim(),
+        fullName: _nameController.text.trim(),
+        phoneNum: '+63${_phoneController.text.trim()}',
+        createdAt: DateTime.now(),
+      );
+
+      final DonorProfModel newProfile = DonorProfModel(
+        profId: activeProfId,
+        userId: activeUserId,
+        bloodType: _selectedBloodType == "I'm not sure" ? 'Unknown' : _selectedBloodType,
+        gender: _gender,
+        weight: weight,
+        age: calculatedAge,
+        eligibilityStats: result.status,
+        lastDonationDate: _lastDonationDate,
+      );
+
+      // TODO: IMPLEMENT DATABASE PERSISTENCE HERE
+      // await DatabaseService.saveUserRegistration(newUser, newProfile, finalModel);
+      debugPrint('Persisting New User: ${newUser.fullName} with ID: ${newUser.id}');
+    } else {
+      // Logic for EXISTING USER Re-assessment (Retake)
+      // TODO: IMPLEMENT DATABASE UPDATE HERE
+      // await DatabaseService.updateEligibility(activeProfId, result.status, finalModel);
+      debugPrint('Updating Eligibility for Profile: $activeProfId to ${result.status.name}');
+    }
+
     if (!mounted) return;
     setState(() => _isLoading = false);
+
+    final String activeDonorName = widget.isRetake
+        ? (widget.donorName ?? 'Donor')
+        : (_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Donor');
+    final String activeBloodType = _selectedBloodType == "I'm not sure" ? 'Unknown' : _selectedBloodType;
 
     if (widget.isRetake) {
       widget.onRetakeCompleted?.call(finalModel, result);
@@ -296,7 +327,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           builder: (context) => HomeView(
             donorName: activeDonorName,
             bloodType: activeBloodType,
-            donorId: assignedDonorId,
+            donorId: activeProfId,
             screeningModel: finalModel,
             classificationResult: result,
             isFirstTimeDonor: _isFirstTimeDonor,
@@ -372,162 +403,164 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   }
 
   // ===========================================================================
-  // STEP 1: CREATE YOUR ACCOUNT (Image 1)
+  // STEP 1: CREATE YOUR ACCOUNT
   // ===========================================================================
   Widget _buildStep1AccountUI() {
-    return Column(
-      children: [
-        const SizedBox(height: 10),
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
         // Big Circular RQ Badge
         Container(
-          width: 86,
-          height: 86,
-          decoration: const BoxDecoration(
-            color: Color(0xFF7D1B22),
+          width: 90,
+          height: 90,
+          decoration: BoxDecoration(
+            color: const Color(0xFF7D1B22),
             shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF7D1B22).withOpacity(0.2),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           alignment: Alignment.center,
-          child: const Text(
-            'RQ',
-            style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+          child: Image.asset(
+            'assets/images/rq_logo_white.png',
+            height: 52,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Text(
+              'RQ',
+              style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+            ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         const Text(
           'Create Your Account',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E), letterSpacing: -0.5),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         const Text(
           'Join our community of lifesaving donors.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 32),
 
         // Full Name
         _buildBorderedInput(
           controller: _nameController,
           hintText: 'Full Name',
-          icon: Icons.person_outline_rounded,
+          icon: Icons.person_rounded,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return 'Please enter your full name';
+            return null;
+          },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // Email
         _buildBorderedInput(
           controller: _emailController,
-          hintText: 'Email',
-          icon: Icons.email_outlined,
+          hintText: 'Email Address',
+          icon: Icons.email_rounded,
           keyboardType: TextInputType.emailAddress,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return 'Please enter your email';
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return 'Please enter a valid email address';
+            }
+            return null;
+          },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
-        // Phone with Flag
-        Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF7D1B22), width: 1.4),
-          ),
-          child: Row(
-            children: [
-              const Text('🇵🇭 +63', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              const Icon(Icons.arrow_drop_down, color: Color(0xFF1E1E1E), size: 18),
-              const SizedBox(width: 8),
-              Container(width: 1, height: 22, color: const Color(0xFFD1D5DB)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    hintText: 'Phone Number',
-                    hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13.5),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
+        // Phone Input
+        _buildPhoneInput(),
+        const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF7D1B22)),
-            SizedBox(width: 6),
+          children: [
+            const Icon(Icons.info_rounded, size: 16, color: Color(0xFF7D1B22)),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                "We'll send a 6-digit verification code via SMS to this number. Standard rates may apply.",
-                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), height: 1.3),
+                "We'll send a 6-digit verification code via SMS to this number.",
+                style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // Password
         _buildBorderedInput(
           controller: _passwordController,
           hintText: 'Password',
-          icon: Icons.lock_outline_rounded,
+          icon: Icons.lock_rounded,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
-            icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Colors.grey, size: 20),
+            icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           ),
+          validator: (value) {
+            if (value == null || value.isEmpty) return 'Please enter a password';
+            if (value.length < 8) return 'Password must be at least 8 characters';
+            return null;
+          },
         ),
-        const SizedBox(height: 4),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Must be at least 8 characters with a number & symbol.',
-            style: TextStyle(fontSize: 10.5, color: Color(0xFF6B7280)),
-          ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // Confirm Password
         _buildBorderedInput(
           controller: _confirmPasswordController,
           hintText: 'Confirm Password',
-          icon: Icons.lock_outline_rounded,
+          icon: Icons.lock_clock_rounded,
           obscureText: _obscureConfirmPassword,
           suffixIcon: IconButton(
-            icon: Icon(_obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: Colors.grey, size: 20),
+            icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
             onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
           ),
+          validator: (value) {
+            if (value == null || value.isEmpty) return 'Please confirm your password';
+            if (value != _passwordController.text) return 'Passwords do not match';
+            return null;
+          },
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 24),
 
         // Privacy Guaranteed Banner
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: const Color(0xFFFFF6F6),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFEAA1A5)),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFEAA1A5).withOpacity(0.5)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(color: Color(0xFFFBE4E5), shape: BoxShape.circle),
-                child: const Icon(Icons.shield_outlined, color: Color(0xFF7D1B22), size: 18),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7D1B22).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7D1B22))),
-                    SizedBox(height: 2),
+                    Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
+                    SizedBox(height: 4),
                     Text(
                       'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), height: 1.3),
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
                     ),
                   ],
                 ),
@@ -535,12 +568,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 20),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Already have an account? ', style: TextStyle(fontSize: 12, color: Color(0xFF4B5563))),
+            const Text('Already have an account? ', style: TextStyle(fontSize: 14, color: Color(0xFF4B5563))),
             InkWell(
               onTap: () {
                 Navigator.pushReplacement(
@@ -548,11 +581,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   MaterialPageRoute(builder: (context) => const LoginView()),
                 );
               },
-              child: const Text('Log In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+              child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
             ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 24),
 
         // Continue Button
         _buildPrimaryCTA(
@@ -561,6 +594,43 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ),
         const SizedBox(height: 16),
       ],
+    ),
+  );
+}
+
+  Widget _buildPhoneInput() {
+    return TextFormField(
+      controller: _phoneController,
+      keyboardType: TextInputType.phone,
+      style: const TextStyle(fontSize: 14, color: Color(0xFF1E1E1E), fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        filled: true,
+        fillColor: Colors.white,
+        hintText: 'Phone Number',
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.normal),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 16, right: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🇵🇭 +63', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E1E1E))),
+              const Icon(Icons.arrow_drop_down, color: Color(0xFF1E1E1E), size: 20),
+              const SizedBox(width: 12),
+              Container(width: 1.5, height: 24, color: const Color(0xFFE5E7EB)),
+            ],
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
+        ),
+      ),
     );
   }
 
@@ -1155,34 +1225,36 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
   }) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF7D1B22), width: 1.4),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF4B5563), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              obscureText: obscureText,
-              keyboardType: keyboardType,
-              style: const TextStyle(fontSize: 13.5, color: Color(0xFF1E1E1E)),
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13.5),
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-          if (suffixIcon != null) suffixIcon,
-        ],
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      style: const TextStyle(fontSize: 14, color: Color(0xFF1E1E1E), fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        filled: true,
+        fillColor: Colors.white,
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.normal),
+        prefixIcon: Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        suffixIcon: suffixIcon,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
       ),
     );
   }

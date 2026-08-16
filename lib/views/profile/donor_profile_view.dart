@@ -205,11 +205,11 @@ class DonorProfileView extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => SettingsView(
-                    screeningModel: screeningModel,
-                    donorName: donorName,
-                    bloodType: bloodType,
-                    donorId: donorId,
-                    onRetakeCompleted: onProfileUpdated,
+                    // --- FIXED HERE: Passed required dynamic data & placeholders ---
+                    userName: donorName, // Use the existing donorName
+                    userPhone: '09xxxxxxxxx', // TODO: Implement persistent storage retrieval here
+                    userEmail: 'donor@example.com', // TODO: Implement persistent storage retrieval here
+                    // --- Removed old parameters that caused errors ---
                   ),
                 ),
               );
