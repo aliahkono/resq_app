@@ -42,9 +42,9 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   int _currentTabIndex = 0;
-  late ClassificationResult _effectiveResult;
-  late ScreenNPTModel? _currentScreeningModel;
-  late bool _isFirstTime;
+  ClassificationResult _effectiveResult = ClassificationResult(status: EligibleStats.deferredWeight);
+  ScreenNPTModel? _currentScreeningModel;
+  bool _isFirstTime = true;
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;

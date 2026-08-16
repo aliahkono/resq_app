@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
@@ -17,7 +16,7 @@ class IneligibleHomeView extends StatefulWidget {
     this.classificationResult,
     this.daysRemaining = 45,
     this.isFirstTimeDonor = false,
-    this.donorName = 'Donor',
+    this.donorName = '',
     this.bloodType = '',
     this.donorId = '',
   });
@@ -137,28 +136,80 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     final String reasonTitle = _getReasonTitle(status);
     final String reasonDesc = _getReasonDesc(status);
     final String clearanceDateStr = _getClearanceDate(status, effectiveDays);
-    final bool isPostDonationRecovery = status.toString().toLowerCase().contains('interval');
 
-    return Container(
-      width: double.infinity,
+    return ColoredBox(
       color: const Color(0xFFF3F3F5),
-      child: SingleChildScrollView(
+      child: ListView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildIneligibilityBanner(reasonTitle),
-            const SizedBox(height: 14),
-            if (isPostDonationRecovery)
-              _buildActiveDonorRecoveryLayout(context, status, effectiveDays, clearanceDateStr)
-            else
-              _buildClinicalDeferralLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr),
-            const SizedBox(height: 16),
-            _buildActionCard(context, status),
-            const SizedBox(height: 30),
-          ],
-        ),
+        children: [
+          _buildIneligibilityBanner(reasonTitle),
+          const SizedBox(height: 14),
+          _buildCompactDeferralSummary(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr),
+          const SizedBox(height: 16),
+          _buildActionCard(context, status),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactDeferralSummary(
+      BuildContext context,
+      EligibleStats status,
+      int effectiveDays,
+      String reasonTitle,
+      String reasonDesc,
+      String clearanceDateStr,
+      ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ineligible Home Active',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+          ),
+          const SizedBox(height: 10),
+          _buildDetailInfoCard('REASON', reasonTitle),
+          const SizedBox(height: 10),
+          _buildDetailInfoCard('CLEARANCE DATE', clearanceDateStr),
+          const SizedBox(height: 10),
+          _buildDetailInfoCard('STANDARD WINDOW', _resolveStandardWindow(status, effectiveDays)),
+          const SizedBox(height: 12),
+          Text(
+            reasonDesc,
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF4B5563), height: 1.45),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () => _showScreeningDetailsModal(context, reasonTitle, reasonDesc, clearanceDateStr),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7D1B22),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('View Screening Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -660,27 +711,30 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(desc, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.35)),
-            const SizedBox(height: 12),
-            Text('Projected Clearance: $clearDate', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-                child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(desc, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.35)),
+              const SizedBox(height: 12),
+              Text('Projected Clearance: $clearDate', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                  child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
