@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
+import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 
 class SettingsView extends StatefulWidget {
@@ -25,287 +25,622 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  // Notification Toggles
-  bool _enableCodeRedAlerts = true;
-  bool _enableAppointmentReminders = true;
-  bool _enableHealthTips = false;
+  // Account & Security
+  bool _biometricLogin = false;
 
-  // Security Toggles
-  bool _enableBiometrics = true;
+  // Alert & Notification Preferences
+  bool _emergencyShortageAlerts = false;
+  bool _smsAlerts = false;
+  bool _appointmentReminders = false;
+
+  // Location & Emergency Radius
+  bool _locationServices = false;
+  String _selectedRadius = '15 km';
+
+  final List<String> _radiusOptions = ['5 km', '10 km', '15 km', '25 km', '50 km'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ResQTheme.bgOffWhite,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: ResQTheme.textDark, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Settings',
-          style: ResQTheme.heading2.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: ResQTheme.textDark,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      backgroundColor: const Color(0xFFEBEBEB),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // SECTION 1: Notifications & Emergency Alerts
-              _buildSectionHeader('Notifications & Alerts'),
-              const SizedBox(height: 8),
-              _buildSettingsCard([
-                _buildSwitchTile(
-                  icon: Icons.emergency_rounded,
-                  iconColor: ResQTheme.primaryCrimson,
-                  title: 'Code Red Emergency Alerts',
-                  subtitle: 'Receive instant notifications for critical blood needs near you',
-                  value: _enableCodeRedAlerts,
-                  onChanged: (val) => setState(() => _enableCodeRedAlerts = val),
-                ),
-                const Divider(height: 1),
-                _buildSwitchTile(
-                  icon: Icons.calendar_month_rounded,
-                  iconColor: Colors.blueAccent,
-                  title: 'Appointment Reminders',
-                  subtitle: 'Upcoming donation schedule notifications',
-                  value: _enableAppointmentReminders,
-                  onChanged: (val) => setState(() => _enableAppointmentReminders = val),
-                ),
-                const Divider(height: 1),
-                _buildSwitchTile(
-                  icon: Icons.lightbulb_outline_rounded,
-                  iconColor: Colors.amber.shade700,
-                  title: 'Health & Nutrition Tips',
-                  subtitle: 'Iron restoration and dietary advice during recovery',
-                  value: _enableHealthTips,
-                  onChanged: (val) => setState(() => _enableHealthTips = val),
-                ),
-              ]),
-
-              const SizedBox(height: 24),
-
-              // SECTION 2: Account & Security (Retake Screening linked here)
-              _buildSectionHeader('Account & Security'),
-              const SizedBox(height: 8),
-              _buildSettingsCard([
-                _buildSwitchTile(
-                  icon: Icons.fingerprint_rounded,
-                  iconColor: Colors.purple,
-                  title: 'Biometric Login',
-                  subtitle: 'Use Face ID / Fingerprint to access digital QR pass',
-                  value: _enableBiometrics,
-                  onChanged: (val) => setState(() => _enableBiometrics = val),
-                ),
-                const Divider(height: 1),
-                _buildNavigationTile(
-                  icon: Icons.lock_outline_rounded,
-                  iconColor: ResQTheme.textDark,
-                  title: 'Change Password',
-                  subtitle: 'Update your account security credentials',
-                  onTap: () {},
-                ),
-                const Divider(height: 1),
-                _buildNavigationTile(
-                  icon: Icons.refresh_rounded,
-                  iconColor: ResQTheme.primaryCrimson,
-                  title: 'Retake Health Assessment',
-                  subtitle: 'Re-evaluate clinical donor parameters',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => RegistrationWizView(
-                          isRetake: true,
-                          initialScreening: widget.screeningModel,
-                          donorName: widget.donorName,
-                          bloodType: widget.bloodType,
-                          donorId: widget.donorId,
-                          onRetakeCompleted: (updatedModel, result) {
-                            if (widget.onRetakeCompleted != null) {
-                              widget.onRetakeCompleted!(updatedModel, result);
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  result.isEligible
-                                      ? 'Assessment updated: You are now verified eligible!'
-                                      : 'Assessment updated: Deferred (${result.status.name})',
-                                ),
-                                backgroundColor: result.isEligible ? Colors.green : Colors.orange,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                        ),
+        child: Column(
+          children: [
+            _buildTopHeader(context),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // SECTION 1: ACCOUNT & SECURITY
+                    _buildSectionTitle('ACCOUNT & SECURITY'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildNavigationTile(
+                        title: 'Edit Personal Details (Name, Phone, Email)',
+                        onTap: () => _showEditPersonalDetailsModal(context),
                       ),
-                    );
-                  },
-                ),
-              ]),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildNavigationTile(
+                        title: 'Change Password & Security',
+                        onTap: () => _showChangePasswordModal(context),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildSwitchTile(
+                        title: 'Biometric Login (FaceID / Fingerprint)',
+                        value: _enableBiometricsSafe(),
+                        onChanged: (val) => setState(() => _biometricLogin = val),
+                      ),
+                    ]),
 
-              const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-              // SECTION 3: Guidelines & Legal
-              _buildSectionHeader('Guidelines & Legal'),
-              const SizedBox(height: 8),
-              _buildSettingsCard([
-                _buildNavigationTile(
-                  icon: Icons.health_and_safety_outlined,
-                  iconColor: Colors.teal,
-                  title: 'NVBSP & DOH Guidelines',
-                  subtitle: 'Philippine blood donation regulations',
-                  onTap: () {},
-                ),
-                const Divider(height: 1),
-                _buildNavigationTile(
-                  icon: Icons.privacy_tip_outlined,
-                  iconColor: Colors.blueGrey,
-                  title: 'Privacy Policy',
-                  subtitle: 'Data handling and donor medical privacy',
-                  onTap: () {},
-                ),
-                const Divider(height: 1),
-                _buildNavigationTile(
-                  icon: Icons.description_outlined,
-                  iconColor: Colors.blueGrey,
-                  title: 'Terms of Service',
-                  subtitle: 'ResQ mobile application terms',
-                  onTap: () {},
-                ),
-              ]),
+                    // SECTION 2: ALERT & NOTIFICATION PREFERENCES
+                    _buildSectionTitle('ALERT & NOTIFICATION PREFERENCES'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildSwitchTile(
+                        title: 'Emergency Blood Shortage Alerts',
+                        value: _emergencyShortageAlerts,
+                        onChanged: (val) => setState(() => _emergencyShortageAlerts = val),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildSwitchTile(
+                        title: 'SMS Alerts (Urgent Hospital Broadcasts)',
+                        value: _smsAlerts,
+                        onChanged: (val) => setState(() => _smsAlerts = val),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildSwitchTile(
+                        title: 'Appointment Reminders & Tips',
+                        value: _appointmentReminders,
+                        onChanged: (val) => setState(() => _appointmentReminders = val),
+                      ),
+                    ]),
 
-              const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-              // SECTION 4: Sign Out Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showSignOutDialog(context),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    foregroundColor: Colors.redAccent,
-                  ),
-                  icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text(
-                    'SIGN OUT',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.8),
-                  ),
+                    // SECTION 3: LOCATION & EMERGENCY RADIUS
+                    _buildSectionTitle('LOCATION & EMERGENCY RADIUS'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildSwitchTile(
+                        title: 'Location Services Access',
+                        value: _locationServices,
+                        onChanged: (val) => setState(() => _locationServices = val),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildRadiusSelectorTile(context),
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // SECTION 4: PRIVACY & SYSTEM
+                    _buildSectionTitle('PRIVACY & SYSTEM'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildNavigationTile(
+                        title: 'Medical Data Privacy & Encryption',
+                        onTap: () => _showPrivacyModal(context),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildNavigationTile(
+                        title: 'Terms of Service & Health Guidelines',
+                        onTap: () => _showTermsModal(context),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildVersionTile(),
+                    ]),
+
+                    const SizedBox(height: 24),
+
+                    // SECTION 5: SIGN OUT BUTTON
+                    _buildSignOutButton(context),
+
+                    const SizedBox(height: 24),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // App Version Footer
-              Center(
-                child: Text(
-                  'ResQ Blood Donation System • v1.0.0',
-                  style: TextStyle(fontSize: 11, color: ResQTheme.textMuted),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4.0),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.bold,
-          color: ResQTheme.textMuted,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
+  bool _enableBiometricsSafe() => _biometricLogin;
 
-  Widget _buildSettingsCard(List<Widget> children) {
+  // --- Top Navigation Header ---
+  Widget _buildTopHeader(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ResQTheme.lightBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 10, bottom: 14, left: 8, right: 14),
+      decoration: const BoxDecoration(
+        color: Color(0xFF7D1B22),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: Row(
+                children: const [
+                  Icon(Icons.arrow_back, color: Colors.white, size: 18),
+                  SizedBox(width: 4),
+                  Text(
+                    'Profile',
+                    style: TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Text(
+            'Settings',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline_rounded, color: Colors.white, size: 22),
+            onPressed: () => _showHelpModal(context),
           ),
         ],
       ),
-      child: Column(children: children),
     );
   }
 
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return SwitchListTile(
-      value: value,
-      onChanged: onChanged,
-      activeColor: ResQTheme.primaryCrimson,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      secondary: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF5A4D4A),
+          letterSpacing: 0.6,
         ),
-        child: Icon(icon, color: iconColor, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: ResQTheme.textMuted, height: 1.25)),
+    );
+  }
+
+  Widget _buildCardGroup(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
     );
   }
 
   Widget _buildNavigationTile({
-    required IconData icon,
-    required Color iconColor,
     required String title,
-    required String subtitle,
     required VoidCallback onTap,
   }) {
-    return ListTile(
+    return InkWell(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1E2432),
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF4B5563)),
+          ],
         ),
-        child: Icon(icon, color: iconColor, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: ResQTheme.textMuted, height: 1.25)),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
     );
   }
 
+  Widget _buildSwitchTile({
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1E2432),
+              ),
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: Colors.white,
+            activeTrackColor: const Color(0xFF7D1B22),
+            inactiveThumbColor: Colors.white,
+            inactiveTrackColor: const Color(0xFFD1D5DB),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRadiusSelectorTile(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Urgent Alert Radius Range',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1E2432),
+                ),
+              ),
+              InkWell(
+                onTap: () => _showRadiusPicker(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F3F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min, // Fixed here
+                    children: [
+                      Text(
+                        _selectedRadius,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF7D1B22),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF7D1B22)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '(Receive alerts for nearby hospitals within $_selectedRadius)',
+            style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionTile() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: const [
+          Text(
+            'App Version 2.4.0 (Up to date)',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1E2432),
+            ),
+          ),
+          Icon(Icons.verified_rounded, size: 16, color: Color(0xFF1D4ED8)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignOutButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 52,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showSignOutDialog(context),
+        borderRadius: BorderRadius.circular(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.logout_rounded, color: Color(0xFF1E2432), size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Sign Out',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E2432),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRadiusPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select Urgent Alert Radius',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+            ),
+            const SizedBox(height: 12),
+            ...List.generate(_radiusOptions.length, (index) {
+              final option = _radiusOptions[index];
+              return ListTile(
+                title: Text(option, style: const TextStyle(fontWeight: FontWeight.w600)),
+                trailing: _selectedRadius == option
+                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF7D1B22))
+                    : null,
+                onTap: () {
+                  setState(() => _selectedRadius = option);
+                  Navigator.pop(ctx);
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditPersonalDetailsModal(BuildContext context) {
+    final nameCtrl = TextEditingController(text: widget.donorName.isNotEmpty ? widget.donorName : 'Donor');
+    final phoneCtrl = TextEditingController(text: '09123456789');
+    final emailCtrl = TextEditingController(text: 'donor@resq.ph');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Personal Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const SizedBox(height: 14),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder())),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => RegistrationWizView(
+                            isRetake: true,
+                            initialScreening: widget.screeningModel,
+                            donorName: widget.donorName,
+                            bloodType: widget.bloodType,
+                            donorId: widget.donorId,
+                            onRetakeCompleted: widget.onRetakeCompleted,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF7D1B22), fontSize: 11.5)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Personal profile details saved successfully!'), backgroundColor: Color(0xFF2E7D32)),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                    child: const Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontSize: 11.5)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showChangePasswordModal(BuildContext context) {
+    final currentPw = TextEditingController();
+    final newPw = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Change Password & Security', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const SizedBox(height: 14),
+            TextField(controller: currentPw, obscureText: true, decoration: const InputDecoration(labelText: 'Current Password', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: newPw, obscureText: true, decoration: const InputDecoration(labelText: 'New Password', border: OutlineInputBorder())),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Account security credentials updated!'), backgroundColor: Color(0xFF2E7D32)),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                child: const Text('UPDATE PASSWORD', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPrivacyModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Medical Data Privacy & Encryption', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const SizedBox(height: 10),
+            const Text(
+              'All donor health evaluations, biometrics, and clinical vitals logged by hospital staff are secured using AES-256 end-to-end encryption in compliance with the Philippine Data Privacy Act of 2012 (RA 10173).',
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF374151)),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTermsModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Terms of Service & Health Guidelines', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const SizedBox(height: 10),
+            const Text(
+              'ResQ operates under National Voluntary Blood Services Program (NVBSP) and Department of Health (DOH) clinical donor safety criteria. Voluntary donors agree to accurate disclosure of physical metrics.',
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF374151)),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                child: const Text('AGREE & CLOSE', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHelpModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('ResQ Donor Support & Help', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const SizedBox(height: 10),
+            const Text(
+              'Need assistance with emergency blood requests, screening retakes, or booking queue slots? Contact your local Red Cross chapter or email support@resq.ph.',
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF374151)),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Sign Out Dialog Linking to AuthLandingView ---
   void _showSignOutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -323,13 +658,13 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+              backgroundColor: const Color(0xFF7D1B22),
               foregroundColor: Colors.white,
             ),
             onPressed: () {
               Navigator.pop(context);
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const RegistrationWizView()),
+                MaterialPageRoute(builder: (context) => const AuthLandingView()),
                     (route) => false,
               );
             },
