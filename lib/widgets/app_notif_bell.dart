@@ -142,8 +142,8 @@ class _BroadcastModalSheet extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.campaign_rounded, color: Color(0xFF7D1B22), size: 22),
                     SizedBox(width: 8),
                     Text(

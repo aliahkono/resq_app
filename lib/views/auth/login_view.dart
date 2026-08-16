@@ -1,11 +1,84 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
-import 'package:resq/views/auth/registration_wiz_view.dart';
+import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/home/home_view.dart';
+// Future DB integration: Import your actual service file here
+// import 'package:resq/services/auth_service.dart';
+
+// =============================================================================
+// PLACEHOLDER STRUCTURES FOR FUTURE DB INTEGRATION
+// Copy these definitions to lib/model/auth_model.dart and lib/services/auth_service.dart
+// when ready to connect to the database.
+// =============================================================================
+
+/// Real-world model for returned donor profile data from database
+class DonorProfileData {
+  final String id;
+  final String name;
+  final String bloodType;
+  final bool isEligible;
+  final String? token; // JWT/Session token
+
+  DonorProfileData({
+    required this.id,
+    required this.name,
+    required this.bloodType,
+    required this.isEligible,
+    this.token,
+  });
+}
+
+/// Structured response object for asynchronous auth service calls
+class AuthResult {
+  final bool success;
+  final String? errorMessage;
+  final DonorProfileData? donorData;
+
+  AuthResult({required this.success, this.errorMessage, this.donorData});
+}
+
+/// INTERFACE: Replace this with your actual DB/API service implementation
+class AuthService {
+  // Static instance for singleton pattern if needed
+  // static final AuthService _instance = AuthService._internal();
+  // factory AuthService() => _instance;
+  // AuthService._internal();
+
+  /// Permanent Logic placeholder for email/phone login
+  Future<AuthResult> signInWithCredentials({
+    required String identifier, // Email or Phone
+    required String password,
+    required bool isEmail,
+  }) async {
+    // --- INTEGRATE DATABASE HERE ---
+    // 1. Perform POST request to /api/v1/login
+    // 2. Map responses:
+    //    - 200 OK -> Map JSON to DonorProfileData, return AuthResult(success: true, donorData: mappedData)
+    //    - 401 Unauthorized -> return AuthResult(success: false, errorMessage: 'Invalid credentials')
+    //    - 404 Not Found -> return AuthResult(success: false, errorMessage: 'Account does not exist')
+    //    - 500/Network Error -> throw Exception or return success: false
+
+    // Temporarily throw an error to demonstrate error handling is working without mock data
+    throw UnimplementedError("AuthService.signInWithCredentials is not yet implemented with a database.");
+  }
+
+  /// Permanent Logic placeholder for biometric token-based session refresh
+  Future<AuthResult> signInWithStoredSessionToken() async {
+    // --- INTEGRATE DATABASE / SECURE STORAGE HERE ---
+    // 1. Retrieve securely stored JWT/Refresh token (e.g., using flutter_secure_storage)
+    // 2. If token exists, call API /api/v1/refresh-session with token
+    // 3. Verify server response (success vs expired/revoked token)
+    // 4. Return appropriate AuthResult.
+
+    throw UnimplementedError("AuthService.signInWithStoredSessionToken is not yet implemented with a database.");
+  }
+}
+// =============================================================================
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -20,34 +93,15 @@ class _LoginViewState extends State<LoginView> {
   final TextEditingController _passwordController = TextEditingController();
   final LocalAuthentication _localAuth = LocalAuthentication();
 
+  // Interface instance for database calls
+  final AuthService _authService = AuthService();
+
   bool _isEmailMode = true; // true = Email, false = Phone No.
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
-  // Registered mock accounts for credential & biometric verification
-  final List<Map<String, dynamic>> _registeredUsers = [
-    {
-      'email': 'donor@resq.ph',
-      'phone': '09987654321',
-      'password': 'Password123!',
-      'name': 'John Doe',
-      'bloodType': 'A+',
-      'donorId': 'BD-10942',
-      'isEligible': true,
-      'biometricsLinked': true,
-    },
-    {
-      'email': 'civic@gmail.com',
-      'phone': '09123456789',
-      'password': 'Password123!',
-      'name': 'Civic Buenafe',
-      'bloodType': 'O+',
-      'donorId': 'BD-10942',
-      'isEligible': true,
-      'biometricsLinked': true,
-    },
-  ];
+  // --- MOCK REGISTERED ACCOUNTS LIST REMOVED ---
 
   @override
   void dispose() {
@@ -56,7 +110,7 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
-  // --- Validation Helpers ---
+  // --- Validation Helpers (Keep existing local validation) ---
   String? _validateIdentifier(String? value) {
     if (value == null || value.trim().isEmpty) {
       return _isEmailMode ? 'Please enter your email' : 'Please enter your phone number';
@@ -86,148 +140,143 @@ class _LoginViewState extends State<LoginView> {
     return null;
   }
 
+  // ===========================================================================
+  // PERMANENT LOGIC: HANDLE CREDENTIAL LOGIN
+  // ===========================================================================
   void _handleLogin() async {
     setState(() => _errorMessage = null);
 
+    // 1. Perform client-side validation
     if (!_formKey.currentState!.validate()) return;
 
+    // 2. Start loading state
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
 
     final input = _identifierController.text.trim().toLowerCase();
     final password = _passwordController.text;
 
-    // Search user database
-    final matchedUser = _registeredUsers.firstWhere(
-          (u) => _isEmailMode
-          ? (u['email'].toString().toLowerCase() == input)
-          : (u['phone'].toString() == input),
-      orElse: () => {},
-    );
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (matchedUser.isEmpty) {
-      setState(() {
-        _errorMessage = 'Account does not exist. Please register first.';
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text('Account does not exist. Please register first.'),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFF8A1E26),
-          behavior: SnackBarBehavior.floating,
-        ),
+    try {
+      // 3. CALL DB SERVICE INTERFACE
+      // This call will fail (throw UnimplementedError) until you connect your DB.
+      final AuthResult result = await _authService.signInWithCredentials(
+        identifier: input,
+        password: password,
+        isEmail: _isEmailMode,
       );
-      return;
-    }
 
-    if (matchedUser['password'] != password) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      // 4. Handle Service Result
+      if (result.success) {
+        // Success path
+        final data = result.donorData!;
+
+        // (Optional DB Prep: Store JWT/Session token locally here if service doesn't do it)
+
+        _routeToHome(
+          donorName: data.name,
+          bloodType: data.bloodType,
+          donorId: data.id,
+          isEligible: data.isEligible,
+        );
+      } else {
+        // Failure path returned by DB (e.g., 401, 404)
+        setState(() {
+          _errorMessage = result.errorMessage ?? 'Unable to sign in. Please try again.';
+        });
+      }
+    } catch (e) {
+      // 5. Handle Network/Connection Errors or Unimplemented Errors during testing
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      String displayError = 'A connection error occurred. Please check your internet and try again.';
+
+      if (e is UnimplementedError) {
+        displayError = 'Error: The Database connection logic in AuthService is not yet implemented.';
+      } else if (e is SocketException || e is TimeoutException) {
+        displayError = 'Network error: Cannot reach the ResQ server.';
+      }
+
       setState(() {
-        _errorMessage = 'Incorrect password. Please try again.';
+        _errorMessage = displayError;
       });
-      return;
-    }
 
-    _routeToHome(
-      donorName: matchedUser['name'],
-      bloodType: matchedUser['bloodType'],
-      donorId: matchedUser['donorId'],
-      isEligible: matchedUser['isEligible'],
-    );
+      _showFloatingErrorSnackBar(displayError);
+    }
   }
 
-  // --- Device Biometric / PIN Auth Dialog with Non-Existent User Handling ---
+  // ===========================================================================
+  // PERMANENT LOGIC: HANDLE DEVICE BIOMETRIC / PIN AUTH
+  // ===========================================================================
   Future<void> _handleDeviceBiometricAuth() async {
     setState(() => _errorMessage = null);
 
     try {
+      // 1. Check device capabilities locally
       final bool canCheck = await _localAuth.canCheckBiometrics;
       final bool isSupported = await _localAuth.isDeviceSupported();
 
       if (!canCheck && !isSupported) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Device security (Fingerprint / PIN) is not set up on this device.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showFloatingErrorSnackBar('Device security (Fingerprint / PIN) is not set up on this device.');
         return;
       }
 
+      // 2. UPDATED local_auth implementation for version 3.0.x
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: 'Scan fingerprint or enter device PIN to sign in to ResQ',
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
       );
 
       if (!didAuthenticate || !mounted) return;
 
-      final input = _identifierController.text.trim().toLowerCase();
+      // 3. Local scan successful -> Start network loading
+      setState(() => _isLoading = true);
 
-      // Check if typed user exists or resolve stored account
-      Map<String, dynamic> matchedUser = {};
+      // 4. CALL DB SERVICE: Verify session with stored token
+      // Mapping local biometric success to a remote DB user requires token verification.
+      final AuthResult result = await _authService.signInWithStoredSessionToken();
 
-      if (input.isNotEmpty) {
-        matchedUser = _registeredUsers.firstWhere(
-              (u) => _isEmailMode
-              ? (u['email'].toString().toLowerCase() == input)
-              : (u['phone'].toString() == input),
-          orElse: () => {},
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      // 5. Handle Service Result
+      if (result.success) {
+        final data = result.donorData!;
+        _routeToHome(
+          donorName: data.name,
+          bloodType: data.bloodType,
+          donorId: data.id,
+          isEligible: data.isEligible,
         );
       } else {
-        // Find default linked device account
-        matchedUser = _registeredUsers.firstWhere(
-              (u) => u['biometricsLinked'] == true,
-          orElse: () => {},
-        );
-      }
-
-      // Explicit error handling if no registered user matches the biometric request
-      if (matchedUser.isEmpty) {
+        // Token was invalid, expired, or biometrics revoked on backend
+        final String failMsg = result.errorMessage ?? 'Biometric session expired. Please sign in with your credentials.';
         setState(() {
-          _errorMessage = 'No registered account found linked with this biometric. Please sign up first.';
+          _errorMessage = failMsg;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text('Account not found in system. Please register first.'),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF8A1E26),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return;
+        _showFloatingErrorSnackBar(failMsg);
       }
-
-      _routeToHome(
-        donorName: matchedUser['name'],
-        bloodType: matchedUser['bloodType'],
-        donorId: matchedUser['donorId'],
-        isEligible: matchedUser['isEligible'],
-      );
     } on PlatformException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Authentication failed: ${e.message ?? "Try again"}'),
-          backgroundColor: const Color(0xFF8A1E26),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showFloatingErrorSnackBar('Authentication failed: ${e.message ?? "Try again"}');
+    } catch (e) {
+      // Handle Network Errors during token refresh or Unimplemented Error during testing
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      String displayError = 'Connection error during biometric login. Please use your credentials.';
+      if (e is UnimplementedError) {
+        displayError = 'Biometric DB Logic Unimplemented in AuthService.';
+      }
+
+      setState(() {
+        _errorMessage = displayError;
+      });
+      _showFloatingErrorSnackBar(displayError);
     }
   }
 
@@ -243,6 +292,7 @@ class _LoginViewState extends State<LoginView> {
           donorName: donorName,
           bloodType: bloodType,
           donorId: donorId,
+          // --- UPDATED: Passing correct structure of ClassificationResult ---
           classificationResult: ClassificationResult(
             status: isEligible ? EligibleStats.eligible : EligibleStats.deferredWeight,
           ),
@@ -250,6 +300,22 @@ class _LoginViewState extends State<LoginView> {
         ),
       ),
           (route) => false,
+    );
+  }
+
+  void _showFloatingErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: const Color(0xFF8A1E26),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -333,6 +399,8 @@ class _LoginViewState extends State<LoginView> {
                                 setState(() {
                                   _isEmailMode = true;
                                   _identifierController.clear();
+                                  // --- UPDATED: Clears password when switching modes ---
+                                  _passwordController.clear();
                                   _errorMessage = null;
                                 });
                               }
@@ -345,7 +413,7 @@ class _LoginViewState extends State<LoginView> {
                                 boxShadow: _isEmailMode
                                     ? [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   )
@@ -371,6 +439,8 @@ class _LoginViewState extends State<LoginView> {
                                 setState(() {
                                   _isEmailMode = false;
                                   _identifierController.clear();
+                                  // --- UPDATED: Clears password when switching modes ---
+                                  _passwordController.clear();
                                   _errorMessage = null;
                                 });
                               }
@@ -383,7 +453,7 @@ class _LoginViewState extends State<LoginView> {
                                 boxShadow: !_isEmailMode
                                     ? [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   )
@@ -408,7 +478,7 @@ class _LoginViewState extends State<LoginView> {
 
                   const SizedBox(height: 20),
 
-                  // Error Message Banner
+                  // Error Message Banner (Now displays permanent error states)
                   if (_errorMessage != null) ...[
                     Container(
                       width: double.infinity,
@@ -446,7 +516,11 @@ class _LoginViewState extends State<LoginView> {
                     decoration: InputDecoration(
                       hintText: _isEmailMode ? 'Email' : 'Phone Number',
                       hintStyle: const TextStyle(color: Color(0xFF8E8E93), fontSize: 13),
-                      prefixIcon: const Icon(Icons.mail_outline_rounded, color: Color(0xFF8E8E93), size: 20),
+                      prefixIcon: Icon(
+                        _isEmailMode ? Icons.mail_outline_rounded : Icons.phone_outlined,
+                        color: const Color(0xFF8E8E93),
+                        size: 20,
+                      ),
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -552,7 +626,7 @@ class _LoginViewState extends State<LoginView> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7D1B22).withOpacity(0.35),
+                          color: const Color(0xFF7D1B22).withValues(alpha: 0.35),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -616,10 +690,11 @@ class _LoginViewState extends State<LoginView> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
+                              // --- UPDATED: Routes using AuthLandingView when signing out ---
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const RegistrationWizView(),
+                                  builder: (context) => const AuthLandingView(),
                                 ),
                               );
                             },

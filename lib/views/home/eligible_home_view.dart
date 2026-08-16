@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/appointment/eligible_appoint_view.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 
@@ -62,6 +61,7 @@ class EligibleHomeView extends StatelessWidget {
     );
   }
 
+  // --- Top Header Bar ---
   Widget _buildTopHeader(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -101,6 +101,9 @@ class EligibleHomeView extends StatelessWidget {
     );
   }
 
+  // ===========================================================================
+  // 1. FIRST-TIME DONOR VIEW
+  // ===========================================================================
   Widget _buildFirstTimeDonorView(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,7 +116,7 @@ class EligibleHomeView extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7D1B22).withOpacity(0.25),
+                color: const Color(0xFF7D1B22).withValues(alpha: 0.25),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -121,8 +124,8 @@ class EligibleHomeView extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Expanded(child: Divider(color: Colors.white38, thickness: 1)),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8.0),
@@ -197,8 +200,8 @@ class EligibleHomeView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        Row(
-          children: const [
+        const Row(
+          children: [
             Icon(Icons.map_outlined, color: Color(0xFF7D1B22), size: 18),
             SizedBox(width: 8),
             Text(
@@ -215,14 +218,14 @@ class EligibleHomeView extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
             ],
           ),
           child: Column(
             children: [
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
+                children: [
                   Text(
                     'STEP 1 OF 3: ACCOUNT CREATED',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4B5563)),
@@ -287,7 +290,7 @@ class EligibleHomeView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -317,16 +320,16 @@ class EligibleHomeView extends StatelessWidget {
                           left: 0,
                           child: CircleAvatar(
                             radius: 14,
-                            backgroundImage: AssetImage('assets/images/donor_sample.jpg'),
-                            child: Icon(Icons.person, size: 16, color: Colors.grey),
+                            backgroundColor: Color(0xFFF3E5E6),
+                            child: Icon(Icons.person, size: 16, color: Color(0xFF7D1B22)),
                           ),
                         ),
                         const Positioned(
                           left: 20,
                           child: CircleAvatar(
                             radius: 14,
-                            backgroundImage: AssetImage('assets/images/donor_sample.jpg'),
-                            child: Icon(Icons.person, size: 16, color: Colors.grey),
+                            backgroundColor: Color(0xFFE2EDFE),
+                            child: Icon(Icons.person, size: 16, color: Color(0xFF1E3A8A)),
                           ),
                         ),
                         Positioned(
@@ -446,6 +449,9 @@ class EligibleHomeView extends StatelessWidget {
     );
   }
 
+  // ===========================================================================
+  // 2. ACTIVE / RETURNING DONOR VIEW (DYNAMIC & EMPTY-STATE READY)
+  // ===========================================================================
   Widget _buildActiveDonorView(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,11 +463,11 @@ class EligibleHomeView extends StatelessWidget {
             color: const Color(0xFFEBF3FE),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
             ],
           ),
-          child: Row(
-            children: const [
+          child: const Row(
+            children: [
               Icon(Icons.celebration_outlined, color: Color(0xFF1D4ED8), size: 22),
               SizedBox(width: 12),
               Expanded(
@@ -511,19 +517,24 @@ class EligibleHomeView extends StatelessWidget {
             style: const TextStyle(fontSize: 12.5, color: Color(0xFF4B5563), height: 1.4),
             children: [
               const TextSpan(text: 'Your blood type ('),
-              TextSpan(text: bloodType, style: const TextStyle(color: Color(0xFF8A1E26), fontWeight: FontWeight.bold)),
-              const TextSpan(text: ') is in high demand near you. Hospitals are currently facing a shortage.'),
+              TextSpan(
+                text: bloodType.isNotEmpty ? bloodType : 'Compatible',
+                style: const TextStyle(color: Color(0xFF8A1E26), fontWeight: FontWeight.bold),
+              ),
+              const TextSpan(text: ') is on standby for hospital broadcasts.'),
             ],
           ),
         ),
         const SizedBox(height: 20),
+
+        // Urgent Blood Requests Header
         Row(
           children: [
             Container(width: 3.5, height: 16, decoration: BoxDecoration(color: const Color(0xFF7D1B22), borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 8),
-            Column(
+            const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text('Urgent Blood Requests', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
                 Text('Nearby clinics in critical need', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
               ],
@@ -531,11 +542,16 @@ class EligibleHomeView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+
+        // Dynamic State: Empty Standby vs Live Broadcast Requests
         if (activeRequests.isEmpty)
-          _buildDefaultRequestCard(context)
+          _buildStandbyEmptyState()
         else
           ...activeRequests.map((req) => _buildDynamicRequestCard(context, req)),
+
         const SizedBox(height: 20),
+
+        // Community Impact Card
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(18),
@@ -544,7 +560,7 @@ class EligibleHomeView extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7D1B22).withOpacity(0.2),
+                color: const Color(0xFF7D1B22).withValues(alpha: 0.2),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -570,7 +586,7 @@ class EligibleHomeView extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.14),
+                        color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Column(
@@ -588,7 +604,7 @@ class EligibleHomeView extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.14),
+                        color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Column(
@@ -606,43 +622,16 @@ class EligibleHomeView extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 22),
-        const Text(
-          'Community Blood Drives',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-        ),
-        const SizedBox(height: 12),
-        _buildBloodDriveCard(
-          month: 'JUL',
-          day: '25',
-          title: 'Central Plaza Community Hall',
-          time: '09:00 AM – 04:00 PM',
-          attendeesCount: '14 local donors attending',
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Registered interest for Central Plaza Community Drive!')),
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        _buildBloodDriveCard(
-          month: 'AUG',
-          day: '02',
-          title: 'Tech Park Wellness Center',
-          time: '10:00 AM – 05:00 PM',
-          attendeesCount: '8 local donors attending',
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Registered interest for Tech Park Wellness Drive!')),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
+
+        const SizedBox(height: 20),
+
+        // Educational Image Banner
         Container(
           width: double.infinity,
           height: 150,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
+            color: const Color(0xFF7D1B22),
             image: const DecorationImage(
               image: AssetImage('assets/images/donor_sample.jpg'),
               fit: BoxFit.cover,
@@ -655,8 +644,8 @@ class EligibleHomeView extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.15),
-                  Colors.black.withOpacity(0.85),
+                  Colors.black.withValues(alpha: 0.15),
+                  Colors.black.withValues(alpha: 0.85),
                 ],
               ),
             ),
@@ -679,8 +668,137 @@ class EligibleHomeView extends StatelessWidget {
             ),
           ),
         ),
+
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  // --- Real-time Standby State Card ---
+  Widget _buildStandbyEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7D1B22).withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.sensors_rounded,
+              color: Color(0xFF7D1B22),
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No Active Hospital Broadcasts',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF1E1E1E)),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Nearby facilities currently have sufficient inventory. When a medtech or nurse logs an urgent shortage on the hospital dashboard, it will sync directly here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Dynamic Live Request Card ---
+  Widget _buildDynamicRequestCard(BuildContext context, EmergencyBloodRequest req) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEE),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  req.urgency,
+                  style: const TextStyle(color: Color(0xFFC62828), fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                req.distance,
+                style: const TextStyle(color: Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            req.hospital,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _buildBloodPill(req.bloodType),
+              const SizedBox(width: 8),
+              Text('${req.unitsNeeded} Units Needed', style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton(
+              onPressed: onAcceptRequest != null ? () => onAcceptRequest!(req) : () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8A1E26),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Reserve Slot',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBloodPill(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEBF3FE),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Color(0xFF1E3A8A), fontSize: 11, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
@@ -774,248 +892,6 @@ class EligibleHomeView extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDefaultRequestCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEE),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'CRITICAL',
-                  style: TextStyle(color: Color(0xFFC62828), fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const Text(
-                '1.8 km',
-                style: TextStyle(color: Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "St. Mary's General Hospital",
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildBloodPill('O+'),
-              const SizedBox(width: 6),
-              _buildBloodPill('A+'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: ElevatedButton(
-              onPressed: () {
-                if (onAcceptRequest != null) {
-                  onAcceptRequest!(
-                    EmergencyBloodRequest(
-                      id: 'REQ-9901',
-                      hospital: "St. Mary's General Hospital",
-                      bloodType: 'O+',
-                      urgency: 'CRITICAL',
-                      distance: '1.8 km',
-                      unitsNeeded: 3,
-                      timeAgo: 'Just now',
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8A1E26),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Reserve Slot',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDynamicRequestCard(BuildContext context, EmergencyBloodRequest req) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEE),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  req.urgency,
-                  style: const TextStyle(color: Color(0xFFC62828), fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-              Text(
-                req.distance,
-                style: const TextStyle(color: Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            req.hospital,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildBloodPill(req.bloodType),
-              const SizedBox(width: 8),
-              Text('${req.unitsNeeded} Units Needed', style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: ElevatedButton(
-              onPressed: onAcceptRequest != null ? () => onAcceptRequest!(req) : () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8A1E26),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Reserve Slot',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBloodPill(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEBF3FE),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(color: Color(0xFF1E3A8A), fontSize: 11, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  Widget _buildBloodDriveCard({
-    required String month,
-    required String day,
-    required String title,
-    required String time,
-    required String attendeesCount,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFDE8E9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    month,
-                    style: const TextStyle(color: Color(0xFF7D1B22), fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    day,
-                    style: const TextStyle(color: Color(0xFF1E1E1E), fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF8A1E26)),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF6B7280)),
-                      const SizedBox(width: 4),
-                      Text(time, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(attendeesCount, style: const TextStyle(fontSize: 10.5, color: Color(0xFF6B7280))),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF8A1E26)),
-          ],
-        ),
       ),
     );
   }

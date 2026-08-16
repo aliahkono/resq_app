@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
+
+class Clinic {
+  final String name;
+  final String address;
+  final String distance;
+  final double rating;
+
+  Clinic({
+    required this.name,
+    required this.address,
+    required this.distance,
+    required this.rating,
+  });
+}
 
 class EligibleAppointView extends StatefulWidget {
   final bool isFirstTimeDonor;
@@ -17,31 +30,36 @@ class EligibleAppointView extends StatefulWidget {
 }
 
 class _EligibleAppointViewState extends State<EligibleAppointView> {
-  int _selectedCenterIndex = 0;
-  int _selectedSlotIndex = 0;
-
-  final List<Map<String, String>> _centers = [
-    {
-      'name': 'Philippine Red Cross - Quezon Chapter',
-      'address': 'Quezon Ave, Lucena City',
-      'distance': '1.2 km',
-    },
-    {
-      'name': 'Quezon Medical Center (QMC) Blood Bank',
-      'address': 'Lucena City, Quezon',
-      'distance': '2.8 km',
-    },
-    {
-      'name': 'St. Anne General Hospital',
-      'address': 'Gulang-Gulang, Lucena City',
-      'distance': '3.5 km',
-    },
+  final List<Clinic> _clinics = [
+    Clinic(
+      name: 'Philippine Red Cross - Quezon Chapter',
+      address: 'Quezon Blvd, Quezon City, Metro Manila',
+      distance: '1.2 km',
+      rating: 4.8,
+    ),
+    Clinic(
+      name: 'St. Luke\'s Medical Center - Blood Bank',
+      address: '279 E Rodriguez Sr. Ave, Quezon City',
+      distance: '3.5 km',
+      rating: 4.9,
+    ),
+    Clinic(
+      name: 'Lung Center of the Philippines',
+      address: 'Quezon Ave, Diliman, Quezon City',
+      distance: '4.1 km',
+      rating: 4.7,
+    ),
   ];
 
-  final List<String> _slots = [
-    '08:30 AM - 09:30 AM',
+  String? _selectedClinic;
+  String? _selectedTime;
+
+  final List<String> _timeSlots = [
+    '08:00 AM - 09:00 AM',
+    '09:00 AM - 10:00 AM',
     '10:00 AM - 11:00 AM',
-    '01:30 PM - 02:30 PM',
+    '01:00 PM - 02:00 PM',
+    '02:00 PM - 03:00 PM',
     '03:00 PM - 04:00 PM',
   ];
 
@@ -52,110 +70,63 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildAppointmentHeaderWithBack(context),
+            _buildHeader(context),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
+                padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Select Blood Donation Center',
-                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-                    ),
-                    const SizedBox(height: 10),
-                    ...List.generate(_centers.length, (index) {
-                      final center = _centers[index];
-                      final isSelected = _selectedCenterIndex == index;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10.0),
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedCenterIndex = index),
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isSelected ? const Color(0xFF7D1B22) : const Color(0xFFE5E7EB),
-                                width: isSelected ? 1.8 : 1.0,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                                  color: isSelected ? const Color(0xFF7D1B22) : Colors.grey,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        center['name']!,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${center['address']} • ${center['distance']}',
-                                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
+                    if (widget.isFirstTimeDonor) _buildFirstTimeBadge(),
                     const SizedBox(height: 16),
                     const Text(
-                      'Select Preferred Time Slot',
-                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: List.generate(_slots.length, (index) {
-                        final isSelected = _selectedSlotIndex == index;
-                        return ChoiceChip(
-                          label: Text(_slots[index]),
-                          selected: isSelected,
-                          selectedColor: const Color(0xFF7D1B22),
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : const Color(0xFF1E1E1E),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                          onSelected: (val) => setState(() => _selectedSlotIndex = index),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 26),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: widget.onBookingCompleted,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7D1B22),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'CONFIRM APPOINTMENT SLOT',
-                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                        ),
+                      'Choose a Donation Center',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E1E1E),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+                    ..._clinics.map((clinic) => _buildClinicCard(clinic)),
+                    const SizedBox(height: 24),
+                    if (_selectedClinic != null) ...[
+                      const Text(
+                        'Available Time Slots',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E1E1E),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _timeSlots.map((slot) => _buildTimeSlot(slot)).toList(),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _selectedTime != null ? widget.onBookingCompleted : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7D1B22),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Confirm Booking',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -166,45 +137,138 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
     );
   }
 
-  Widget _buildAppointmentHeaderWithBack(BuildContext context) {
+  Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 14, bottom: 14, left: 8, right: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: const BoxDecoration(color: Color(0xFF7D1B22)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
                 onPressed: () => Navigator.pop(context),
               ),
-              Image.asset(
-                'assets/images/rq_logo_white.png',
-                height: 28,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text(
-                  'RQ',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(width: 1.5, height: 20, color: Colors.white60),
-              const SizedBox(width: 10),
+              const SizedBox(width: 4),
               const Text(
-                'Appointment',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                'Book Appointment',
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          const AppNotificationBell(
-            isEligible: true,
-            donorBloodType: 'O+',
+          const AppNotificationBell(isEligible: true, donorBloodType: ''),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFirstTimeBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFCC80)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.stars_rounded, color: Color(0xFFE65100), size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'First-Time Donor Priority: Slots are prioritized for your first quest!',
+              style: TextStyle(color: Color(0xFFBF360C), fontSize: 12, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClinicCard(Clinic clinic) {
+    bool isSelected = _selectedClinic == clinic.name;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _selectedClinic = clinic.name;
+        _selectedTime = null;
+      }),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF7D1B22) : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    clinic.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E1E1E)),
+                  ),
+                ),
+                if (isSelected)
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF7D1B22), size: 20),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(clinic.address, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF7D1B22)),
+                const SizedBox(width: 4),
+                Text(clinic.distance, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 16),
+                const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text(clinic.rating.toString(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeSlot(String slot) {
+    bool isSelected = _selectedTime == slot;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTime = slot),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF7D1B22) : const Color(0xFFD1D5DB),
+          ),
+        ),
+        child: Text(
+          slot,
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF4B5563),
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
