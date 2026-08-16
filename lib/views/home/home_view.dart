@@ -10,12 +10,16 @@ import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
 import 'package:resq/views/profile/donor_profile_view.dart';
+import 'package:resq/views/settings/settings_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
+import 'package:resq/widgets/app_notif_bell.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
   final String bloodType;
   final String donorId;
+  final String phoneNum;
+  final String donorEmail;
   final ScreenNPTModel? screeningModel;
   final ClassificationResult? classificationResult;
   final bool isFirstTimeDonor;
@@ -25,6 +29,8 @@ class HomeView extends StatefulWidget {
     this.donorName = '',
     this.bloodType = '',
     this.donorId = '',
+    this.phoneNum = '',
+    this.donorEmail = '',
     this.screeningModel,
     this.classificationResult,
     this.isFirstTimeDonor = true,
@@ -37,17 +43,12 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   int _currentTabIndex = 0;
   bool _isLoading = true;
-  late ClassificationResult _effectiveResult;
-  late ScreenNPTModel? _currentScreeningModel;
-  late bool _isFirstTime;
+  ClassificationResult? _effectiveResult;
+  ScreenNPTModel? _currentScreeningModel;
+  bool _isFirstTime = true;
 
-  // Hospital clinical records (null until MedTech/Nurse records them via Dashboard)
   ClinicalVitalsRecord? _clinicalVitalsRecord;
-
-  // Active confirmed appointment state
   ConfirmedAppointmentData? _confirmedAppointment;
-
-  // Dynamic emergency blood requests stream / list from hospital-web-dashboard
   final List<EmergencyBloodRequest> _activeRequests = [];
 
   @override
@@ -58,26 +59,30 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<void> _evaluateEligibility() async {
+    ClassificationResult result;
+    bool firstTime;
+
     if (widget.classificationResult != null) {
-      _effectiveResult = widget.classificationResult!;
-      _isFirstTime = widget.isFirstTimeDonor;
+      result = widget.classificationResult!;
+      firstTime = widget.isFirstTimeDonor;
     } else if (_currentScreeningModel != null) {
-      _effectiveResult = _currentScreeningModel!.evaluateEligibility();
-      _isFirstTime = _currentScreeningModel!.screensNPT.isFirstTimeDonor;
+      result = _currentScreeningModel!.evaluateEligibility();
+      firstTime = _currentScreeningModel!.screensNPT.isFirstTimeDonor;
     } else {
       await Future.delayed(const Duration(milliseconds: 300));
-      _effectiveResult = ClassificationResult(status: EligibleStats.eligible);
-      _isFirstTime = widget.isFirstTimeDonor;
+      result = ClassificationResult(status: EligibleStats.eligible);
+      firstTime = widget.isFirstTimeDonor;
     }
 
     if (mounted) {
       setState(() {
+        _effectiveResult = result;
+        _isFirstTime = firstTime;
         _isLoading = false;
       });
     }
   }
 
-  /// Opens the unified registration wizard in Retake Mode, skipping account creation
   void _openRetakeScreening() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -100,7 +105,8 @@ class _HomeViewState extends State<HomeView> {
                       ? 'Assessment updated: You are now verified eligible to donate!'
                       : 'Assessment updated: Temporarily deferred (${result.status.name})',
                 ),
-                backgroundColor: result.isEligible ? Colors.green : Colors.orange,
+                backgroundColor:
+                result.isEligible ? Colors.green : Colors.orange,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -110,25 +116,131 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  Widget _buildBody() {
-    final String activeDonorName = widget.donorName.isNotEmpty
-        ? widget.donorName
-        : 'John Doe';
+  Widget _buildTopHeader() {
+    String title = 'Dashboard';
+    if (_currentTabIndex == 1) title = 'Appointment';
+    if (_currentTabIndex == 2) title = 'Profile & Records';
 
-    final String activeBloodType = widget.bloodType.isNotEmpty
-        ? widget.bloodType
-        : 'A+';
+    return Container(
+      color: const Color(0xFF7D1B22),
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          width: double.infinity,
+          padding:
+          const EdgeInsets.only(top: 14, bottom: 14, left: 18, right: 18),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/images/rq_logo_white.png',
+                    height: 30,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Text(
+                      'RQ',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(width: 1.5, height: 22, color: Colors.white60),
+                  const SizedBox(width: 12),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  if (_currentTabIndex == 2)
+                    IconButton(
+                      icon: const Icon(Icons.settings_rounded,
+                          color: Colors.white, size: 22),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => SettingsView(
+                              userName: widget.donorName,
+                              userPhone: widget.phoneNum,
+                              userEmail: widget.donorEmail,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  AppNotificationBell(
+                    isEligible: _effectiveResult?.isEligible ?? true,
+                    donorBloodType: widget.bloodType,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    final String activeDonorId = widget.donorId.isNotEmpty
-        ? widget.donorId
-        : 'BD-10942';
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
+    final String activeDonorName =
+    widget.donorName.isNotEmpty ? widget.donorName : 'John Doe';
+
+    final String activeBloodType =
+    widget.bloodType.isNotEmpty ? widget.bloodType : 'A+';
+
+    final String activeDonorId =
+    widget.donorId.isNotEmpty ? widget.donorId : 'BD-10942';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F3F5),
+      body: Column(
+        children: [
+          _buildTopHeader(),
+          Expanded(
+            child: _buildCurrentTab(
+              activeDonorName,
+              activeBloodType,
+              activeDonorId,
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: _currentTabIndex,
+        onTap: (index) {
+          setState(() {
+            _currentTabIndex = index;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildCurrentTab(
+      String activeDonorName,
+      String activeBloodType,
+      String activeDonorId,
+      ) {
     switch (_currentTabIndex) {
-    // =======================================================================
-    // TAB 0: HOME DASHBOARD
-    // =======================================================================
       case 0:
-        return _effectiveResult.isEligible
+        return (_effectiveResult?.isEligible ?? true)
             ? EligibleHomeView(
           isFirstTimeDonor: _isFirstTime,
           donorName: activeDonorName,
@@ -140,7 +252,8 @@ class _HomeViewState extends State<HomeView> {
                 facility: request.hospital,
                 date: DateTime.now().add(const Duration(days: 1)),
                 timeSlot: '09:00 AM - 10:00 AM',
-                queueNumber: 'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                queueNumber:
+                'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
               );
               _currentTabIndex = 1;
             });
@@ -153,12 +266,8 @@ class _HomeViewState extends State<HomeView> {
           bloodType: activeBloodType,
           donorId: activeDonorId,
         );
-
-    // =======================================================================
-    // TAB 1: SCHEDULE / APPOINTMENTS
-    // =======================================================================
       case 1:
-        if (_effectiveResult.isEligible) {
+        if (_effectiveResult?.isEligible ?? true) {
           if (_confirmedAppointment != null) {
             return ActiveSchedView(
               appointment: _confirmedAppointment!,
@@ -189,12 +298,14 @@ class _HomeViewState extends State<HomeView> {
                             facility: 'Philippine Red Cross - Quezon Chapter',
                             date: DateTime.now().add(const Duration(days: 2)),
                             timeSlot: '09:00 AM - 10:00 AM',
-                            queueNumber: 'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                            queueNumber:
+                            'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
                           );
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Appointment slot confirmed successfully!'),
+                            content:
+                            Text('Appointment slot confirmed successfully!'),
                             backgroundColor: Colors.green,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -209,14 +320,10 @@ class _HomeViewState extends State<HomeView> {
         } else {
           return IneligibleAppointView(
             isFirstTimeDonor: _isFirstTime,
-            daysRemaining: _effectiveResult.daysRemaining,
+            daysRemaining: _effectiveResult?.daysRemaining ?? 0,
             onRefreshScreening: _openRetakeScreening,
           );
         }
-
-    // =======================================================================
-    // TAB 2: PROFILE & SETTINGS
-    // =======================================================================
       case 2:
         return DonorProfileView(
           screeningModel: _currentScreeningModel,
@@ -234,32 +341,8 @@ class _HomeViewState extends State<HomeView> {
           },
           clinicalVitals: _clinicalVitalsRecord,
         );
-
       default:
         return const SizedBox.shrink();
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: _buildBody(),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _currentTabIndex,
-        onTap: (index) {
-          setState(() {
-            _currentTabIndex = index;
-          });
-        },
-      ),
-    );
   }
 }

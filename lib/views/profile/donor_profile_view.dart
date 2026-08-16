@@ -4,7 +4,6 @@ import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
-import 'package:resq/views/settings/settings_view.dart';
 
 class DonorProfileView extends StatelessWidget {
   final ScreenNPTModel? screeningModel;
@@ -139,83 +138,23 @@ class DonorProfileView extends StatelessWidget {
     final String displayBlood = bloodType.isNotEmpty ? bloodType : 'A+';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F4),
-      body: SafeArea(
+      backgroundColor: const Color(0xFFF3F3F5),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
         child: Column(
           children: [
-            _buildTopHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-                child: Column(
-                  children: [
-                    _buildMainProfileCard(context, displayName, displayId, displayBlood, isEligible),
-                    const SizedBox(height: 14),
-                    _buildDonationScheduleRow(context, isEligible),
-                    const SizedBox(height: 14),
-                    _buildLifetimeImpactCard(context),
-                    const SizedBox(height: 14),
-                    _buildClinicalRecordsSection(context, isEligible),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ),
+            _buildMainProfileCard(
+                context, displayName, displayId, displayBlood, isEligible),
+            const SizedBox(height: 14),
+            _buildDonationScheduleRow(context, isEligible),
+            const SizedBox(height: 14),
+            _buildLifetimeImpactCard(context),
+            const SizedBox(height: 14),
+            _buildClinicalRecordsSection(context, isEligible),
+            const SizedBox(height: 24),
           ],
         ),
-      ),
-    );
-  }
-
-  // --- Top Navigation Header ---
-  Widget _buildTopHeader(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 14, bottom: 16, left: 18, right: 18),
-      decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/images/rq_logo_white.png',
-                height: 30,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text(
-                  'RQ',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.5, height: 22, color: Colors.white60),
-              const SizedBox(width: 12),
-              const Text(
-                'Profile & Records',
-                style: TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => SettingsView(
-                    // --- FIXED HERE: Passed required dynamic data & placeholders ---
-                    userName: donorName, // Use the existing donorName
-                    userPhone: '09xxxxxxxxx', // TODO: Implement persistent storage retrieval here
-                    userEmail: 'donor@example.com', // TODO: Implement persistent storage retrieval here
-                    // --- Removed old parameters that caused errors ---
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
       ),
     );
   }

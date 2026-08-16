@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
-import 'package:resq/widgets/app_notif_bell.dart';
 
 class ConfirmedAppointmentData {
   final String facility;
@@ -37,169 +36,149 @@ class ActiveSchedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEBEBEB),
-      body: SafeArea(
+      backgroundColor: const Color(0xFFF3F3F5),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildAppointmentHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 14),
-                          SizedBox(width: 6),
-                          Text(
-                            'APPOINTMENT CONFIRMED',
-                            style: TextStyle(color: Color(0xFF15803D), fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.check_circle_rounded,
+                      color: Color(0xFF16A34A), size: 14),
+                  SizedBox(width: 6),
+                  Text(
+                    'APPOINTMENT CONFIRMED',
+                    style: TextStyle(
+                        color: Color(0xFF15803D),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF7D1B22),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(16)),
                     ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF7D1B22),
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  appointment.queueNumber,
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                                const Text(
-                                  'Priority Slot',
-                                  style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDetailRow(Icons.local_hospital_outlined, 'Facility Center', appointment.facility),
-                                const Divider(height: 20),
-                                _buildDetailRow(Icons.calendar_month_outlined, 'Scheduled Date', _formatDate(appointment.date)),
-                                const Divider(height: 20),
-                                _buildDetailRow(Icons.access_time_rounded, 'Time Window', appointment.timeSlot),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 44,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              title: const Text('Cancel Appointment?'),
-                              content: const Text('Are you sure you want to cancel this scheduled donation slot?'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Keep Slot')),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    onCancelAppointment();
-                                  },
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-                                  child: const Text('Yes, Cancel', style: TextStyle(color: Colors.white)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.cancel_outlined, size: 18, color: Color(0xFF7D1B22)),
-                        label: const Text(
-                          'Cancel This Appointment',
-                          style: TextStyle(color: Color(0xFF7D1B22), fontSize: 13, fontWeight: FontWeight.bold),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          appointment.queueNumber,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF7D1B22), width: 1.2),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        const Text(
+                          'Priority Slot',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDetailRow(Icons.local_hospital_outlined,
+                            'Facility Center', appointment.facility),
+                        const Divider(height: 20),
+                        _buildDetailRow(Icons.calendar_month_outlined,
+                            'Scheduled Date', _formatDate(appointment.date)),
+                        const Divider(height: 20),
+                        _buildDetailRow(Icons.access_time_rounded,
+                            'Time Window', appointment.timeSlot),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      title: const Text('Cancel Appointment?'),
+                      content: const Text(
+                          'Are you sure you want to cancel this scheduled donation slot?'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Keep Slot')),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onCancelAppointment();
+                          },
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF7D1B22)),
+                          child: const Text('Yes, Cancel',
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.cancel_outlined,
+                    size: 18, color: Color(0xFF7D1B22)),
+                label: const Text(
+                  'Cancel This Appointment',
+                  style: TextStyle(
+                      color: Color(0xFF7D1B22),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.2),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildAppointmentHeader(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 14, bottom: 14, left: 16, right: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/images/rq_logo_white.png',
-                height: 30,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text(
-                  'RQ',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.5, height: 22, color: Colors.white60),
-              const SizedBox(width: 12),
-              const Text(
-                'Appointment',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const AppNotificationBell(
-            isEligible: true,
-            donorBloodType: 'O+',
-          ),
-        ],
       ),
     );
   }

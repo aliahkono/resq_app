@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
-import 'package:resq/utils/helpers/eligibility_rules.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
-import 'package:resq/widgets/app_notif_bell.dart';
 
 class IneligibleHomeView extends StatefulWidget {
   final ClassificationResult? classificationResult;
@@ -18,7 +16,7 @@ class IneligibleHomeView extends StatefulWidget {
     this.classificationResult,
     this.daysRemaining = 45,
     this.isFirstTimeDonor = false,
-    this.donorName = 'Donor',
+    this.donorName = '',
     this.bloodType = '',
     this.donorId = '',
   });
@@ -29,15 +27,54 @@ class IneligibleHomeView extends StatefulWidget {
 
 class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   final List<Map<String, dynamic>> _checklistTasks = [
-    {'title': 'Maintain a high-iron diet', 'completed': true},
-    {'title': 'Maintain body weight > 50kg', 'completed': true},
-    {'title': 'Routine wellness check', 'completed': false},
-    {'title': 'Hydrate regularly (2.0L - 2.5L daily)', 'completed': false},
+    {'title': 'Maintain a high-iron, protein-rich diet', 'completed': true},
+    {'title': 'Reach baseline body weight (≥ 50.0 kg)', 'completed': false},
+    {'title': 'Routine wellness & hydration check (2.5L/day)', 'completed': false},
     {'title': 'Review deferral clearance guidelines', 'completed': false},
   ];
 
-  String _formatClearanceDate(int days) {
-    final target = DateTime.now().add(Duration(days: days > 0 ? days : 1));
+  String _getReasonTitle(EligibleStats status) {
+    switch (status) {
+      case EligibleStats.deferredWeight:
+        return 'Weight Below 50.0 kg Baseline';
+      case EligibleStats.deferredTattsPierce:
+        return 'Recent Tattoo or Body Piercing';
+      case EligibleStats.deferredAlcohol:
+        return 'Recent Alcohol Intake (< 24 hrs)';
+      case EligibleStats.deferredMaternal:
+        return 'Maternal & Lactation Protocol';
+      case EligibleStats.deferredInterval:
+        return 'Whole Blood Recovery Window';
+      default:
+        return 'Temporary Health Deferral';
+    }
+  }
+
+  String _getReasonDesc(EligibleStats status) {
+    switch (status) {
+      case EligibleStats.deferredWeight:
+        return 'The minimum weight requirement for whole blood donation is 50.0 kg (110 lbs). This standard protects donors from hypovolemia, sudden blood pressure drops, and fainting.';
+      case EligibleStats.deferredTattsPierce:
+        return 'A standard 6 to 12-month deferral window is required following recent tattoos or piercings to guarantee blood transfusion safety.';
+      case EligibleStats.deferredAlcohol:
+        return 'Alcohol consumption within 24 hours can cause dehydration and vasovagal reactions during collection. Please hydrate and retest after 24 hours.';
+      case EligibleStats.deferredMaternal:
+        return 'Deferred under maternal health protocols (pregnancy or lactation) to protect mother and child nutrient reserves.';
+      case EligibleStats.deferredInterval:
+        return 'Your body requires at least 56 days to replenish red blood cells and iron stores after a whole blood donation.';
+      default:
+        return 'Based on health screening protocols, your donation is temporarily deferred to prioritize your safety.';
+    }
+  }
+
+  String _getClearanceDate(EligibleStats status, int days) {
+    if (status == EligibleStats.deferredWeight) {
+      return 'Upon reaching ≥ 50.0 kg';
+    }
+    if (status == EligibleStats.deferredAlcohol) {
+      return 'Tomorrow (24-Hour Clearance)';
+    }
+    final target = DateTime.now().add(Duration(days: days > 0 ? days : 30));
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
@@ -50,85 +87,30 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     final status = widget.classificationResult?.status ?? EligibleStats.deferredWeight;
     final effectiveDays = widget.classificationResult?.daysRemaining ?? widget.daysRemaining;
 
-    final String reasonTitle = EligibilityRules.getStatsTitle(status);
-    final String reasonDesc = widget.classificationResult != null
-        ? EligibilityRules.getStatsDesc(widget.classificationResult!)
-        : EligibilityRules.getStatsDesc(
-      ClassificationResult(status: status, daysRemaining: effectiveDays),
-    );
-
-    final String clearanceDateStr = _formatClearanceDate(effectiveDays);
+    final String reasonTitle = _getReasonTitle(status);
+    final String reasonDesc = _getReasonDesc(status);
+    final String clearanceDateStr = _getClearanceDate(status, effectiveDays);
     final bool isPostDonationRecovery = status == EligibleStats.deferredInterval;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F3F5),
-      body: SafeArea(
+    return Container(
+      color: const Color(0xFFF3F3F5),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildTopHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildIneligibilityBanner(reasonTitle),
-                    const SizedBox(height: 14),
-
-                    if (isPostDonationRecovery)
-                      _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr)
-                    else
-                      _buildClinicalDeferralLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr),
-
-                    const SizedBox(height: 16),
-                    _buildActionCard(context, status),
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
-            ),
+            _buildIneligibilityBanner(reasonTitle),
+            const SizedBox(height: 14),
+            if (isPostDonationRecovery)
+              _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr)
+            else
+              _buildClinicalDeferralLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr),
+            const SizedBox(height: 16),
+            _buildActionCard(context, status),
+            const SizedBox(height: 30),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTopHeader(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 14, bottom: 14, left: 18, right: 18),
-      decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Image.asset(
-                'assets/images/rq_logo_white.png',
-                height: 30,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text(
-                  'RQ',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.5, height: 22, color: Colors.white60),
-              const SizedBox(width: 12),
-              const Text(
-                'Dashboard',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          AppNotificationBell(
-            isEligible: false,
-            donorBloodType: widget.bloodType,
-          ),
-        ],
       ),
     );
   }
@@ -245,7 +227,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 child: Column(
                   children: [
                     const Text(
-                      'ESTIMATED CLEARANCE DATE',
+                      'ESTIMATED CLEARANCE STATUS',
                       style: TextStyle(
                         color: Colors.white60,
                         fontSize: 10.5,
@@ -258,7 +240,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                       clearanceDateStr,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 19,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -310,7 +292,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           ],
         ),
         const SizedBox(height: 12),
-        ...List.generate(_checklistTasks.length.clamp(0, 3), (index) {
+        ...List.generate(_checklistTasks.length.clamp(0, 4), (index) {
           final task = _checklistTasks[index];
           final bool isDone = task['completed'] == true;
           return Padding(
@@ -518,11 +500,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   }
 
   Widget _buildActionCard(BuildContext context, EligibleStats status) {
-    bool canRetake = status == EligibleStats.deferredAlcohol ||
-        status == EligibleStats.deferredMensCycle ||
-        status == EligibleStats.deferredMedical ||
-        status == EligibleStats.deferredWeight;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -550,45 +527,32 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             style: const TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), height: 1.45),
           ),
           const SizedBox(height: 16),
-          if (canRetake)
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RegistrationWizView(isRetake: true),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RegistrationWizView(
+                      isRetake: true,
+                      donorName: widget.donorName,
+                      bloodType: widget.bloodType,
+                      donorId: widget.donorId,
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7D1B22),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: const Text('Update Health Assessment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7D1B22),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
-            )
-          else
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  _showInfoModal(context, 'Deferral Policy', 'This deferral is based on clinical safety guidelines set by DOH and NVBSP to protect donor and recipient health.');
-                },
-                icon: const Icon(Icons.info_outline, size: 18),
-                label: const Text('Understand Deferral Policy', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF7D1B22),
-                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
+              child: const Text('Update Health Assessment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ),
+          ),
         ],
       ),
     );
@@ -711,34 +675,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
                 child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showInfoModal(BuildContext context, String title, String body) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
-            const SizedBox(height: 10),
-            Text(body, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-                child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
               ),
             ),
           ],
