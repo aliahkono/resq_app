@@ -149,6 +149,9 @@ class _HomeViewState extends State<HomeView> {
             : IneligibleHomeView(
           classificationResult: _effectiveResult,
           isFirstTimeDonor: _isFirstTime,
+          donorName: activeDonorName,
+          bloodType: activeBloodType,
+          donorId: activeDonorId,
         );
 
     // =======================================================================

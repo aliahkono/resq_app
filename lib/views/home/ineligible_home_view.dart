@@ -10,12 +10,18 @@ class IneligibleHomeView extends StatefulWidget {
   final ClassificationResult? classificationResult;
   final int daysRemaining;
   final bool isFirstTimeDonor;
+  final String donorName;
+  final String bloodType;
+  final String donorId;
 
   const IneligibleHomeView({
     super.key,
     this.classificationResult,
     this.daysRemaining = 45,
     this.isFirstTimeDonor = false,
+    this.donorName = 'Donor',
+    this.bloodType = '',
+    this.donorId = '',
   });
 
   @override
@@ -54,33 +60,31 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
 
     final String clearanceDateStr = _formatClearanceDate(effectiveDays);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopHeader(context),
-            _buildIneligibilityBanner(reasonTitle),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                child: Column(
-                  children: [
-                    if (widget.isFirstTimeDonor)
-                      _buildFirstTimeDonorLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr)
-                    else
-                      _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr),
-                    
-                    const SizedBox(height: 20),
-                    _buildActionCard(context, status),
-                    const SizedBox(height: 30),
-                  ],
-                ),
+    return Container(
+      color: const Color(0xFFF3F3F5),
+      child: Column(
+        children: [
+          _buildTopHeader(context),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.isFirstTimeDonor)
+                    _buildFirstTimeDonorLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr)
+                  else
+                    _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr),
+                  
+                  const SizedBox(height: 24),
+                  _buildActionCard(context, status),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -204,9 +208,9 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   Widget _buildTopHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.only(top: 14, bottom: 14, left: 16, right: 16),
+      padding: const EdgeInsets.only(top: 12, bottom: 12, left: 20, right: 20),
       decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
+        color: Color(0xFF8A1E26),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -215,25 +219,25 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             children: [
               Image.asset(
                 'assets/images/rq_logo_white.png',
-                height: 30,
+                height: 34,
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const Text(
                   'RQ',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(width: 1.5, height: 22, color: Colors.white60),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
+              Container(width: 1.5, height: 28, color: Colors.white60),
+              const SizedBox(width: 14),
               const Text(
                 'Dashboard',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
               ),
             ],
           ),
-          const AppNotificationBell(
+          AppNotificationBell(
             isEligible: false,
-            donorBloodType: '',
+            donorBloodType: widget.bloodType,
           ),
         ],
       ),
@@ -255,15 +259,15 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             color: const Color(0xFFB52934),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7D1B22).withOpacity(0.25),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF7D1B22).withOpacity(0.2),
+                blurRadius: 15,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -274,87 +278,87 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.medical_services_outlined, color: Colors.white, size: 24),
+                    child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 28),
                   ),
                   ElevatedButton(
                     onPressed: () {
                       QrPassModalView.show(
                         context,
-                        donorName: 'First-Time Volunteer',
-                        bloodType: 'Pending',
-                        donorId: 'BD-PENDING',
+                        donorName: widget.donorName,
+                        bloodType: widget.bloodType.isNotEmpty ? widget.bloodType : 'Pending',
+                        donorId: widget.donorId.isNotEmpty ? widget.donorId : 'BD-PENDING',
                         isEligible: false,
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.2),
+                      backgroundColor: Colors.white.withOpacity(0.18),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                     ),
-                    child: const Text('Show Digital Pass', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                    child: const Text('Show Digital Pass', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               const Text(
                 'Temporary Deferral Notice',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 'Your health comes first!\nBased on your screening, you are temporarily deferred from donating today.',
-                style: TextStyle(color: Colors.white, fontSize: 12.5, height: 1.4),
+                style: TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.5),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.black.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
                   children: [
                     const Text(
                       'CLEARANCE DATE',
                       style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
+                        color: Colors.white60,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
+                        letterSpacing: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       clearanceDateStr,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 18),
                     SizedBox(
                       width: double.infinity,
-                      height: 38,
+                      height: 44,
                       child: ElevatedButton(
                         onPressed: () => _showScreeningDetailsModal(context, reasonTitle, reasonDesc, clearanceDateStr),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF7D1B22),
+                          foregroundColor: const Color(0xFFB52934),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: const Text(
                           'View Screening Details',
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -364,17 +368,17 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _buildSectionHeader('Why Am I Deferred?'),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         _buildDetailInfoCard('REASON', reasonTitle),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         _buildDetailInfoCard('STANDARD WINDOW', _resolveStandardWindow(status, effectiveDays)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         _buildDetailInfoCard('CLEAR DATE', clearanceDateStr),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         _buildDetailInfoCard('SAFETY NOTE', _resolveSafetyNote(status)),
-        const SizedBox(height: 22),
+        const SizedBox(height: 28),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -383,7 +387,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
               '$completedCount OF ${_checklistTasks.length} TASKS\nCOMPLETE',
               textAlign: TextAlign.right,
               style: const TextStyle(
-                color: Color(0xFF7D1B22),
+                color: Color(0xFFB52934),
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 height: 1.2,
@@ -391,39 +395,38 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         ...List.generate(_checklistTasks.length.clamp(0, 3), (index) {
           final task = _checklistTasks[index];
           final bool isDone = task['completed'] == true;
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
+            padding: const EdgeInsets.only(bottom: 10.0),
             child: InkWell(
               onTap: () {
                 setState(() {
                   task['completed'] = !isDone;
                 });
               },
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: isDone ? const Color(0xFFEBF1FA) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDone ? Colors.transparent : const Color(0xFFD4D4D4),
-                    width: 1,
-                  ),
+                  color: isDone ? const Color(0xFFEBF3FE) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+                  ],
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: 22,
-                      height: 22,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         color: isDone ? const Color(0xFF8A1E26) : Colors.white,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isDone ? const Color(0xFF8A1E26) : const Color(0xFFBDBDBD),
+                          color: isDone ? const Color(0xFF8A1E26) : const Color(0xFFD4D4D4),
                           width: 1.5,
                         ),
                       ),
@@ -431,14 +434,14 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                           ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
                           : null,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Text(
                         task['title'],
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: isDone ? const Color(0xFF1E1E1E) : const Color(0xFF6B7280),
+                          color: isDone ? const Color(0xFF1E1E1E) : const Color(0xFF4B5563),
                         ),
                       ),
                     ),
@@ -448,12 +451,12 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ),
           );
         }),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _buildSectionHeader('First - Time Donor Knowledge Hub'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 10,
+          runSpacing: 10,
           children: [
             _buildKnowledgeChip(Icons.help_outline_rounded, 'Deferral Rules', () {
               _showInfoModal(context, 'Deferral Rules & Protocols', 'Blood donation safety regulations set by the Department of Health (DOH) protect donor hemodynamics and transfusion safety.');
@@ -466,7 +469,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             }),
           ],
         ),
-        const SizedBox(height: 24),
       ],
     );
   }
@@ -487,36 +489,36 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFFFEF3D6),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 52,
+                height: 52,
                 decoration: const BoxDecoration(
                   color: Color(0xFFFDE68A),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.nightlight_round, color: Color(0xFFB45309), size: 22),
+                child: const Icon(Icons.nightlight_round, color: Color(0xFFB45309), size: 28),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      'REST & RECOVERY\nPERIOD',
+                      'REST & RECOVERY PERIOD',
                       style: TextStyle(
                         color: Color(0xFF92400E),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        height: 1.2,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        letterSpacing: 0.2,
                       ),
                     ),
                     SizedBox(height: 6),
@@ -524,8 +526,8 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                       'Thank you for your recent donation! Your body is replenishing its reserves.',
                       style: TextStyle(
                         color: Color(0xFFB45309),
-                        fontSize: 12,
-                        height: 1.35,
+                        fontSize: 13,
+                        height: 1.4,
                       ),
                     ),
                   ],
@@ -534,17 +536,17 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -555,15 +557,15 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 top: 0,
                 bottom: 0,
                 child: Container(
-                  width: 4.5,
+                  width: 5,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF7D1B22),
-                    borderRadius: BorderRadius.horizontal(left: Radius.circular(16)),
+                    color: Color(0xFF8A1E26),
+                    borderRadius: BorderRadius.horizontal(left: Radius.circular(18)),
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(18.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -575,12 +577,12 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                           children: [
                             const Text(
                               'NEXT ELIGIBLE DATE',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280), letterSpacing: 0.5),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               clearanceDateStr,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
                             ),
                           ],
                         ),
@@ -594,52 +596,52 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                               ),
                             );
                           },
-                          icon: const Icon(Icons.alarm, size: 14),
-                          label: const Text('Set Reminder', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.alarm, size: 15),
+                          label: const Text('Set Reminder', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFEDF2FE),
-                            foregroundColor: const Color(0xFF1E3A8A),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            foregroundColor: const Color(0xFF1E293B),
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     Text(
                       '$effectiveDays Days Left',
-                      style: const TextStyle(color: Color(0xFF8A1E26), fontSize: 13, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Color(0xFFB52934), fontSize: 14, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Progress: $daysPassed/$totalCycleDays Days', style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                        Text('$percentComplete% Complete', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E))),
+                        Text('Progress: $daysPassed/$totalCycleDays Days', style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                        Text('$percentComplete% Complete', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E1E1E))),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                       child: LinearProgressIndicator(
                         value: (daysPassed / totalCycleDays).clamp(0.0, 1.0),
                         backgroundColor: const Color(0xFFFFDDE0),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8A1E26)),
-                        minHeight: 7,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFB52934)),
+                        minHeight: 8,
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
                     const SizedBox(height: 12),
-                    const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                    const SizedBox(height: 10),
                     const Text(
                       'Last Donation: April 12, 2026 (@ Philippine Red Cross)',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF4B5563)),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       'Reason: Standard $totalCycleDays-day whole blood recovery',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF4B5563)),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
                     ),
                   ],
                 ),
@@ -647,18 +649,12 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-            children: [
-              TextSpan(text: 'Staying Ready '),
-              TextSpan(text: '| ', style: TextStyle(color: Color(0xFF7D1B22))),
-              TextSpan(text: 'Recovery Tips'),
-            ],
-          ),
+        const SizedBox(height: 28),
+        const Text(
+          'Staying Ready | Recovery Tips',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
@@ -666,10 +662,10 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 icon: Icons.restaurant_rounded,
                 title: 'Iron-Rich Foods',
                 desc: 'Spinach, lentils, and red meats help recovery.',
-                iconColor: const Color(0xFF8A1E26),
+                iconColor: const Color(0xFFB52934),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildRecoveryTipTile(
                 icon: Icons.water_drop_rounded,
@@ -680,7 +676,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -691,7 +687,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 iconColor: const Color(0xFF475569),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: _buildRecoveryTipTile(
                 icon: Icons.nightlight_round,
@@ -702,13 +698,13 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             color: const Color(0xFF111827),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(22),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,72 +712,72 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8A1E26),
+                      color: const Color(0xFFB52934),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       'URGENT NEED',
-                      style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Text('Quezon / Cavite Region', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                  const SizedBox(width: 10),
+                  const Text('Cavite Region', style: TextStyle(color: Colors.white60, fontSize: 13)),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               const Text(
                 'Help Save Lives While You Rest',
-                style: TextStyle(color: Colors.white, fontSize: 15.5, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               RichText(
                 text: const TextSpan(
-                  style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.35),
+                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
                   children: [
                     TextSpan(text: 'Type '),
                     TextSpan(text: 'O+ ', style: TextStyle(color: Color(0xFFFF8A80), fontWeight: FontWeight.bold)),
-                    TextSpan(text: 'supplies are critically low near your area. Since you\'re resting, can you share this with your circle?'),
+                    TextSpan(text: 'supplies are critically low near Cavite. Since you\'re resting, can you share this with your circle?'),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                height: 42,
+                height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Sharing urgent blood recruitment link to your social apps...'),
+                        content: Text('Sharing urgent blood recruitment link...'),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
                   },
-                  icon: const Icon(Icons.share_rounded, size: 16),
-                  label: const Text('Share Urgent Blood Need', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('Share Urgent Blood Need', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8A1E26),
+                    backgroundColor: const Color(0xFFB52934),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -791,23 +787,23 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             children: [
               const Text(
                 'YOUR LIFETIME IMPACT SUMMARY',
-                style: TextStyle(color: Color(0xFF7D1B22), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.6),
+                style: TextStyle(color: Color(0xFF8A1E26), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.8),
               ),
-              const SizedBox(height: 10),
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Expanded(
                     child: Row(
                       children: [
-                        const Icon(Icons.water_drop_outlined, color: Color(0xFF8A1E26), size: 28),
-                        const SizedBox(width: 8),
+                        const Icon(Icons.water_drop_outlined, color: Color(0xFFB52934), size: 36),
+                        const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: const [
-                            Text('1.8', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E))),
-                            Text('Total Donated (L)', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                            Text('1.8', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1E1E1E))),
+                            Text('Total Donated (L)', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
                           ],
                         ),
                       ],
@@ -816,13 +812,13 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                   Expanded(
                     child: Row(
                       children: [
-                        const Icon(Icons.people_alt_outlined, color: Color(0xFF1D4ED8), size: 28),
-                        const SizedBox(width: 8),
+                        const Icon(Icons.people_alt_outlined, color: Color(0xFF1D4ED8), size: 36),
+                        const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: const [
-                            Text('12', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E))),
-                            Text('Lives Impacted', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                            Text('12', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF1E1E1E))),
+                            Text('Lives Impacted', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
                           ],
                         ),
                       ],
@@ -842,17 +838,17 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     return Row(
       children: [
         Container(
-          width: 3.5,
-          height: 16,
+          width: 4.5,
+          height: 18,
           decoration: BoxDecoration(
-            color: const Color(0xFF7D1B22),
+            color: const Color(0xFFB52934),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 10),
         Text(
           title,
-          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
         ),
       ],
     );
@@ -861,15 +857,15 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   Widget _buildDetailInfoCard(String label, String value) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -878,12 +874,12 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22), letterSpacing: 0.5),
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFB52934), letterSpacing: 0.8),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF2C2C2C)),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
           ),
         ],
       ),
@@ -897,25 +893,25 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     required Color iconColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFB52934).withOpacity(0.4), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(height: 8),
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(height: 10),
           Text(
             title,
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             desc,
-            style: const TextStyle(fontSize: 10.5, color: Color(0xFF6B7280), height: 1.3),
+            style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
           ),
         ],
       ),
