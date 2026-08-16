@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:resq/model/screening_input_model.dart';
-import 'package:resq/utils/algo/decision_tree_class.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
-import 'package:resq/views/auth/login_view.dart';
-import 'package:resq/views/home/home_view.dart';
-import 'package:resq/widgets/custom_input_field.dart';
-import 'package:resq/model/user_model.dart';
 import 'package:resq/model/donor_profile_model.dart';
+import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/model/user_model.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
+import 'package:resq/views/auth/login_view.dart';
+import 'package:resq/views/auth/registration_summary_view.dart';
+import 'package:resq/widgets/custom_input_field.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
@@ -232,9 +231,8 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
   Future<void> _finishAssessment() async {
     setState(() => _isLoading = true);
-    
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 1200));
+
+    await Future.delayed(const Duration(milliseconds: 600));
 
     final double weight = double.tryParse(_weightController.text.trim()) ?? 52.0;
     int calculatedAge = 22;
@@ -264,12 +262,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,
     );
 
-    // 1. Generate / Retrieve IDs
     final String timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
     final String activeUserId = 'USR-$timestamp';
     final String activeProfId = widget.donorId ?? 'PRF-$timestamp';
 
-    // 2. Prepare Screening Model
     final ScreenNPTModel finalModel = ScreenNPTModel(
       donorProfId: activeProfId,
       submissionDate: DateTime.now(),
@@ -278,9 +274,13 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
     final ClassificationResult result = finalModel.evaluateEligibility();
 
-    // 3. Permanent Logic: Construct Models for Persistence
-    if (!widget.isRetake) {
-      // Logic for NEW USER Registration
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (widget.isRetake) {
+      widget.onRetakeCompleted?.call(finalModel, result);
+      Navigator.pop(context);
+    } else {
       final UserModel newUser = UserModel(
         id: activeUserId,
         email: _emailController.text.trim(),
@@ -300,40 +300,18 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         lastDonationDate: _lastDonationDate,
       );
 
-      // TODO: IMPLEMENT DATABASE PERSISTENCE HERE
-      // await DatabaseService.saveUserRegistration(newUser, newProfile, finalModel);
-      debugPrint('Persisting New User: ${newUser.fullName} with ID: ${newUser.id}');
-    } else {
-      // Logic for EXISTING USER Re-assessment (Retake)
-      // TODO: IMPLEMENT DATABASE UPDATE HERE
-      // await DatabaseService.updateEligibility(activeProfId, result.status, finalModel);
-      debugPrint('Updating Eligibility for Profile: $activeProfId to ${result.status.name}');
-    }
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    final String activeDonorName = widget.isRetake
-        ? (widget.donorName ?? 'Donor')
-        : (_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Donor');
-    final String activeBloodType = _selectedBloodType == "I'm not sure" ? 'Unknown' : _selectedBloodType;
-
-    if (widget.isRetake) {
-      widget.onRetakeCompleted?.call(finalModel, result);
-      Navigator.pop(context);
-    } else {
-      Navigator.of(context).pushAndRemoveUntil(
+      // Navigate to Summary View to allow donor review before SMS OTP verification
+      Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => HomeView(
-            donorName: activeDonorName,
-            bloodType: activeBloodType,
-            donorId: activeProfId,
+          builder: (context) => RegistrationSummaryView(
+            userModel: newUser,
+            profileModel: newProfile,
             screeningModel: finalModel,
             classificationResult: result,
+            rawPassword: _passwordController.text,
             isFirstTimeDonor: _isFirstTimeDonor,
           ),
         ),
-            (route) => false,
       );
     }
   }
@@ -367,9 +345,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // ===========================================================================
-  // TOP CURVED HEADER (Steps 2 & 3 - Images 2, 5, 7)
-  // ===========================================================================
   Widget _buildCurvedTopHeader() {
     return Container(
       width: double.infinity,
@@ -402,201 +377,182 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // ===========================================================================
-  // STEP 1: CREATE YOUR ACCOUNT
-  // ===========================================================================
   Widget _buildStep1AccountUI() {
     return Form(
       key: _formKey,
       child: Column(
         children: [
           const SizedBox(height: 10),
-        // Big Circular RQ Badge
-        Container(
-          width: 90,
-          height: 90,
-          decoration: BoxDecoration(
-            color: const Color(0xFF7D1B22),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7D1B22).withOpacity(0.2),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: Image.asset(
-            'assets/images/rq_logo_white.png',
-            height: 52,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Text(
-              'RQ',
-              style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              color: const Color(0xFF7D1B22),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7D1B22).withOpacity(0.2),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Create Your Account',
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E), letterSpacing: -0.5),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Join our community of lifesaving donors.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 32),
-
-        // Full Name
-        _buildBorderedInput(
-          controller: _nameController,
-          hintText: 'Full Name',
-          icon: Icons.person_rounded,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) return 'Please enter your full name';
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Email
-        _buildBorderedInput(
-          controller: _emailController,
-          hintText: 'Email Address',
-          icon: Icons.email_rounded,
-          keyboardType: TextInputType.emailAddress,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) return 'Please enter your email';
-            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Please enter a valid email address';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Phone Input
-        _buildPhoneInput(),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.info_rounded, size: 16, color: Color(0xFF7D1B22)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                "We'll send a 6-digit verification code via SMS to this number.",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
+            alignment: Alignment.center,
+            child: Image.asset(
+              'assets/images/rq_logo_white.png',
+              height: 52,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Text(
+                'RQ',
+                style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 0.5),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Password
-        _buildBorderedInput(
-          controller: _passwordController,
-          hintText: 'Password',
-          icon: Icons.lock_rounded,
-          obscureText: _obscurePassword,
-          suffixIcon: IconButton(
-            icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           ),
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Please enter a password';
-            if (value.length < 8) return 'Password must be at least 8 characters';
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Confirm Password
-        _buildBorderedInput(
-          controller: _confirmPasswordController,
-          hintText: 'Confirm Password',
-          icon: Icons.lock_clock_rounded,
-          obscureText: _obscureConfirmPassword,
-          suffixIcon: IconButton(
-            icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
-            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+          const SizedBox(height: 24),
+          const Text(
+            'Create Your Account',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E), letterSpacing: -0.5),
           ),
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Please confirm your password';
-            if (value != _passwordController.text) return 'Passwords do not match';
-            return null;
-          },
-        ),
-        const SizedBox(height: 24),
-
-        // Privacy Guaranteed Banner
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF6F6),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFEAA1A5).withOpacity(0.5)),
+          const SizedBox(height: 8),
+          const Text(
+            'Join our community of lifesaving donors.',
+            style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
           ),
-          child: Row(
+          const SizedBox(height: 32),
+          _buildBorderedInput(
+            controller: _nameController,
+            hintText: 'Full Name',
+            icon: Icons.person_rounded,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Please enter your full name';
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildBorderedInput(
+            controller: _emailController,
+            hintText: 'Email Address',
+            icon: Icons.email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Please enter your email';
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                return 'Please enter a valid email address';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildPhoneInput(),
+          const SizedBox(height: 8),
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7D1B22).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
-              ),
-              const SizedBox(width: 12),
+              const Icon(Icons.info_rounded, size: 16, color: Color(0xFF7D1B22)),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
-                    SizedBox(height: 4),
-                    Text(
-                      'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
-                      style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
-                    ),
-                  ],
+                child: Text(
+                  "We'll send a 6-digit verification code via SMS to this number.",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 20),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Already have an account? ', style: TextStyle(fontSize: 14, color: Color(0xFF4B5563))),
-            InkWell(
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginView()),
-                );
-              },
-              child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+          const SizedBox(height: 16),
+          _buildBorderedInput(
+            controller: _passwordController,
+            hintText: 'Password',
+            icon: Icons.lock_rounded,
+            obscureText: _obscurePassword,
+            suffixIcon: IconButton(
+              icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
+              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
             ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // Continue Button
-        _buildPrimaryCTA(
-          title: 'Continue to Details',
-          onTap: _nextStep,
-        ),
-        const SizedBox(height: 16),
-      ],
-    ),
-  );
-}
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Please enter a password';
+              if (value.length < 8) return 'Password must be at least 8 characters';
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildBorderedInput(
+            controller: _confirmPasswordController,
+            hintText: 'Confirm Password',
+            icon: Icons.lock_clock_rounded,
+            obscureText: _obscureConfirmPassword,
+            suffixIcon: IconButton(
+              icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
+              onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) return 'Please confirm your password';
+              if (value != _passwordController.text) return 'Passwords do not match';
+              return null;
+            },
+          ),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF6F6),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFEAA1A5).withOpacity(0.5)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7D1B22).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
+                      SizedBox(height: 4),
+                      Text(
+                        'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Already have an account? ', style: TextStyle(fontSize: 14, color: Color(0xFF4B5563))),
+              InkWell(
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginView()),
+                  );
+                },
+                child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildPrimaryCTA(
+            title: 'Continue to Details',
+            onTap: _nextStep,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
 
   Widget _buildPhoneInput() {
     return TextFormField(
@@ -634,9 +590,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // ===========================================================================
-  // STEP 2: PHYSICAL METRICS (Images 2, 3, 4)
-  // ===========================================================================
   Widget _buildStep2PhysicalMetricsUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,14 +610,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Blood Type Selection
         const Text('Blood Type Selection', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E))),
         const SizedBox(height: 2),
         const Text('Select your blood type if known. Otherwise, choose "I\'m not sure".', style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
         const SizedBox(height: 12),
-
-        // 4x2 Blood Grid
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -701,8 +650,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           },
         ),
         const SizedBox(height: 10),
-
-        // "I'm not sure" Button
         SizedBox(
           width: double.infinity,
           height: 44,
@@ -723,10 +670,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ),
         ),
-
         const SizedBox(height: 18),
-
-        // Date of Birth
         const Text('Date of Birth', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         _buildCrimsonDateButton(
@@ -739,10 +683,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             onPicked: (d) => _dob = d,
           ),
         ),
-
         const SizedBox(height: 16),
-
-        // Biological Sex (Segmented Slider)
         const Text('Biological Sex', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Container(
@@ -800,10 +741,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ],
           ),
         ),
-
         const SizedBox(height: 16),
-
-        // Weight (kg)
         const Text('Weight (kg)', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         _buildBorderedInput(
@@ -812,10 +750,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           icon: Icons.monitor_weight_outlined,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
-
         const SizedBox(height: 18),
-
-        // Last Blood Donation (Image 3)
         const Text('Last Blood Donation', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         _buildCrimsonDateButton(
@@ -858,13 +793,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ],
           ),
         ),
-
         const SizedBox(height: 20),
-
-        // Recent Procedures (Tattoos / Piercings - Images 3 & 4)
         const Text('Recent Procedures', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
-
         _buildProcedureOption(
           label: 'No Tattoos or Piercings',
           isSelected: !_hasTattoosOrPiercings,
@@ -876,8 +807,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           isSelected: _hasTattoosOrPiercings,
           onTap: () => setState(() => _hasTattoosOrPiercings = true),
         ),
-
-        // Conditional Blue Alert Box & Date Picker (Image 4)
         if (_hasTattoosOrPiercings) ...[
           const SizedBox(height: 12),
           Container(
@@ -915,7 +844,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ),
         ],
-
         const SizedBox(height: 24),
         _buildPrimaryCTA(
           title: 'Continue to Final Screening',
@@ -926,9 +854,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // ===========================================================================
-  // STEP 3: FINAL SCREENING (Female: Images 5 & 6 | Male: Images 7 & 8)
-  // ===========================================================================
   Widget _buildStep3FinalScreeningUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -948,10 +873,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           ),
         ),
         const SizedBox(height: 18),
-
-        // FEMALE BRANCH (Images 5 & 6)
         if (_gender == BioSex.female) ...[
-          // Amber Warning Banner
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
@@ -974,8 +896,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Date of Last Menstrual Period
           const Text('Date of Last Menstrual Period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           InkWell(
@@ -1001,10 +921,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Pregnancy Status Choices
           const Text('Pregnancy Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           _buildSelectionOption(
@@ -1024,10 +941,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             isSelected: _pregnancyStatusIndex == 2,
             onTap: () => setState(() => _pregnancyStatusIndex = 2),
           ),
-
           const SizedBox(height: 14),
-
-          // Currently Breastfeeding Switch
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -1054,10 +968,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ),
         ],
-
-        // MALE BRANCH (Images 7 & 8)
         if (_gender == BioSex.male) ...[
-          // History of STI/STD
           const Text('History of STI/STD (Last 12 mos)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Row(
@@ -1071,10 +982,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // High-Risk Sexual Contact Card
           const Text('High-Risk Sexual Contact (Last 12 mos)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Container(
@@ -1105,10 +1013,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               ],
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // MSM History
           const Text('MSM History (Men who have sex with men)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           _buildSelectionOption(
@@ -1129,10 +1034,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             onTap: () => setState(() => _msmHistoryIndex = 2),
           ),
         ],
-
         const SizedBox(height: 16),
-
-        // Recent Sexual Risk Checkbox (Images 6 & 8)
         const Text('Recent Sexual Risk', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         InkWell(
@@ -1167,10 +1069,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ),
         ),
-
         const SizedBox(height: 20),
-
-        // Almost Ready Card (Images 6 & 8)
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -1199,17 +1098,16 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Completing this registration will book your appointment slot at the Downtown Clinical Center.',
+                'Review your details to ensure eligibility verification matches your government clinical records.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Color(0xFF6B7280), height: 1.4),
               ),
             ],
           ),
         ),
-
         const SizedBox(height: 20),
         _buildPrimaryCTA(
-          title: 'Submit & Complete Registration',
+          title: 'Review Registration Summary',
           onTap: _nextStep,
         ),
         const SizedBox(height: 20),
@@ -1217,7 +1115,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // --- Helper UI Widgets ---
   Widget _buildBorderedInput({
     required TextEditingController controller,
     required String hintText,
