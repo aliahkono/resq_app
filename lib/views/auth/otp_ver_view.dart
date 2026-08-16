@@ -297,7 +297,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                     ? 'Your phone number ($_phoneNumber) has been verified.'
                     : 'Your email address ($_email) has been verified.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12.5,
                   color: ResQTheme.textMuted,
                   height: 1.45,
@@ -316,6 +316,8 @@ class _OtpVerViewState extends State<OtpVerView> {
                           donorName: widget.donorName,
                           bloodType: widget.bloodType,
                           donorId: widget.donorId,
+                          phoneNum: _phoneNumber,
+                          donorEmail: _email,
                           screeningModel: widget.screeningModel,
                           classificationResult: widget.classificationResult,
                           isFirstTimeDonor:
@@ -379,7 +381,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   color: ResQTheme.primaryCrimson.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Center(
+                child: const Center(
                   child: Icon(
                     Icons.shield_outlined,
                     size: 38,
@@ -515,7 +517,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                     ),
                     TextSpan(
                       text: activeTarget,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: ResQTheme.textDark,
                         fontWeight: FontWeight.bold,
                       ),
@@ -526,11 +528,9 @@ class _OtpVerViewState extends State<OtpVerView> {
               const SizedBox(height: 4),
               TextButton.icon(
                 onPressed: _showChangeContactModal,
-                icon: Icon(Icons.edit_outlined, size: 14, color: ResQTheme.primaryCrimson),
-                label: Text(
-                  _verificationMode == OtpVerificationMode.phone
-                      ? 'Change phone number'
-                      : 'Change email address',
+                icon: const Icon(Icons.edit_outlined, size: 14, color: ResQTheme.primaryCrimson),
+                label: const Text(
+                  'Change contact details',
                   style: TextStyle(
                     color: ResQTheme.primaryCrimson,
                     fontSize: 11.5,
@@ -625,7 +625,7 @@ class _OtpVerViewState extends State<OtpVerView> {
               _canResend
                   ? TextButton(
                 onPressed: _resendCode,
-                child: Text(
+                child: const Text(
                   'RESEND CODE NOW',
                   style: TextStyle(
                     color: ResQTheme.primaryCrimson,
@@ -637,7 +637,7 @@ class _OtpVerViewState extends State<OtpVerView> {
               )
                   : Text(
                 'Resend code in ${_secondsRemaining.toString().padLeft(2, '0')}s',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
                   color: ResQTheme.textMuted,
                   fontWeight: FontWeight.w500,

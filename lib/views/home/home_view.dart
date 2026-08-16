@@ -42,10 +42,9 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   int _currentTabIndex = 0;
-  bool _isLoading = true;
-  ClassificationResult? _effectiveResult;
-  ScreenNPTModel? _currentScreeningModel;
-  bool _isFirstTime = true;
+  late ClassificationResult _effectiveResult;
+  late ScreenNPTModel? _currentScreeningModel;
+  late bool _isFirstTime;
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
@@ -55,31 +54,17 @@ class _HomeViewState extends State<HomeView> {
   void initState() {
     super.initState();
     _currentScreeningModel = widget.screeningModel;
-    _evaluateEligibility();
-  }
 
-  Future<void> _evaluateEligibility() async {
-    ClassificationResult result;
-    bool firstTime;
-
+    // Direct synchronous evaluation (zero delay, zero race conditions)
     if (widget.classificationResult != null) {
-      result = widget.classificationResult!;
-      firstTime = widget.isFirstTimeDonor;
+      _effectiveResult = widget.classificationResult!;
+      _isFirstTime = widget.isFirstTimeDonor;
     } else if (_currentScreeningModel != null) {
-      result = _currentScreeningModel!.evaluateEligibility();
-      firstTime = _currentScreeningModel!.screensNPT.isFirstTimeDonor;
+      _effectiveResult = _currentScreeningModel!.evaluateEligibility();
+      _isFirstTime = _currentScreeningModel!.screensNPT.isFirstTimeDonor;
     } else {
-      await Future.delayed(const Duration(milliseconds: 300));
-      result = ClassificationResult(status: EligibleStats.eligible);
-      firstTime = widget.isFirstTimeDonor;
-    }
-
-    if (mounted) {
-      setState(() {
-        _effectiveResult = result;
-        _isFirstTime = firstTime;
-        _isLoading = false;
-      });
+      _effectiveResult = ClassificationResult(status: EligibleStats.eligible);
+      _isFirstTime = widget.isFirstTimeDonor;
     }
   }
 
@@ -105,8 +90,7 @@ class _HomeViewState extends State<HomeView> {
                       ? 'Assessment updated: You are now verified eligible to donate!'
                       : 'Assessment updated: Temporarily deferred (${result.status.name})',
                 ),
-                backgroundColor:
-                result.isEligible ? Colors.green : Colors.orange,
+                backgroundColor: result.isEligible ? Colors.green : Colors.orange,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -127,8 +111,7 @@ class _HomeViewState extends State<HomeView> {
         bottom: false,
         child: Container(
           width: double.infinity,
-          padding:
-          const EdgeInsets.only(top: 14, bottom: 14, left: 18, right: 18),
+          padding: const EdgeInsets.only(top: 14, bottom: 14, left: 18, right: 18),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -140,10 +123,7 @@ class _HomeViewState extends State<HomeView> {
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Text(
                       'RQ',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -151,10 +131,7 @@ class _HomeViewState extends State<HomeView> {
                   const SizedBox(width: 12),
                   Text(
                     title,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600),
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -162,8 +139,7 @@ class _HomeViewState extends State<HomeView> {
                 children: [
                   if (_currentTabIndex == 2)
                     IconButton(
-                      icon: const Icon(Icons.settings_rounded,
-                          color: Colors.white, size: 22),
+                      icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -177,7 +153,7 @@ class _HomeViewState extends State<HomeView> {
                       },
                     ),
                   AppNotificationBell(
-                    isEligible: _effectiveResult?.isEligible ?? true,
+                    isEligible: _effectiveResult.isEligible,
                     donorBloodType: widget.bloodType,
                   ),
                 ],
@@ -191,22 +167,9 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    final String activeDonorName =
-    widget.donorName.isNotEmpty ? widget.donorName : 'John Doe';
-
-    final String activeBloodType =
-    widget.bloodType.isNotEmpty ? widget.bloodType : 'A+';
-
-    final String activeDonorId =
-    widget.donorId.isNotEmpty ? widget.donorId : 'BD-10942';
+    final String activeDonorName = widget.donorName.isNotEmpty ? widget.donorName : 'John Doe';
+    final String activeBloodType = widget.bloodType.isNotEmpty ? widget.bloodType : 'A+';
+    final String activeDonorId = widget.donorId.isNotEmpty ? widget.donorId : 'BD-10942';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F5),
@@ -240,7 +203,7 @@ class _HomeViewState extends State<HomeView> {
       ) {
     switch (_currentTabIndex) {
       case 0:
-        return (_effectiveResult?.isEligible ?? true)
+        return _effectiveResult.isEligible
             ? EligibleHomeView(
           isFirstTimeDonor: _isFirstTime,
           donorName: activeDonorName,
@@ -252,8 +215,7 @@ class _HomeViewState extends State<HomeView> {
                 facility: request.hospital,
                 date: DateTime.now().add(const Duration(days: 1)),
                 timeSlot: '09:00 AM - 10:00 AM',
-                queueNumber:
-                'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                queueNumber: 'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
               );
               _currentTabIndex = 1;
             });
@@ -267,7 +229,7 @@ class _HomeViewState extends State<HomeView> {
           donorId: activeDonorId,
         );
       case 1:
-        if (_effectiveResult?.isEligible ?? true) {
+        if (_effectiveResult.isEligible) {
           if (_confirmedAppointment != null) {
             return ActiveSchedView(
               appointment: _confirmedAppointment!,
@@ -298,14 +260,12 @@ class _HomeViewState extends State<HomeView> {
                             facility: 'Philippine Red Cross - Quezon Chapter',
                             date: DateTime.now().add(const Duration(days: 2)),
                             timeSlot: '09:00 AM - 10:00 AM',
-                            queueNumber:
-                            'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                            queueNumber: 'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
                           );
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content:
-                            Text('Appointment slot confirmed successfully!'),
+                            content: Text('Appointment slot confirmed successfully!'),
                             backgroundColor: Colors.green,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -320,7 +280,7 @@ class _HomeViewState extends State<HomeView> {
         } else {
           return IneligibleAppointView(
             isFirstTimeDonor: _isFirstTime,
-            daysRemaining: _effectiveResult?.daysRemaining ?? 0,
+            daysRemaining: _effectiveResult.daysRemaining,
             onRefreshScreening: _openRetakeScreening,
           );
         }

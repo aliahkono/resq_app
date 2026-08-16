@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
@@ -16,7 +17,7 @@ class IneligibleHomeView extends StatefulWidget {
     this.classificationResult,
     this.daysRemaining = 45,
     this.isFirstTimeDonor = false,
-    this.donorName = '',
+    this.donorName = 'Donor',
     this.bloodType = '',
     this.donorId = '',
   });
@@ -26,60 +27,105 @@ class IneligibleHomeView extends StatefulWidget {
 }
 
 class _IneligibleHomeViewState extends State<IneligibleHomeView> {
-  final List<Map<String, dynamic>> _checklistTasks = [
-    {'title': 'Maintain a high-iron, protein-rich diet', 'completed': true},
-    {'title': 'Reach baseline body weight (≥ 50.0 kg)', 'completed': false},
-    {'title': 'Routine wellness & hydration check (2.5L/day)', 'completed': false},
-    {'title': 'Review deferral clearance guidelines', 'completed': false},
-  ];
+  late final List<Map<String, dynamic>> _checklistTasks;
 
-  String _getReasonTitle(EligibleStats status) {
-    switch (status) {
-      case EligibleStats.deferredWeight:
-        return 'Weight Below 50.0 kg Baseline';
-      case EligibleStats.deferredTattsPierce:
-        return 'Recent Tattoo or Body Piercing';
-      case EligibleStats.deferredAlcohol:
-        return 'Recent Alcohol Intake (< 24 hrs)';
-      case EligibleStats.deferredMaternal:
-        return 'Maternal & Lactation Protocol';
-      case EligibleStats.deferredInterval:
-        return 'Whole Blood Recovery Window';
-      default:
-        return 'Temporary Health Deferral';
-    }
+  @override
+  void initState() {
+    super.initState();
+    _checklistTasks = [
+      {'title': 'Maintain a high-iron, protein-rich diet', 'completed': true},
+      {'title': 'Reach baseline body weight (≥ 50.0 kg)', 'completed': false},
+      {'title': 'Routine wellness & hydration check (2.5L/day)', 'completed': false},
+      {'title': 'Review deferral clearance guidelines', 'completed': false},
+    ];
   }
 
-  String _getReasonDesc(EligibleStats status) {
-    switch (status) {
-      case EligibleStats.deferredWeight:
-        return 'The minimum weight requirement for whole blood donation is 50.0 kg (110 lbs). This standard protects donors from hypovolemia, sudden blood pressure drops, and fainting.';
-      case EligibleStats.deferredTattsPierce:
-        return 'A standard 6 to 12-month deferral window is required following recent tattoos or piercings to guarantee blood transfusion safety.';
-      case EligibleStats.deferredAlcohol:
-        return 'Alcohol consumption within 24 hours can cause dehydration and vasovagal reactions during collection. Please hydrate and retest after 24 hours.';
-      case EligibleStats.deferredMaternal:
-        return 'Deferred under maternal health protocols (pregnancy or lactation) to protect mother and child nutrient reserves.';
-      case EligibleStats.deferredInterval:
-        return 'Your body requires at least 56 days to replenish red blood cells and iron stores after a whole blood donation.';
-      default:
-        return 'Based on health screening protocols, your donation is temporarily deferred to prioritize your safety.';
-    }
+  // Defensive, string-safe enum resolver to prevent enum-mismatch crashes
+  String _getReasonTitle(EligibleStats? status) {
+    if (status == null) return 'Temporary Health Deferral';
+    final s = status.toString().toLowerCase();
+    if (s.contains('weight')) return 'Weight Below 50.0 kg Baseline';
+    if (s.contains('tatts') || s.contains('pierce')) return 'Recent Tattoo or Body Piercing';
+    if (s.contains('alcohol')) return 'Recent Alcohol Intake (< 24 hrs)';
+    if (s.contains('maternal') || s.contains('preg')) return 'Maternal & Lactation Protocol';
+    if (s.contains('interval')) return 'Whole Blood Recovery Window';
+    if (s.contains('cycle') || s.contains('mens')) return 'Menstrual Cycle Timing';
+    if (s.contains('med')) return 'Medical / Medication Review';
+    return 'Temporary Health Deferral';
   }
 
-  String _getClearanceDate(EligibleStats status, int days) {
-    if (status == EligibleStats.deferredWeight) {
-      return 'Upon reaching ≥ 50.0 kg';
+  String _getReasonDesc(EligibleStats? status) {
+    if (status == null) return 'Screening indicates temporary deferral.';
+    final s = status.toString().toLowerCase();
+    if (s.contains('weight')) {
+      return 'The minimum weight requirement for whole blood donation is 50.0 kg (110 lbs). This standard protects donors from hypovolemia, sudden blood pressure drops, and fainting.';
     }
-    if (status == EligibleStats.deferredAlcohol) {
-      return 'Tomorrow (24-Hour Clearance)';
+    if (s.contains('tatts') || s.contains('pierce')) {
+      return 'A standard 6 to 12-month deferral window is required following recent tattoos or piercings to guarantee blood transfusion safety.';
     }
+    if (s.contains('alcohol')) {
+      return 'Alcohol consumption within 24 hours can cause dehydration and vasovagal reactions during collection. Please hydrate and retest after 24 hours.';
+    }
+    if (s.contains('maternal') || s.contains('preg')) {
+      return 'Deferred under maternal health protocols (pregnancy or lactation) to protect mother and child nutrient reserves.';
+    }
+    if (s.contains('interval')) {
+      return 'Your body requires at least 56 days to replenish red blood cells and iron stores after a whole blood donation.';
+    }
+    return 'Based on clinical screening protocols, your donation is temporarily deferred to prioritize your safety.';
+  }
+
+  String _getClearanceDate(EligibleStats? status, int days) {
+    final s = (status ?? '').toString().toLowerCase();
+    if (s.contains('weight')) return 'Upon reaching ≥ 50.0 kg';
+    if (s.contains('alcohol')) return 'Tomorrow (24-Hour Clearance)';
+
     final target = DateTime.now().add(Duration(days: days > 0 ? days : 30));
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     return '${months[target.month - 1]} ${target.day}, ${target.year}';
+  }
+
+  String _resolveStandardWindow(EligibleStats? status, int days) {
+    final s = (status ?? '').toString().toLowerCase();
+    if (s.contains('tatts') || s.contains('pierce')) return '6 Months Window';
+    if (s.contains('alcohol')) return '24 Hours Window';
+    if (s.contains('weight')) return 'Until >= 50.0 kg baseline';
+    if (s.contains('maternal')) return '6 Months Postpartum';
+    return '$days Days Window';
+  }
+
+  String _resolveSafetyNote(EligibleStats? status) {
+    final s = (status ?? '').toString().toLowerCase();
+    if (s.contains('tatts') || s.contains('pierce')) {
+      return 'DOH transfusion safety protocol for skin procedures.';
+    }
+    if (s.contains('weight')) {
+      return 'Required by clinical standards to prevent donor fainting or hypotension.';
+    }
+    if (s.contains('alcohol')) {
+      return 'Ensures plasma hydration and prevents adverse vasovagal reactions.';
+    }
+    return 'Clinical protocol prioritizing donor recovery and safety.';
+  }
+
+  String _getRecommendedAction(EligibleStats? status) {
+    final s = (status ?? '').toString().toLowerCase();
+    if (s.contains('weight')) {
+      return 'Focus on a balanced diet rich in proteins and iron to safely reach the 50.0 kg weight requirement.';
+    }
+    if (s.contains('alcohol')) {
+      return 'Refrain from alcohol intake for at least 24 hours and hydrate well before retaking your screening.';
+    }
+    if (s.contains('tatts') || s.contains('pierce')) {
+      return 'Wait for the 6-month healing window to conclude to eliminate infection risk.';
+    }
+    if (s.contains('interval')) {
+      return 'Allow your body sufficient time to replenish iron stores before booking your next appointment.';
+    }
+    return 'Follow clinical guidance and retake your health assessment once the temporary deferral window passes.';
   }
 
   @override
@@ -90,9 +136,10 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     final String reasonTitle = _getReasonTitle(status);
     final String reasonDesc = _getReasonDesc(status);
     final String clearanceDateStr = _getClearanceDate(status, effectiveDays);
-    final bool isPostDonationRecovery = status == EligibleStats.deferredInterval;
+    final bool isPostDonationRecovery = status.toString().toLowerCase().contains('interval');
 
     return Container(
+      width: double.infinity,
       color: const Color(0xFFF3F3F5),
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -103,7 +150,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             _buildIneligibilityBanner(reasonTitle),
             const SizedBox(height: 14),
             if (isPostDonationRecovery)
-              _buildActiveDonorRecoveryLayout(context, status, effectiveDays, reasonTitle, clearanceDateStr)
+              _buildActiveDonorRecoveryLayout(context, status, effectiveDays, clearanceDateStr)
             else
               _buildClinicalDeferralLayout(context, status, effectiveDays, reasonTitle, reasonDesc, clearanceDateStr),
             const SizedBox(height: 16),
@@ -189,7 +236,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                     onPressed: () {
                       QrPassModalView.show(
                         context,
-                        donorName: widget.donorName,
+                        donorName: widget.donorName.isNotEmpty ? widget.donorName : 'Donor',
                         bloodType: widget.bloodType.isNotEmpty ? widget.bloodType : 'Pending',
                         donorId: widget.donorId.isNotEmpty ? widget.donorId : 'BD-PENDING',
                         isEligible: false,
@@ -292,8 +339,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           ],
         ),
         const SizedBox(height: 12),
-        ...List.generate(_checklistTasks.length.clamp(0, 4), (index) {
-          final task = _checklistTasks[index];
+        ..._checklistTasks.map((task) {
           final bool isDone = task['completed'] == true;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10.0),
@@ -355,7 +401,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
       BuildContext context,
       EligibleStats status,
       int effectiveDays,
-      String reasonTitle,
       String clearanceDateStr,
       ) {
     const int totalCycleDays = 56;
@@ -558,21 +603,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     );
   }
 
-  String _getRecommendedAction(EligibleStats status) {
-    switch (status) {
-      case EligibleStats.deferredWeight:
-        return "Focus on a balanced diet rich in proteins and iron to safely reach the 50.0 kg weight requirement.";
-      case EligibleStats.deferredAlcohol:
-        return "Refrain from alcohol intake for at least 24 hours and hydrate well before retaking your screening.";
-      case EligibleStats.deferredTattsPierce:
-        return "Wait for the 6-month healing window to conclude to eliminate infection risk.";
-      case EligibleStats.deferredInterval:
-        return "Allow your body sufficient time to replenish iron stores before booking your next appointment.";
-      default:
-        return "Follow clinical guidance and retake your health assessment once the temporary deferral window passes.";
-    }
-  }
-
   Widget _buildSectionHeader(String title) {
     return Row(
       children: [
@@ -623,34 +653,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
         ],
       ),
     );
-  }
-
-  String _resolveStandardWindow(EligibleStats status, int days) {
-    switch (status) {
-      case EligibleStats.deferredTattsPierce:
-        return '6 Months Window';
-      case EligibleStats.deferredAlcohol:
-        return '24 Hours Window';
-      case EligibleStats.deferredWeight:
-        return 'Until >= 50.0 kg baseline';
-      case EligibleStats.deferredMaternal:
-        return '6 Months Postpartum';
-      default:
-        return '$days Days Window';
-    }
-  }
-
-  String _resolveSafetyNote(EligibleStats status) {
-    switch (status) {
-      case EligibleStats.deferredTattsPierce:
-        return 'DOH transfusion safety protocol for skin procedures.';
-      case EligibleStats.deferredWeight:
-        return 'Required by clinical standards to prevent donor fainting or hypotension.';
-      case EligibleStats.deferredAlcohol:
-        return 'Ensures plasma hydration and prevents adverse vasovagal reactions.';
-      default:
-        return 'Clinical protocol prioritizing donor recovery and safety.';
-    }
   }
 
   void _showScreeningDetailsModal(BuildContext context, String title, String desc, String clearDate) {
