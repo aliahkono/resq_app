@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
+import 'package:resq/widgets/app_notif_bell.dart';
 
 class EligibleAppointView extends StatefulWidget {
   final bool isFirstTimeDonor;
@@ -7,7 +8,7 @@ class EligibleAppointView extends StatefulWidget {
 
   const EligibleAppointView({
     super.key,
-    this.isFirstTimeDonor = false,
+    required this.isFirstTimeDonor,
     required this.onBookingCompleted,
   });
 
@@ -16,194 +17,194 @@ class EligibleAppointView extends StatefulWidget {
 }
 
 class _EligibleAppointViewState extends State<EligibleAppointView> {
-  String _selectedLocation = 'Philippine Red Cross - Quezon Chapter';
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 2));
-  String _selectedTimeSlot = '09:00 AM - 10:00 AM';
+  int _selectedCenterIndex = 0;
+  int _selectedSlotIndex = 0;
 
-  final List<String> _locations = [
-    'Philippine Red Cross - Quezon Chapter',
-    'Lucena United Doctors Hospital',
-    'MSEUF Main Campus Medical Hub',
+  final List<Map<String, String>> _centers = [
+    {
+      'name': 'Philippine Red Cross - Quezon Chapter',
+      'address': 'Quezon Ave, Lucena City',
+      'distance': '1.2 km',
+    },
+    {
+      'name': 'Quezon Medical Center (QMC) Blood Bank',
+      'address': 'Lucena City, Quezon',
+      'distance': '2.8 km',
+    },
+    {
+      'name': 'St. Anne General Hospital',
+      'address': 'Gulang-Gulang, Lucena City',
+      'distance': '3.5 km',
+    },
   ];
 
-  final List<String> _timeSlots = [
-    '08:00 AM - 09:00 AM',
-    '09:00 AM - 10:00 AM',
-    '01:00 PM - 02:00 PM',
+  final List<String> _slots = [
+    '08:30 AM - 09:30 AM',
+    '10:00 AM - 11:00 AM',
+    '01:30 PM - 02:30 PM',
     '03:00 PM - 04:00 PM',
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ResQTheme.bgOffWhite,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          widget.isFirstTimeDonor ? 'First-Time Donation Booking' : 'Schedule Appointment',
-          style: ResQTheme.heading2.copyWith(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
+      backgroundColor: const Color(0xFFEBEBEB),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Status Badge Info
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFA5D6A7)),
-                ),
-                child: Row(
+        child: Column(
+          children: [
+            _buildAppointmentHeaderWithBack(context),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 24),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        widget.isFirstTimeDonor
-                            ? 'Eligible for First-Time Contribution! Secure your priority check-in slot.'
-                            : 'Eligible for Regular Donation Cycle. Book your preferred slot below.',
-                        style: const TextStyle(
-                          color: Color(0xFF1B5E20),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    const Text(
+                      'Select Blood Donation Center',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Location Selection
-              const Text('Select Donation Facility / Center', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedLocation,
-                items: _locations.map((loc) => DropdownMenuItem(value: loc, child: Text(loc, style: const TextStyle(fontSize: 13)))).toList(),
-                onChanged: (val) => setState(() => _selectedLocation = val!),
-                decoration: const InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: ResQTheme.lightBorder)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: ResQTheme.lightBorder)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: ResQTheme.primaryCrimson, width: 1.5)),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Date Selector
-              const Text('Target Donation Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 30)),
-                  );
-                  if (picked != null) setState(() => _selectedDate = picked);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: ResQTheme.lightBorder),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${_selectedDate.month}/${_selectedDate.day}/${_selectedDate.year}',
-                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                      ),
-                      const Icon(Icons.calendar_month, color: ResQTheme.primaryCrimson, size: 20),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Time Slot Selection Grid
-              const Text('Select Time Slot', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              const SizedBox(height: 10),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 2.8,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                ),
-                itemCount: _timeSlots.length,
-                itemBuilder: (context, index) {
-                  final slot = _timeSlots[index];
-                  final isSelected = slot == _selectedTimeSlot;
-                  return InkWell(
-                    onTap: () => setState(() => _selectedTimeSlot = slot),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected ? ResQTheme.primaryCrimson : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected ? ResQTheme.primaryCrimson : ResQTheme.lightBorder,
+                    const SizedBox(height: 10),
+                    ...List.generate(_centers.length, (index) {
+                      final center = _centers[index];
+                      final isSelected = _selectedCenterIndex == index;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10.0),
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedCenterIndex = index),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFF7D1B22) : const Color(0xFFE5E7EB),
+                                width: isSelected ? 1.8 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                  color: isSelected ? const Color(0xFF7D1B22) : Colors.grey,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        center['name']!,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${center['address']} • ${center['distance']}',
+                                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          slot,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : ResQTheme.textDark,
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Select Preferred Time Slot',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(_slots.length, (index) {
+                        final isSelected = _selectedSlotIndex == index;
+                        return ChoiceChip(
+                          label: Text(_slots[index]),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFF7D1B22),
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : const Color(0xFF1E1E1E),
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
+                          onSelected: (val) => setState(() => _selectedSlotIndex = index),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 26),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: widget.onBookingCompleted,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7D1B22),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'CONFIRM APPOINTMENT SLOT',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 36),
-
-              // Confirm Booking CTA
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: widget.onBookingCompleted,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ResQTheme.primaryCrimson,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'CONFIRM APPOINTMENT SLOT',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.8),
-                  ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppointmentHeaderWithBack(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 14, bottom: 14, left: 8, right: 16),
+      decoration: const BoxDecoration(
+        color: Color(0xFF7D1B22),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                onPressed: () => Navigator.pop(context),
+              ),
+              Image.asset(
+                'assets/images/rq_logo_white.png',
+                height: 28,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Text(
+                  'RQ',
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(width: 1.5, height: 20, color: Colors.white60),
+              const SizedBox(width: 10),
+              const Text(
+                'Appointment',
+                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ],
           ),
-        ),
+          const AppNotificationBell(
+            isEligible: true,
+            donorBloodType: 'O+',
+          ),
+        ],
       ),
     );
   }

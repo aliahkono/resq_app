@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/appointment/active_sched_view.dart';
 import 'package:resq/views/appointment/eligible_appoint_view.dart';
@@ -39,6 +40,9 @@ class _HomeViewState extends State<HomeView> {
   late ClassificationResult _effectiveResult;
   late ScreenNPTModel? _currentScreeningModel;
   late bool _isFirstTime;
+
+  // Hospital clinical records (null until MedTech/Nurse records them via Dashboard)
+  ClinicalVitalsRecord? _clinicalVitalsRecord;
 
   // Active confirmed appointment state
   ConfirmedAppointmentData? _confirmedAppointment;
@@ -107,6 +111,18 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildBody() {
+    final String activeDonorName = widget.donorName.isNotEmpty
+        ? widget.donorName
+        : 'John Doe';
+
+    final String activeBloodType = widget.bloodType.isNotEmpty
+        ? widget.bloodType
+        : 'A+';
+
+    final String activeDonorId = widget.donorId.isNotEmpty
+        ? widget.donorId
+        : 'BD-10942';
+
     switch (_currentTabIndex) {
     // =======================================================================
     // TAB 0: HOME DASHBOARD
@@ -115,10 +131,10 @@ class _HomeViewState extends State<HomeView> {
         return _effectiveResult.isEligible
             ? EligibleHomeView(
           isFirstTimeDonor: _isFirstTime,
-          donorName: widget.donorName.isNotEmpty ? widget.donorName : 'Donor',
+          donorName: activeDonorName,
+          bloodType: activeBloodType,
           activeRequests: _activeRequests,
           onAcceptRequest: (request) {
-            // Direct to appointment confirmation when request is accepted
             setState(() {
               _confirmedAppointment = ConfirmedAppointmentData(
                 facility: request.hospital,
@@ -203,9 +219,17 @@ class _HomeViewState extends State<HomeView> {
           screeningModel: _currentScreeningModel,
           classificationResult: _effectiveResult,
           isFirstTimeDonor: _isFirstTime,
-          donorName: widget.donorName.isNotEmpty ? widget.donorName : 'Juan Dela Cruz',
-          bloodType: widget.bloodType.isNotEmpty ? widget.bloodType : 'O+',
-          donorId: widget.donorId.isNotEmpty ? widget.donorId : 'RESQ-PH-2026-00001',
+          donorName: activeDonorName,
+          bloodType: activeBloodType,
+          donorId: activeDonorId,
+          onProfileUpdated: (updatedModel, result) {
+            setState(() {
+              _currentScreeningModel = updatedModel;
+              _effectiveResult = result;
+              _isFirstTime = updatedModel.screensNPT.isFirstTimeDonor;
+            });
+          },
+          clinicalVitals: _clinicalVitalsRecord,
         );
 
       default:

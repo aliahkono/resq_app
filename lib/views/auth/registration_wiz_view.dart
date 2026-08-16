@@ -2,24 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
-import 'package:resq/views/auth/otp_ver_view.dart';
 import 'package:resq/views/auth/login_view.dart';
+import 'package:resq/views/home/home_view.dart';
+import 'package:resq/widgets/custom_input_field.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
   final ScreenNPTModel? initialScreening;
-  final String donorName;
-  final String bloodType;
-  final String donorId;
+  final String? donorName;
+  final String? bloodType;
+  final String? donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
 
   const RegistrationWizView({
     super.key,
     this.isRetake = false,
     this.initialScreening,
-    this.donorName = '',
-    this.bloodType = '',
-    this.donorId = '',
+    this.donorName,
+    this.bloodType,
+    this.donorId,
     this.onRetakeCompleted,
   });
 
@@ -28,1294 +29,590 @@ class RegistrationWizView extends StatefulWidget {
 }
 
 class _RegistrationWizViewState extends State<RegistrationWizView> {
-  late PageController _pageController;
-  late int _currentStep;
-  final int _totalSteps = 4; // 1: Account, 2: Physical Metrics, 3: Sex Screening, 4: Final Confirmation
+  int _currentStep = 1;
+  final int _totalSteps = 4;
+  bool _isLoading = false;
 
-  // STEP 1: Account Credentials
-  late final TextEditingController _fullNameController;
+  // Step 1: Account Controllers
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
 
-  // STEP 2: Physical Metrics
-  String _selectedBloodType = '';
-  DateTime? _dob;
-  BioSex _selectedGender = BioSex.male;
+  // Step 2: Physical & Health Controllers
+  final _ageController = TextEditingController();
   final _weightController = TextEditingController();
+  final _lastDonationController = TextEditingController();
+
+  // Mutable state variables for wizard evaluation
+  BioSex _gender = BioSex.male;
+  bool _isFirstTimeDonor = true;
   DateTime? _lastDonationDate;
-  bool _isFirstTimeDonating = true;
-  bool _hasTattoosOrPiercings = false;
-  DateTime? _lastTattooDate;
-
-  // STEP 3: Final Screening (Female)
-  DateTime? _lastMensDate;
-  String _pregnancyStatus = 'Not currently pregnant';
-  bool _isBreastfeeding = false;
-  bool _femaleRecentSexualRisk = false;
-
-  // STEP 3: Final Screening (Male)
-  bool _maleStiHistory = false;
-  bool _maleHighRiskContact = false;
-  String _msmHistory = 'Never had sex with a man';
-  bool _maleRecentSexualRisk = false;
-
-  final List<String> _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  int _totalDonations = 0;
+  bool _hasActiveInfectOrMeds = false;
+  bool _hasAlcoholPast24hr = false;
+  bool _hasTattsOrPierce = false;
+  bool _isPregOrNursing = false;
+  bool _hasRecentTravelRisk = false;
 
   @override
   void initState() {
     super.initState();
-    _currentStep = widget.isRetake ? 1 : 0;
-    _pageController = PageController(initialPage: _currentStep);
+    if (widget.isRetake && widget.initialScreening != null) {
+      final initial = widget.initialScreening!.screensNPT;
+      _currentStep = 2; // Skip account creation on retake
+      _nameController.text = widget.donorName ?? '';
+      _ageController.text = initial.age > 0 ? initial.age.toString() : '';
+      _weightController.text = initial.weight > 0 ? initial.weight.toString() : '';
+      _gender = initial.gender;
+      _isFirstTimeDonor = initial.isFirstTimeDonor;
+      _lastDonationDate = initial.lastDonationDate;
+      _totalDonations = initial.totalDonations;
+      _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
+      _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
+      _hasTattsOrPierce = initial.hasTattsOrPierce;
+      _isPregOrNursing = initial.isPregOrNursing ?? false;
 
-    _fullNameController = TextEditingController(text: widget.donorName);
-    _selectedBloodType = widget.bloodType;
-
-    if (widget.initialScreening != null) {
-      final prev = widget.initialScreening!.screensNPT;
-      _selectedGender = prev.gender;
-      _weightController.text = prev.weight > 0 ? prev.weight.toStringAsFixed(1) : '';
-      _isFirstTimeDonating = prev.isFirstTimeDonor;
-      _lastDonationDate = prev.lastDonationDate;
-      _hasTattoosOrPiercings = prev.hasTattsOrPierce;
-      _lastMensDate = prev.lastMensPeriodDate;
-      _isBreastfeeding = prev.isPregOrNursing ?? false;
-      _maleHighRiskContact = prev.hasHighRiskExpo ?? false;
+      if (_lastDonationDate != null) {
+        _lastDonationController.text =
+        "${_lastDonationDate!.year}-${_lastDonationDate!.month.toString().padLeft(2, '0')}-${_lastDonationDate!.day.toString().padLeft(2, '0')}";
+      }
     }
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
-    _fullNameController.dispose();
+    _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _ageController.dispose();
     _weightController.dispose();
+    _lastDonationController.dispose();
     super.dispose();
   }
 
-  int get _calculatedAge {
-    if (_dob == null) return widget.initialScreening?.screensNPT.age ?? 21;
-    final now = DateTime.now();
-    int age = now.year - _dob!.year;
-    if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
-      age--;
+  // --- Date Picker & Donation Count Popup ---
+  Future<void> _selectLastDonationDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _lastDonationDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF7D1B22),
+              onPrimary: Colors.white,
+              onSurface: ResQTheme.textDark,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _lastDonationDate = picked;
+        _isFirstTimeDonor = false;
+        _lastDonationController.text =
+        "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+      if (!mounted) return;
+      await _promptForDonationCount(context);
     }
-    return age;
   }
 
-  void _nextPage() {
-    if (_currentStep < _totalSteps - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+  Future<void> _promptForDonationCount(BuildContext context) async {
+    final TextEditingController countController = TextEditingController(
+      text: _totalDonations > 0 ? _totalDonations.toString() : '',
+    );
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Lifetime Donation History',
+            style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'How many times have you donated blood in total (lifetime)?',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              CustomInputField(
+                controller: countController,
+                hintText: 'e.g., 4',
+                labelText: 'Total Lifetime Donations',
+                icon: Icons.history_edu_rounded,
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Skip', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final int? count = int.tryParse(countController.text.trim());
+                if (count != null && count >= 0) {
+                  setState(() {
+                    _totalDonations = count;
+                  });
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid number (0 or higher).')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+              child: const Text('Save', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  bool _validateStep() {
+    if (_currentStep == 1 && !widget.isRetake) {
+      if (_nameController.text.trim().isEmpty ||
+          _emailController.text.trim().isEmpty ||
+          _passwordController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please complete all account fields.')),
+        );
+        return false;
+      }
+    } else if (_currentStep == 2) {
+      final age = int.tryParse(_ageController.text.trim()) ?? 0;
+      final weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
+      if (age <= 0 || weight <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter valid age and weight.')),
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _nextStep() {
+    if (!_validateStep()) return;
+    if (_currentStep < _totalSteps) {
+      setState(() => _currentStep++);
     } else {
-      _submitRegistrationOrRetake();
+      _finishAssessment();
     }
   }
 
-  void _previousPage() {
-    final int minStep = widget.isRetake ? 1 : 0;
-    if (_currentStep > minStep) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      Navigator.of(context).pop();
-    }
-  }
+  Future<void> _finishAssessment() async {
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(milliseconds: 1000));
 
-  void _submitRegistrationOrRetake() {
-    final double weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
+    final int age = int.tryParse(_ageController.text.trim()) ?? 21;
+    final double weight = double.tryParse(_weightController.text.trim()) ?? 55.0;
 
-    final donorScreens = DonorScreensNPT(
-      gender: _selectedGender,
+    final DonorScreensNPT evaluatedParams = DonorScreensNPT(
+      age: age,
       weight: weight,
-      age: _calculatedAge,
-      isFirstTimeDonor: _isFirstTimeDonating,
-      lastDonationDate: _isFirstTimeDonating ? null : _lastDonationDate,
-      hasTattsOrPierce: _hasTattoosOrPiercings,
-      hasAlcoholPast24hr: false,
-      hasActiveInfectOrMeds: _selectedGender == BioSex.male ? _maleStiHistory : false,
-      isPregOrNursing: _selectedGender == BioSex.female
-          ? (_pregnancyStatus != 'Not currently pregnant' || _isBreastfeeding)
-          : null,
-      lastMensPeriodDate: _selectedGender == BioSex.female ? _lastMensDate : null,
-      hasHighRiskExpo: _selectedGender == BioSex.male
-          ? (_maleHighRiskContact || _maleRecentSexualRisk || _msmHistory == 'Recent contact within 3 months')
-          : _femaleRecentSexualRisk,
+      gender: _gender,
+      isFirstTimeDonor: _isFirstTimeDonor,
+      lastDonationDate: _lastDonationDate,
+      totalDonations: _isFirstTimeDonor ? 0 : _totalDonations,
+      hasActiveInfectOrMeds: _hasActiveInfectOrMeds,
+      hasAlcoholPast24hr: _hasAlcoholPast24hr,
+      hasTattsOrPierce: _hasTattsOrPierce,
+      isPregOrNursing: _gender == BioSex.female ? _isPregOrNursing : null,
     );
 
-    final screeningModel = ScreenNPTModel(
-      donorProfId: widget.initialScreening?.donorProfId ?? 'donor_${DateTime.now().millisecondsSinceEpoch}',
-      screensNPT: donorScreens,
+    final String assignedDonorId = widget.donorId ?? 'BD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final String activeDonorName = widget.isRetake
+        ? (widget.donorName ?? 'Donor')
+        : (_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Donor');
+    final String activeBloodType = widget.bloodType ?? 'O+';
+
+    final ScreenNPTModel finalModel = ScreenNPTModel(
+      donorProfId: assignedDonorId,
       submissionDate: DateTime.now(),
+      screensNPT: evaluatedParams,
     );
 
-    final classificationResult = screeningModel.evaluateEligibility();
+    final ClassificationResult result = finalModel.evaluateEligibility();
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (widget.isRetake) {
-      Navigator.of(context).pop();
-      if (widget.onRetakeCompleted != null) {
-        widget.onRetakeCompleted!(screeningModel, classificationResult);
-      }
-      return;
-    }
-
-    final String chosenBloodType = (_selectedBloodType.isEmpty || _selectedBloodType == "I'm not sure")
-        ? 'Unknown'
-        : _selectedBloodType;
-
-    final String generatedDonorId =
-        'RESQ-PH-${DateTime.now().year}-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => OtpVerView(
-          phoneNumber: _phoneController.text.trim().isEmpty ? '09123456789' : _phoneController.text.trim(),
-          email: _emailController.text.trim().isEmpty ? 'donor@resq.ph' : _emailController.text.trim(),
-          donorName: _fullNameController.text.trim().isEmpty ? 'Volunteer Donor' : _fullNameController.text.trim(),
-          bloodType: chosenBloodType,
-          donorId: generatedDonorId,
-          screeningModel: screeningModel,
-          classificationResult: classificationResult,
+      widget.onRetakeCompleted?.call(finalModel, result);
+      Navigator.pop(context);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => HomeView(
+            donorName: activeDonorName,
+            bloodType: activeBloodType,
+            donorId: assignedDonorId,
+            screeningModel: finalModel,
+            classificationResult: result,
+            isFirstTimeDonor: _isFirstTimeDonor,
+          ),
         ),
-      ),
-    );
+            (route) => false,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ResQTheme.bgOffWhite,
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (i) => setState(() => _currentStep = i),
-        children: [
-          _buildStep1Account(),
-          _buildStep2PhysicalMetrics(),
-          _buildStep3FinalScreening(),
-          _buildStep4AlmostReady(),
-        ],
+      backgroundColor: const Color(0xFFF2F2F4),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF7D1B22),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+          onPressed: () {
+            if (_currentStep > 1 && !(widget.isRetake && _currentStep == 2)) {
+              setState(() => _currentStep--);
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
+        title: Text(
+          widget.isRetake ? 'Retake Health Assessment' : 'Donor Registration ($currentStepTitle)',
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
       ),
-    );
-  }
-
-  // --- Step Indicator Bar ---
-  Widget _buildStepProgressBar() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF7D1B22)))
+            : SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'STEP ${_currentStep + 1} OF $_totalSteps',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                  color: Color(0xFF7D2229),
+              _buildProgressBar(),
+              const SizedBox(height: 20),
+              _buildCurrentStepContent(),
+              const SizedBox(height: 26),
+              _buildActionButtons(),
+              if (!widget.isRetake && _currentStep == 1) ...[
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Already have an account? ', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                    InkWell(
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginView()),
+                        );
+                      },
+                      child: const Text(
+                        'Log In',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                _getStepTitle(_currentStep),
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54),
-              ),
+              ],
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: List.generate(_totalSteps, (index) {
-            final isCompletedOrCurrent = index <= _currentStep;
-            return Expanded(
-              child: Container(
-                height: 4,
-                margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 6.0 : 0.0),
-                decoration: BoxDecoration(
-                  color: isCompletedOrCurrent ? const Color(0xFF7D2229) : const Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
+      ),
     );
   }
 
-  String _getStepTitle(int step) {
-    switch (step) {
-      case 0:
-        return 'Account Setup';
+  String get currentStepTitle {
+    switch (_currentStep) {
       case 1:
-        return 'Physical Metrics';
+        return 'Step 1 of 4: Account';
       case 2:
-        return 'Health Screening';
+        return 'Step 2 of 4: Physical Metrics';
       case 3:
-        return 'Review & Confirm';
+        return 'Step 3 of 4: Medical History';
+      case 4:
+        return 'Step 4 of 4: Lifestyle & Risk';
       default:
-        return '';
+        return 'Assessment';
     }
   }
 
-  // ===========================================================================
-  // STEP 1: Account Creation
-  // ===========================================================================
-  Widget _buildStep1Account() {
-    return SafeArea(
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+  Widget _buildProgressBar() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildStepProgressBar(),
-            const SizedBox(height: 16),
-
-            // Logo Asset
-            Container(
-              width: 90,
-              height: 90,
-              decoration: const BoxDecoration(
-                color: Color(0xFF7D2229),
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Image.asset(
-                'assets/images/rq_logo_white.png',
-                fit: BoxFit.contain,
-              ),
+            Text(
+              currentStepTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7D1B22)),
             ),
-
-            const SizedBox(height: 18),
-            Text('Create Your Account', style: ResQTheme.heading1.copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text('Join our community of lifesaving donors.', style: TextStyle(color: ResQTheme.textMuted, fontSize: 13)),
-            const SizedBox(height: 20),
-
-            _buildCustomInput(controller: _fullNameController, hint: 'Full Name', icon: Icons.person_outline_rounded),
-            const SizedBox(height: 12),
-            _buildCustomInput(controller: _emailController, hint: 'Email', icon: Icons.mail_outline_rounded, keyboardType: TextInputType.emailAddress),
-            const SizedBox(height: 12),
-
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF7D2229), width: 1.2),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  const Text('🇵🇭 +63', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  const Icon(Icons.arrow_drop_down, color: Colors.black54),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(fontSize: 13.5),
-                      decoration: const InputDecoration(
-                        hintText: 'Phone Number',
-                        hintStyle: TextStyle(color: Colors.black38, fontSize: 13.5),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            Text(
+              '${((_currentStep / _totalSteps) * 100).toInt()}%',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7D1B22)),
             ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Icon(Icons.info_outline, color: Color(0xFF7D2229), size: 15),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    "We'll send a 6-digit verification code via SMS to this number.",
-                    style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.3),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            _buildCustomInput(
-              controller: _passwordController,
-              hint: 'Password',
-              icon: Icons.lock_outline_rounded,
-              obscureText: _obscurePassword,
-              suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Must be at least 8 characters with a number & symbol.', style: TextStyle(fontSize: 10.5, color: Colors.black54)),
-            ),
-            const SizedBox(height: 12),
-
-            _buildCustomInput(
-              controller: _confirmPasswordController,
-              hint: 'Confirm Password',
-              icon: Icons.lock_outline_rounded,
-              obscureText: _obscureConfirmPassword,
-              suffixIcon: IconButton(
-                icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey),
-                onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF7D2229).withValues(alpha: 0.5), width: 1),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7D2229).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.shield_outlined, color: Color(0xFF7D2229), size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Privacy Guaranteed: Encrypted strictly for medical eligibility checks.',
-                      style: TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Already have an account? ', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                InkWell(
-                  onTap: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginView()),
-                    );
-                  },
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF7D2229),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _nextPage,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7D2229),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text('Continue to Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 18),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
           ],
         ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // STEP 2: Physical Metrics
-  // ===========================================================================
-  Widget _buildStep2PhysicalMetrics() {
-    return Column(
-      children: [
-        _buildCurvedHeader(widget.isRetake ? 'Retake Physical Metrics' : 'Physical Metrics'),
-        Expanded(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStepProgressBar(),
-                const SizedBox(height: 16),
-
-                Text(widget.isRetake ? 'Update Physical Metrics' : 'Physical Metrics', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text(
-                  'Please provide your basic physical information to help us determine your donation eligibility.',
-                  style: TextStyle(color: Colors.black54, fontSize: 12.5),
-                ),
-                const SizedBox(height: 20),
-
-                const Text('Blood Type Selection', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 2),
-                const Text("Select your blood type if known. Otherwise, choose \"I'm not sure\".", style: TextStyle(color: Colors.black54, fontSize: 11.5)),
-                const SizedBox(height: 12),
-
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    childAspectRatio: 1.3,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: _bloodTypes.length,
-                  itemBuilder: (context, index) {
-                    final type = _bloodTypes[index];
-                    final isSelected = type == _selectedBloodType;
-                    return InkWell(
-                      onTap: () => setState(() => _selectedBloodType = type),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF7D2229) : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF7D2229), width: 1.2),
-                        ),
-                        child: Center(
-                          child: Text(
-                            type,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : const Color(0xFF7D2229),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-
-                InkWell(
-                  onTap: () => setState(() => _selectedBloodType = "I'm not sure"),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _selectedBloodType == "I'm not sure" ? const Color(0xFF7D2229) : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF7D2229), width: 1.2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        "I'm not sure",
-                        style: TextStyle(
-                          color: _selectedBloodType == "I'm not sure" ? Colors.white : const Color(0xFF7D2229),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                const Text('Date of Birth', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _dob ?? DateTime(2003, 1, 1),
-                      firstDate: DateTime(1950),
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) setState(() => _dob = picked);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7D2229),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _dob == null ? 'Date Picker' : '${_dob!.month}/${_dob!.day}/${_dob!.year}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        const Icon(Icons.calendar_month, color: Colors.white, size: 20),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                const Text('Biological Sex', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD6D3D1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedGender = BioSex.female),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _selectedGender == BioSex.female ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Female',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: _selectedGender == BioSex.female ? Colors.black87 : Colors.black54,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedGender = BioSex.male),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _selectedGender == BioSex.male ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Male',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: _selectedGender == BioSex.male ? Colors.black87 : Colors.black54,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                const Text('Weight (kg)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 8),
-                _buildCustomInput(
-                  controller: _weightController,
-                  hint: 'Enter your weight here',
-                  icon: Icons.scale_outlined,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 20),
-
-                const Text('Last Blood Donation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 8),
-                if (!_isFirstTimeDonating) ...[
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _lastDonationDate ?? DateTime.now().subtract(const Duration(days: 95)),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) setState(() => _lastDonationDate = picked);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7D2229),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _lastDonationDate == null
-                                ? 'Date Picker'
-                                : '${_lastDonationDate!.month}/${_lastDonationDate!.day}/${_lastDonationDate!.year}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          const Icon(Icons.calendar_month, color: Colors.white, size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _isFirstTimeDonating,
-                      activeColor: const Color(0xFF7D2229),
-                      onChanged: (val) => setState(() => _isFirstTimeDonating = val ?? true),
-                    ),
-                    const Text('First time donating.', style: TextStyle(fontSize: 13, color: Colors.black87)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                const Text('Recent Procedures', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 10),
-                _buildCardSelection(
-                  title: 'No Tattoos or Piercings',
-                  icon: Icons.radio_button_unchecked,
-                  isSelected: !_hasTattoosOrPiercings,
-                  onTap: () => setState(() => _hasTattoosOrPiercings = false),
-                ),
-                const SizedBox(height: 8),
-                _buildCardSelection(
-                  title: 'Yes, I have Tattoos / Piercings',
-                  icon: Icons.edit_outlined,
-                  isSelected: _hasTattoosOrPiercings,
-                  onTap: () => setState(() => _hasTattoosOrPiercings = true),
-                ),
-
-                if (_hasTattoosOrPiercings) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F1FC),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Icon(Icons.info_outline, color: Color(0xFF1976D2), size: 18),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Standard deferral period is 6 months to 12 months. Please provide the date of your last procedure for verification',
-                            style: TextStyle(color: Color(0xFF1976D2), fontSize: 11.5, height: 1.35),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Date of Last Tattoo / Piercing', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _lastTattooDate ?? DateTime.now().subtract(const Duration(days: 190)),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) setState(() => _lastTattooDate = picked);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7D2229),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _lastTattooDate == null
-                                ? 'dd/mm/yyyy'
-                                : '${_lastTattooDate!.day}/${_lastTattooDate!.month}/${_lastTattooDate!.year}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          const Icon(Icons.calendar_month, color: Colors.white, size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _nextPage,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7D2229),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('CONTINUE TO HEALTH SCREENING', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: _currentStep / _totalSteps,
+          backgroundColor: Colors.grey.shade300,
+          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7D1B22)),
+          minHeight: 6,
+          borderRadius: BorderRadius.circular(3),
         ),
       ],
     );
   }
 
-  // ===========================================================================
-  // STEP 3: Sex-Specific Screening
-  // ===========================================================================
-  Widget _buildStep3FinalScreening() {
-    return Column(
-      children: [
-        _buildCurvedHeader(widget.isRetake ? 'Retake Health Screening' : 'Health Screening'),
-        Expanded(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStepProgressBar(),
-                const SizedBox(height: 16),
-
-                const Text('Health Screening', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('Additional questions based on biological sex.', style: TextStyle(color: Colors.black54, fontSize: 12.5)),
-                const SizedBox(height: 16),
-
-                if (_selectedGender == BioSex.female) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF9E6),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFFE082)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Icon(Icons.warning_amber_rounded, color: Color(0xFFE65100), size: 20),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'If you are currently pregnant or nursing, your donation will be temporarily deferred.',
-                            style: TextStyle(color: Color(0xFFE65100), fontSize: 12, height: 1.35),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('Date of Last Menstrual Period', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _lastMensDate ?? DateTime.now().subtract(const Duration(days: 14)),
-                        firstDate: DateTime(2023),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) setState(() => _lastMensDate = picked);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        _lastMensDate == null
-                            ? 'mm/dd/yyyy'
-                            : '${_lastMensDate!.month}/${_lastMensDate!.day}/${_lastMensDate!.year}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('Pregnancy Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  _buildCardSelection(
-                    title: 'Not currently pregnant',
-                    icon: Icons.circle_outlined,
-                    isSelected: _pregnancyStatus == 'Not currently pregnant',
-                    onTap: () => setState(() => _pregnancyStatus = 'Not currently pregnant'),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildCardSelection(
-                    title: 'Currently pregnant',
-                    icon: Icons.circle_outlined,
-                    isSelected: _pregnancyStatus == 'Currently pregnant',
-                    onTap: () => setState(() => _pregnancyStatus = 'Currently pregnant'),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildCardSelection(
-                    title: 'Pregnant within last 6 weeks',
-                    icon: Icons.circle_outlined,
-                    isSelected: _pregnancyStatus == 'Pregnant within last 6 weeks',
-                    onTap: () => setState(() => _pregnancyStatus = 'Pregnant within last 6 weeks'),
-                  ),
-                  const SizedBox(height: 16),
-
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text('Currently Breastfeeding', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                            Text('Toggle if nursing a child', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                          ],
-                        ),
-                        Switch(
-                          value: _isBreastfeeding,
-                          activeColor: const Color(0xFF7D2229),
-                          onChanged: (val) => setState(() => _isBreastfeeding = val),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('Recent Sexual Risk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: ResQTheme.lightBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Checkbox(
-                          value: _femaleRecentSexualRisk,
-                          activeColor: const Color(0xFF7D2229),
-                          onChanged: (val) => setState(() => _femaleRecentSexualRisk = val ?? false),
-                        ),
-                        const Expanded(
-                          child: Text(
-                            'I have had a new sexual partner or multiple partners in the last 3 months.',
-                            style: TextStyle(fontSize: 11.5, height: 1.3),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  const Text('History of STI/STD (Last 12 mos)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildCardSelection(
-                          title: 'Yes',
-                          icon: Icons.circle_outlined,
-                          isSelected: _maleStiHistory,
-                          onTap: () => setState(() => _maleStiHistory = true),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildCardSelection(
-                          title: 'No',
-                          icon: Icons.circle_outlined,
-                          isSelected: !_maleStiHistory,
-                          onTap: () => setState(() => _maleStiHistory = false),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('High-Risk Sexual Contact (Last 12 mos)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Have you had sexual contact with anyone who has ever had a positive HIV test or used needles for non-prescription drugs?',
-                          style: TextStyle(fontSize: 11.5, color: Colors.black87, height: 1.35),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildCardSelection(
-                                title: 'Yes',
-                                icon: Icons.circle_outlined,
-                                isSelected: _maleHighRiskContact,
-                                onTap: () => setState(() => _maleHighRiskContact = true),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildCardSelection(
-                                title: 'No',
-                                icon: Icons.circle_outlined,
-                                isSelected: !_maleHighRiskContact,
-                                onTap: () => setState(() => _maleHighRiskContact = false),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('MSM History (Men who have sex with men)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  _buildCardSelection(
-                    title: 'Never had sex with a man',
-                    icon: Icons.circle_outlined,
-                    isSelected: _msmHistory == 'Never had sex with a man',
-                    onTap: () => setState(() => _msmHistory = 'Never had sex with a man'),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildCardSelection(
-                    title: 'Last contact over 3 months ago',
-                    icon: Icons.circle_outlined,
-                    isSelected: _msmHistory == 'Last contact over 3 months ago',
-                    onTap: () => setState(() => _msmHistory = 'Last contact over 3 months ago'),
-                  ),
-                  const SizedBox(height: 6),
-                  _buildCardSelection(
-                    title: 'Recent contact within 3 months',
-                    icon: Icons.circle_outlined,
-                    isSelected: _msmHistory == 'Recent contact within 3 months',
-                    onTap: () => setState(() => _msmHistory = 'Recent contact within 3 months'),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text('Recent Sexual Risk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: ResQTheme.lightBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Checkbox(
-                          value: _maleRecentSexualRisk,
-                          activeColor: const Color(0xFF7D2229),
-                          onChanged: (val) => setState(() => _maleRecentSexualRisk = val ?? false),
-                        ),
-                        const Expanded(
-                          child: Text(
-                            'I have had a new sexual partner or multiple partners in the last 3 months.',
-                            style: TextStyle(fontSize: 11.5, height: 1.3),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _nextPage,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7D2229),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('PROCEED TO CONFIRMATION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+  Widget _buildCurrentStepContent() {
+    switch (_currentStep) {
+      case 1:
+        return _buildStep1Account();
+      case 2:
+        return _buildStep2Physical();
+      case 3:
+        return _buildStep3Medical();
+      case 4:
+        return _buildStep4Lifestyle();
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
-  // ===========================================================================
-  // STEP 4: Review & Almost Ready Confirmation
-  // ===========================================================================
-  Widget _buildStep4AlmostReady() {
-    final double weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
-    final sex = _selectedGender == BioSex.female ? 'Female' : 'Male';
-
-    return Column(
-      children: [
-        _buildCurvedHeader(widget.isRetake ? 'Review & Update' : 'Almost Ready'),
-        Expanded(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStepProgressBar(),
-                const SizedBox(height: 20),
-
-                // Shield Icon & Banner
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: ResQTheme.lightBorder),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(color: Color(0xFF7D2229), shape: BoxShape.circle),
-                        child: const Icon(Icons.shield_outlined, color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.isRetake ? 'Update Assessment' : 'Almost Ready',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        widget.isRetake
-                            ? 'Review your updated metrics below. Submitting will evaluate your donor eligibility status in real-time.'
-                            : 'Completing this registration will book your appointment slot at the Downtown Clinical Center.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12, color: Colors.black54, height: 1.35),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Summary Card
-                const Text('Screening Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: ResQTheme.lightBorder),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildSummaryRow('Blood Type', _selectedBloodType.isEmpty ? 'Not sure' : _selectedBloodType),
-                      const Divider(height: 16),
-                      _buildSummaryRow('Biological Sex', sex),
-                      const Divider(height: 16),
-                      _buildSummaryRow('Weight', '$weight kg'),
-                      const Divider(height: 16),
-                      _buildSummaryRow('Age', '$_calculatedAge years old'),
-                      const Divider(height: 16),
-                      _buildSummaryRow('First Time Donor', _isFirstTimeDonating ? 'Yes' : 'No'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _submitRegistrationOrRetake,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7D2229),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text(
-                      widget.isRetake ? 'EVALUATE ELIGIBILITY' : 'COMPLETE REGISTRATION',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.6),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12.5)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7D2229))),
-      ],
-    );
-  }
-
-  // --- Header with rq_logo_white.png ---
-  Widget _buildCurvedHeader(String title) {
+  Widget _buildStep1Account() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 48, bottom: 20, left: 20, right: 24),
-      decoration: const BoxDecoration(
-        color: Color(0xFF7D2229),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
       ),
-      child: Row(
+      child: Column(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-            onPressed: _previousPage,
+          CustomInputField(
+            controller: _nameController,
+            hintText: 'Full Name',
+            labelText: 'Full Name',
+            icon: Icons.person_outline_rounded,
           ),
-          const SizedBox(width: 4),
-          Image.asset(
-            'assets/images/rq_logo_white.png',
-            height: 32,
-            fit: BoxFit.contain,
+          const SizedBox(height: 14),
+          CustomInputField(
+            controller: _emailController,
+            hintText: 'donor@resq.ph',
+            labelText: 'Email Address',
+            icon: Icons.mail_outline_rounded,
+            keyboardType: TextInputType.emailAddress,
           ),
-          const SizedBox(width: 12),
-          Container(width: 1.5, height: 24, color: Colors.white70),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Connect, Save Lives, On time.',
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-            ),
+          const SizedBox(height: 14),
+          CustomInputField(
+            controller: _phoneController,
+            hintText: '09123456789',
+            labelText: 'Mobile Number',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 14),
+          CustomInputField(
+            controller: _passwordController,
+            hintText: '••••••••',
+            labelText: 'Password',
+            icon: Icons.lock_outline_rounded,
+            obscureText: true,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCustomInput({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    bool obscureText = false,
-    Widget? suffixIcon,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      style: const TextStyle(fontSize: 13.5),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black38, fontSize: 13.5),
-        prefixIcon: Icon(icon, color: const Color(0xFF7D2229), size: 20),
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D2229), width: 1.2),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D2229), width: 1.2),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D2229), width: 1.8),
-        ),
+  Widget _buildStep2Physical() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Biological Sex', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('Male')),
+                  selected: _gender == BioSex.male,
+                  selectedColor: const Color(0xFF7D1B22),
+                  labelStyle: TextStyle(
+                    color: _gender == BioSex.male ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  onSelected: (val) => setState(() => _gender = BioSex.male),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('Female')),
+                  selected: _gender == BioSex.female,
+                  selectedColor: const Color(0xFF7D1B22),
+                  labelStyle: TextStyle(
+                    color: _gender == BioSex.female ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  onSelected: (val) => setState(() => _gender = BioSex.female),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: CustomInputField(
+                  controller: _ageController,
+                  hintText: 'e.g. 21',
+                  labelText: 'Age (yrs)',
+                  icon: Icons.cake_outlined,
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomInputField(
+                  controller: _weightController,
+                  hintText: 'e.g. 55.0',
+                  labelText: 'Weight (kg)',
+                  icon: Icons.monitor_weight_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          CustomInputField(
+            controller: _lastDonationController,
+            hintText: 'Tap to select last donation date',
+            labelText: 'Last Donation Date (if applicable)',
+            icon: Icons.calendar_month_rounded,
+            readOnly: true,
+            onTap: () => _selectLastDonationDate(context),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCardSelection({
-    required String title,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF7D2229) : ResQTheme.lightBorder,
-            width: isSelected ? 1.4 : 1.0,
+  Widget _buildStep3Medical() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            activeColor: const Color(0xFF7D1B22),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Active Infection or Contraindicated Meds', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Taking antibiotics or experiencing fever/cold/cough', style: TextStyle(fontSize: 11.5)),
+            value: _hasActiveInfectOrMeds,
+            onChanged: (val) => setState(() => _hasActiveInfectOrMeds = val),
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.check_circle_rounded : icon,
-              size: 18,
-              color: isSelected ? const Color(0xFF7D2229) : Colors.grey,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? const Color(0xFF7D2229) : Colors.black87,
-                ),
-              ),
+          const Divider(),
+          SwitchListTile(
+            activeColor: const Color(0xFF7D1B22),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Alcohol Intake in Past 24 Hours', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Consumed alcoholic beverages within the last 24h', style: TextStyle(fontSize: 11.5)),
+            value: _hasAlcoholPast24hr,
+            onChanged: (val) => setState(() => _hasAlcoholPast24hr = val),
+          ),
+          if (_gender == BioSex.female) ...[
+            const Divider(),
+            SwitchListTile(
+              activeColor: const Color(0xFF7D1B22),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Pregnancy / Lactation Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Currently pregnant, breastfeeding, or within 6 months postpartum', style: TextStyle(fontSize: 11.5)),
+              value: _isPregOrNursing,
+              onChanged: (val) => setState(() => _isPregOrNursing = val),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep4Lifestyle() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            activeColor: const Color(0xFF7D1B22),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Tattoos / Piercings within 12 Months', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: const Text('New tattoo, body piercing, or microblading within past year', style: TextStyle(fontSize: 11.5)),
+            value: _hasTattsOrPierce,
+            onChanged: (val) => setState(() => _hasTattsOrPierce = val),
+          ),
+          const Divider(),
+          SwitchListTile(
+            activeColor: const Color(0xFF7D1B22),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Recent Travel to Endemic Areas', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Travel to malaria-risk or infectious zones in the past 30 days', style: TextStyle(fontSize: 11.5)),
+            value: _hasRecentTravelRisk,
+            onChanged: (val) => setState(() => _hasRecentTravelRisk = val),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: _nextStep,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF7D1B22),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Text(
+          _currentStep == _totalSteps ? 'SUBMIT & EVALUATE' : 'CONTINUE',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5),
         ),
       ),
     );

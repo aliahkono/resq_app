@@ -10,6 +10,7 @@ class DonorScreensNPT {
   // Donation History Parameters
   final bool isFirstTimeDonor;
   final DateTime? lastDonationDate;
+  final int totalDonations; // Lifetime donation count
 
   // General Screening
   final bool hasTattsOrPierce;
@@ -29,6 +30,7 @@ class DonorScreensNPT {
     required this.age,
     required this.isFirstTimeDonor,
     this.lastDonationDate,
+    this.totalDonations = 0,
     required this.hasTattsOrPierce,
     required this.hasAlcoholPast24hr,
     required this.hasActiveInfectOrMeds,
