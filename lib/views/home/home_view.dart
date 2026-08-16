@@ -55,15 +55,21 @@ class _HomeViewState extends State<HomeView> {
     super.initState();
     _currentScreeningModel = widget.screeningModel;
 
-    // Direct synchronous evaluation (zero delay, zero race conditions)
-    if (widget.classificationResult != null) {
-      _effectiveResult = widget.classificationResult!;
-      _isFirstTime = widget.isFirstTimeDonor;
-    } else if (_currentScreeningModel != null) {
-      _effectiveResult = _currentScreeningModel!.evaluateEligibility();
-      _isFirstTime = _currentScreeningModel!.screensNPT.isFirstTimeDonor;
-    } else {
-      _effectiveResult = ClassificationResult(status: EligibleStats.eligible);
+    try {
+      if (widget.classificationResult != null) {
+        _effectiveResult = widget.classificationResult!;
+        _isFirstTime = widget.isFirstTimeDonor;
+      } else if (_currentScreeningModel != null) {
+        _effectiveResult = _currentScreeningModel!.evaluateEligibility();
+        _isFirstTime = _currentScreeningModel!.screensNPT.isFirstTimeDonor;
+      } else {
+        _effectiveResult = ClassificationResult(status: EligibleStats.eligible);
+        _isFirstTime = widget.isFirstTimeDonor;
+      }
+    } catch (e, st) {
+      debugPrint('HomeView: eligibility evaluation failed: $e\n$st');
+      // Fail safe instead of crashing the whole dashboard
+      _effectiveResult = ClassificationResult(status: EligibleStats.deferredWeight);
       _isFirstTime = widget.isFirstTimeDonor;
     }
   }

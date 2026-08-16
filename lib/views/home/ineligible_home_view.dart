@@ -131,7 +131,8 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   @override
   Widget build(BuildContext context) {
     final status = widget.classificationResult?.status ?? EligibleStats.deferredWeight;
-    final effectiveDays = widget.classificationResult?.daysRemaining ?? widget.daysRemaining;
+    final int effectiveDays =
+        widget.classificationResult?.daysRemaining ?? widget.daysRemaining;
 
     final String reasonTitle = _getReasonTitle(status);
     final String reasonDesc = _getReasonDesc(status);
