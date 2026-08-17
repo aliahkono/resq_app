@@ -41,8 +41,8 @@ class AppNotificationBell extends StatelessWidget {
             ),
             if (unreadCount > 0)
               Positioned(
-                right: 8,
-                top: 8,
+                right: 6,
+                top: -2,
                 child: Container(
                   padding: const EdgeInsets.all(3.5),
                   decoration: const BoxDecoration(
