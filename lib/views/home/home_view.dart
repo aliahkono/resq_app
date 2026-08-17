@@ -23,6 +23,11 @@ class HomeView extends StatefulWidget {
   final ScreenNPTModel? screeningModel;
   final ClassificationResult? classificationResult;
   final bool isFirstTimeDonor;
+  // Session token from login/OTP verification (see AuthService.token /
+  // otp_ver_view.dart's _sessionToken) — threaded through so Settings can
+  // call the real donor-portal endpoints (PATCH /api/donor/me, POST
+  // /donor-auth/logout) instead of just editing local UI state.
+  final String token;
 
   const HomeView({
     super.key,
@@ -34,6 +39,7 @@ class HomeView extends StatefulWidget {
     this.screeningModel,
     this.classificationResult,
     this.isFirstTimeDonor = true,
+    this.token = '',
   });
 
   @override
@@ -153,6 +159,7 @@ class _HomeViewState extends State<HomeView> {
                               userName: widget.donorName,
                               userPhone: widget.phoneNum,
                               userEmail: widget.donorEmail,
+                              token: widget.token,
                             ),
                           ),
                         );

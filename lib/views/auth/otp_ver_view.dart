@@ -45,6 +45,10 @@ class _OtpVerViewState extends State<OtpVerView> {
   late OtpVerificationMode _verificationMode;
   late String _phoneNumber;
   late String _email;
+  // Session token issued by verify-otp/complete-profile — held here so
+  // _showSuccessDialog (a separate method, out of _verifyOtp's local scope)
+  // can pass it into HomeView -> SettingsView.
+  String? _sessionToken;
 
   final List<TextEditingController> _controllers =
   List.generate(6, (index) => TextEditingController());
@@ -280,6 +284,7 @@ class _OtpVerViewState extends State<OtpVerView> {
       }
 
       await SessionStorage.saveToken(sessionToken);
+      _sessionToken = sessionToken;
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -495,6 +500,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                           classificationResult: widget.classificationResult,
                           isFirstTimeDonor:
                           widget.screeningModel?.screensNPT.isFirstTimeDonor ?? true,
+                          token: _sessionToken ?? '',
                         ),
                       ),
                           (route) => false,

@@ -9,6 +9,7 @@ import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/home/home_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
+import 'package:resq/services/eligibility_service.dart';
 
 // =============================================================================
 // AUTH RESULT MODELS — kept local to this file (small, only used here and
@@ -23,6 +24,14 @@ class DonorProfileData {
   final String bloodType;
   final bool isEligible;
   final String? token; // JWT/Session token
+  // Full decision-tree result re-derived from the donor's saved screening
+  // answers (see eligibility_service.dart) — null when there isn't enough
+  // saved screening data to evaluate (e.g. an admin-created walk-in donor).
+  // When present, this is what should actually drive the Eligible/
+  // Ineligible home screen, not the plain `isEligible` bool above, which
+  // only reflects the backend's much cruder "90 days since last donation"
+  // check.
+  final ClassificationResult? classificationResult;
 
   DonorProfileData({
     required this.id,
@@ -30,6 +39,7 @@ class DonorProfileData {
     required this.bloodType,
     required this.isEligible,
     this.token,
+    this.classificationResult,
   });
 }
 
@@ -69,6 +79,7 @@ class AuthService {
           bloodType: profile['bloodType'] as String,
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
+          classificationResult: classifyDonorFromProfile(profile),
         ),
       );
     } on ApiException catch (e) {
@@ -99,6 +110,7 @@ class AuthService {
           bloodType: profile['bloodType'] as String,
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
+          classificationResult: classifyDonorFromProfile(profile),
         ),
       );
     } on ApiException catch (e) {
@@ -210,6 +222,8 @@ class _LoginViewState extends State<LoginView> {
           bloodType: data.bloodType,
           donorId: data.id,
           isEligible: data.isEligible,
+          classificationResult: data.classificationResult,
+          token: data.token ?? '',
         );
       } else {
         // Failure path returned by DB (e.g., 401, 404)
@@ -282,6 +296,8 @@ class _LoginViewState extends State<LoginView> {
           bloodType: data.bloodType,
           donorId: data.id,
           isEligible: data.isEligible,
+          classificationResult: data.classificationResult,
+          token: data.token ?? '',
         );
       } else {
         // Token was invalid, expired, or biometrics revoked on backend
@@ -316,6 +332,8 @@ class _LoginViewState extends State<LoginView> {
     required String bloodType,
     required String donorId,
     required bool isEligible,
+    required String token,
+    ClassificationResult? classificationResult,
   }) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
@@ -323,11 +341,20 @@ class _LoginViewState extends State<LoginView> {
           donorName: donorName,
           bloodType: bloodType,
           donorId: donorId,
-          // --- UPDATED: Passing correct structure of ClassificationResult ---
-          classificationResult: ClassificationResult(
-            status: isEligible ? EligibleStats.eligible : EligibleStats.deferredWeight,
-          ),
+          // Prefer the real decision-tree result re-derived from the
+          // donor's saved screening answers (classifyDonorFromProfile) —
+          // falls back to the backend's crude isEligible flag only when
+          // there's no saved screening data to evaluate at all (e.g. an
+          // admin-created walk-in donor). Given how that flag is computed
+          // server-side (donorPortal.controller.js), false can only mean
+          // "donated within the last 90 days" — deferredInterval, not
+          // deferredWeight, is the honest fallback status for that case.
+          classificationResult: classificationResult ??
+              ClassificationResult(
+                status: isEligible ? EligibleStats.eligible : EligibleStats.deferredInterval,
+              ),
           isFirstTimeDonor: false,
+          token: token,
         ),
       ),
           (route) => false,
