@@ -94,6 +94,9 @@ DonorScreensNPT? screensFromProfile(Map<String, dynamic> profile) {
     isFirstTimeDonor: lastDonationDate == null,
     lastDonationDate: lastDonationDate,
     hasTattsOrPierce: hasTatts,
+    tattooDate: screening['tattooDate'] != null
+        ? DateTime.tryParse(screening['tattooDate'] as String)
+        : null,
     hasAlcoholPast24hr: hasAlcohol,
     hasActiveInfectOrMeds: hasActiveInfect,
     isPregOrNursing: screening['isPregOrNursing'] as bool?,

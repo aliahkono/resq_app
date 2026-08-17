@@ -60,6 +60,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   int _totalDonations = 0;
   bool _hasTattoosOrPiercings = false;
   DateTime? _tattooDate;
+  // The backend only stores a computed integer `age`, never a birthdate, so
+  // a retake can't reconstruct the donor's real _dob to re-derive age from.
+  // This holds their last-known age so _finishAssessment can preserve it
+  // when the donor doesn't touch the Date of Birth picker during a retake,
+  // instead of silently falling back to a hardcoded default.
+  int? _prefilledAge;
 
   // Step 3: Final Screening (Sex-Specific) State & Controllers
   // Female Specific
@@ -93,6 +99,8 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       _lastDonationDate = initial.lastDonationDate;
       _totalDonations = initial.totalDonations;
       _hasTattoosOrPiercings = initial.hasTattsOrPierce;
+      _tattooDate = initial.tattooDate;
+      _prefilledAge = initial.age > 0 ? initial.age : null;
       _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
       _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
       _lastMensDate = initial.lastMensPeriodDate;
@@ -239,13 +247,19 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     setState(() => _isLoading = true);
 
     final double weight = double.tryParse(_weightController.text.trim()) ?? 52.0;
-    int calculatedAge = 22;
+    int calculatedAge;
     if (_dob != null) {
       final now = DateTime.now();
       calculatedAge = now.year - _dob!.year;
       if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
         calculatedAge--;
       }
+    } else if (_prefilledAge != null) {
+      // Retake, and the donor didn't touch the DOB picker — keep their
+      // last-known age instead of silently overwriting it with a default.
+      calculatedAge = _prefilledAge!;
+    } else {
+      calculatedAge = 22;
     }
 
     final bool isPregOrNursing = _gender == BioSex.female && (_pregnancyStatusIndex != 0 || _isBreastfeeding);
@@ -259,6 +273,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       lastDonationDate: _isFirstTimeDonor ? null : _lastDonationDate,
       totalDonations: _isFirstTimeDonor ? 0 : _totalDonations,
       hasTattsOrPierce: _hasTattoosOrPiercings,
+      tattooDate: _hasTattoosOrPiercings ? _tattooDate : null,
       hasAlcoholPast24hr: _hasAlcoholPast24hr,
       hasActiveInfectOrMeds: _hasActiveInfectOrMeds,
       isPregOrNursing: _gender == BioSex.female ? isPregOrNursing : null,
@@ -296,6 +311,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             'lastDonationDate': evaluatedParams.lastDonationDate?.toIso8601String(),
             'totalDonations': evaluatedParams.totalDonations,
             'hasTattsOrPierce': evaluatedParams.hasTattsOrPierce,
+            'tattooDate': evaluatedParams.tattooDate?.toIso8601String(),
             'hasAlcoholPast24hr': evaluatedParams.hasAlcoholPast24hr,
             'hasActiveInfectOrMeds': evaluatedParams.hasActiveInfectOrMeds,
             'isPregOrNursing': evaluatedParams.isPregOrNursing,

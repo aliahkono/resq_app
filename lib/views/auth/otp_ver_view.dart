@@ -264,6 +264,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   'lastDonationDate': screens.lastDonationDate?.toIso8601String(),
                   'totalDonations': screens.totalDonations,
                   'hasTattsOrPierce': screens.hasTattsOrPierce,
+                  'tattooDate': screens.tattooDate?.toIso8601String(),
                   'hasAlcoholPast24hr': screens.hasAlcoholPast24hr,
                   'hasActiveInfectOrMeds': screens.hasActiveInfectOrMeds,
                   'isPregOrNursing': screens.isPregOrNursing,
