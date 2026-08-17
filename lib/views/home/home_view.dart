@@ -14,6 +14,7 @@ import 'package:resq/views/settings/settings_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/services/notif_service.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
@@ -55,7 +56,7 @@ class _HomeViewState extends State<HomeView> {
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
-  final List<EmergencyBloodRequest> _activeRequests = [];
+  List<EmergencyBloodRequest> _activeRequests = [];
 
   @override
   void initState() {
@@ -81,6 +82,8 @@ class _HomeViewState extends State<HomeView> {
     }
 
     _loadCurrentAppointment();
+    _loadOpenRequests();
+    NotificationService().refresh(widget.token);
   }
 
   /// GET /api/donor/appointments — populates _confirmedAppointment from
@@ -124,6 +127,69 @@ class _HomeViewState extends State<HomeView> {
       // before.
       queueNumber: 'APPT-${(id.length >= 8 ? id.substring(0, 8) : id).toUpperCase()}',
     );
+  }
+
+  /// GET /api/donor/requests — the real "Priority Request Feed" shown on
+  /// the eligible Home tab (EligibleHomeView's "Urgent Blood Requests"
+  /// section). Previously this list was hardcoded permanently empty with a
+  /// comment saying nothing populated it. No donor GPS is collected yet (no
+  /// location package wired into this app), so results come back ordered
+  /// by urgency-then-recency rather than by distance — same fallback the
+  /// backend itself uses when lat/lng aren't supplied. Silent on failure
+  /// for the same reason as _loadCurrentAppointment: background enrichment
+  /// on open, not a donor-triggered action.
+  Future<void> _loadOpenRequests() async {
+    if (widget.token.isEmpty) return;
+    try {
+      final raw = await ApiService.listOpenRequests(widget.token);
+      if (!mounted) return;
+      setState(() {
+        _activeRequests = raw
+            .cast<Map<String, dynamic>>()
+            .map(_toEmergencyBloodRequest)
+            .toList();
+      });
+    } catch (_) {
+      // Intentionally silent — see method comment.
+    }
+  }
+
+  EmergencyBloodRequest _toEmergencyBloodRequest(Map<String, dynamic> r) {
+    final unitsNeeded = (r['unitsNeeded'] as num?)?.toInt() ?? 0;
+    final unitsFulfilled = (r['unitsFulfilled'] as num?)?.toInt() ?? 0;
+    // distanceKm comes from a `round(...::numeric, 1)` SQL expression — like
+    // any other Postgres NUMERIC, the pg driver hands this back as a string
+    // (e.g. "5.3"), not a number (same gotcha already hit once with
+    // weight_kg — see eligibility_service.dart). Only present at all when
+    // the app sends lat/lng, which it doesn't yet, but parsed defensively
+    // for whenever that's added.
+    final distanceKmRaw = r['distanceKm'];
+    final distanceKm = distanceKmRaw is num
+        ? distanceKmRaw
+        : (distanceKmRaw is String ? num.tryParse(distanceKmRaw) : null);
+    final secondsOpen = (r['secondsOpen'] as num?)?.toInt() ?? 0;
+    return EmergencyBloodRequest(
+      id: (r['requestCode'] as String?) ?? '',
+      hospital: (r['hospitalName'] as String?) ?? 'Partner Hospital',
+      hospitalId: (r['hospitalId'] as String?) ?? '',
+      bloodType: (r['bloodType'] as String?) ?? widget.bloodType,
+      urgency: (r['priority'] as String?) ?? 'NORMAL',
+      // No donor GPS collected yet — see method comment above — so this is
+      // honestly "unknown" rather than a fabricated number.
+      distance: distanceKm != null ? '${distanceKm.toStringAsFixed(1)} km' : '—',
+      unitsNeeded: (unitsNeeded - unitsFulfilled).clamp(0, unitsNeeded).toInt(),
+      timeAgo: _formatSecondsAgo(secondsOpen),
+    );
+  }
+
+  String _formatSecondsAgo(int seconds) {
+    if (seconds < 60) return 'Just now';
+    final minutes = seconds ~/ 60;
+    if (minutes < 60) return '${minutes}m ago';
+    final hours = minutes ~/ 60;
+    if (hours < 24) return '${hours}h ago';
+    final days = hours ~/ 24;
+    return '${days}d ago';
   }
 
   String _formatClockTime(DateTime dt) {
@@ -303,6 +369,7 @@ class _HomeViewState extends State<HomeView> {
                     isEligible: _effectiveResult.isEligible,
                     donorBloodType: widget.bloodType,
                     token: widget.token,
+                    onBookingCompleted: _handleBookingCompleted,
                   ),
                 ],
               ),
@@ -359,23 +426,25 @@ class _HomeViewState extends State<HomeView> {
           token: widget.token,
           onBookingCompleted: _handleBookingCompleted,
           activeRequests: _activeRequests,
-          // NOTE: _activeRequests is always empty right now — nothing
-          // populates it from the real GET /api/donor/requests endpoint yet
-          // (a separate, not-yet-done piece of work from the appointment
-          // booking fix below) — so this callback is currently unreachable.
-          // Still fake/local-only if it ever is reached; left as-is rather
-          // than half-wiring a flow whose data source doesn't exist yet.
+          // Real GET /api/donor/requests data now (see _loadOpenRequests
+          // above) — "Reserve Slot" opens a real booking flow for that
+          // hospital instead of fabricating a fake confirmed appointment
+          // with a blank id (which used to make cancellation silently a
+          // no-op, since there was no real appointment behind it).
           onAcceptRequest: (request) {
-            setState(() {
-              _confirmedAppointment = ConfirmedAppointmentData(
-                id: '',
-                facility: request.hospital,
-                date: DateTime.now().add(const Duration(days: 1)),
-                timeSlot: '09:00 AM - 10:00 AM',
-                queueNumber: 'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
-              );
-              _currentTabIndex = 1;
-            });
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => EligibleAppointView(
+                  isFirstTimeDonor: _isFirstTime,
+                  token: widget.token,
+                  preselectedHospitalId: request.hospitalId.isNotEmpty ? request.hospitalId : null,
+                  onBookingCompleted: (appointment) {
+                    Navigator.pop(context);
+                    _handleBookingCompleted(appointment);
+                  },
+                ),
+              ),
+            );
           },
         )
             : IneligibleHomeView(

@@ -3,9 +3,10 @@ import 'package:resq/utils/constants/theme_constants.dart';
 
 class ConfirmedAppointmentData {
   // Real appointments.id from the backend — needed so Cancel can call
-  // PATCH /api/donor/appointments/:id/cancel for the right row. Empty for
-  // the still-fake Priority Request Feed accept path (see home_view.dart)
-  // since that one doesn't create a real backend appointment yet.
+  // PATCH /api/donor/appointments/:id/cancel for the right row. Every
+  // source of ConfirmedAppointmentData (booking flow, Priority Request Feed
+  // accept, notification bell accept) now goes through a real
+  // POST /api/donor/appointments call first, so this is always populated.
   final String id;
   final String facility;
   final DateTime date;

@@ -6,18 +6,23 @@ import 'package:resq/views/appointment/eligible_appoint_view.dart';
 class AppNotificationBell extends StatelessWidget {
   final bool isEligible;
   final String donorBloodType;
-  // Only threaded through so the (currently unreachable, since
-  // NotificationService's broadcast list is never populated from the real
-  // backend yet) "accept slot" flow below can still open EligibleAppointView,
-  // which now requires a real session token to book for real. Not an
-  // attempt to make the broadcast feed itself functional.
+  // Needed both to load the real notification list (NotificationService
+  // .refresh(token), triggered by HomeView on open) and so the "accept
+  // slot" flow below can open EligibleAppointView, which requires a real
+  // session token to book for real.
   final String token;
+  // Shared with every other "book an appointment" entry point (see
+  // home_view.dart's _handleBookingCompleted) so a booking accepted from a
+  // broadcast notification also shows up on the Appointment tab, instead of
+  // being the one entry point that silently forgets about it.
+  final void Function(Map<String, dynamic> appointment)? onBookingCompleted;
 
   const AppNotificationBell({
     super.key,
     required this.isEligible,
     required this.donorBloodType,
     required this.token,
+    this.onBookingCompleted,
   });
 
   @override
@@ -71,30 +76,11 @@ class AppNotificationBell extends StatelessWidget {
       builder: (ctx) => _BroadcastModalSheet(
         notifications: list,
         isEligible: isEligible,
-        onMarkAllRead: () => service.markAllAsRead(),
+        onMarkAllRead: () => service.markAllAsReadRemote(token),
         onSelectBroadcast: (item) {
           service.markAsRead(item.id);
           Navigator.pop(ctx);
-          if (isEligible) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => EligibleAppointView(
-                  isFirstTimeDonor: false,
-                  token: token,
-                  onBookingCompleted: (appointment) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Reserved slot at ${appointment['hospitalName']}!'),
-                        backgroundColor: const Color(0xFF2E7D32),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            );
-          } else {
+          if (!isEligible) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('You are temporarily deferred. Please complete your recovery period before accepting slots.'),
@@ -102,7 +88,38 @@ class AppNotificationBell extends StatelessWidget {
                 behavior: SnackBarBehavior.floating,
               ),
             );
+            return;
           }
+          if (!item.isStillOpen) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This request has already been closed out — check the Home tab for other open broadcasts.'),
+                backgroundColor: Color(0xFF7D1B22),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => EligibleAppointView(
+                isFirstTimeDonor: false,
+                token: token,
+                preselectedHospitalId: item.hospitalId,
+                onBookingCompleted: (appointment) {
+                  Navigator.pop(context);
+                  onBookingCompleted?.call(appointment);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Reserved slot at ${appointment['hospitalName']}!'),
+                      backgroundColor: const Color(0xFF2E7D32),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
         },
       ),
     );

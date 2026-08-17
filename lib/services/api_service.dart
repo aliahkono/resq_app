@@ -249,4 +249,31 @@ class ApiService {
   static Future<Map<String, dynamic>> cancelAppointment(String token, String appointmentId) {
     return _patch('/donor/appointments/$appointmentId/cancel', {}, token: token);
   }
+
+  /// GET /api/donor/requests — open hospital broadcasts matching this
+  /// donor's blood type (see listOpenRequestsForDonor,
+  /// donorPortal.controller.js), ranked by urgency then, if lat/lng are
+  /// supplied, proximity. This app doesn't collect donor GPS yet (no
+  /// location package wired in), so lat/lng are left out for now — the
+  /// backend just falls back to newest-first ordering, same as it does for
+  /// any caller that skips them.
+  /// [{requestCode, bloodType, priority, ward, unitsNeeded, unitsFulfilled,
+  ///   status, secondsOpen, hospitalId, hospitalName, hospitalAddress,
+  ///   latitude, longitude, distanceKm}]
+  static Future<List<dynamic>> listOpenRequests(String token) {
+    return _getList('/donor/requests', token: token);
+  }
+
+  /// GET /api/donor/notifications — {notifications: [...], unreadCount: n}.
+  /// One row per broadcast the donor was actually sent (see
+  /// listMyNotifications, donorPortal.controller.js).
+  static Future<Map<String, dynamic>> getMyNotifications(String token) {
+    return _get('/donor/notifications', token: token);
+  }
+
+  /// PATCH /api/donor/notifications/read — marks every one of this donor's
+  /// notification rows read in one shot (204 No Content on success).
+  static Future<void> markNotificationsRead(String token) {
+    return _patch('/donor/notifications/read', {}, token: token);
+  }
 }

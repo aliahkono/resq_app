@@ -33,12 +33,19 @@ class EligibleAppointView extends StatefulWidget {
   // POST /api/donor/appointments actually succeeds — not just whenever the
   // donor taps a button.
   final void Function(Map<String, dynamic> appointment) onBookingCompleted;
+  // Set when arriving here from a specific broadcast/priority request (the
+  // notification bell's "accept slot", or the Home tab's Priority Request
+  // Feed "Reserve Slot") — jumps straight past hospital selection to
+  // date/time picking for that exact hospital instead of dropping the donor
+  // into a blank picker they'd have to re-find it in.
+  final String? preselectedHospitalId;
 
   const EligibleAppointView({
     super.key,
     required this.isFirstTimeDonor,
     required this.token,
     required this.onBookingCompleted,
+    this.preselectedHospitalId,
   });
 
   @override
@@ -101,6 +108,10 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
       setState(() {
         _hospitals = raw.map((h) => _Hospital.fromJson(h as Map<String, dynamic>)).toList();
         _loadingHospitals = false;
+        if (widget.preselectedHospitalId != null &&
+            _hospitals.any((h) => h.id == widget.preselectedHospitalId)) {
+          _selectedHospitalId = widget.preselectedHospitalId;
+        }
       });
     } on ApiException catch (e) {
       if (!mounted) return;

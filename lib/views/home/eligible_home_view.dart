@@ -4,6 +4,10 @@ import 'package:resq/views/appointment/eligible_appoint_view.dart';
 class EmergencyBloodRequest {
   final String id;
   final String hospital;
+  // The real hospitals.id this broadcast came from (GET /api/donor/requests
+  // — see listOpenRequestsForDonor) — needed so "Reserve Slot" can book at
+  // the actual hospital instead of dropping the donor into a blank picker.
+  final String hospitalId;
   final String bloodType;
   final String urgency;
   final String distance;
@@ -13,6 +17,7 @@ class EmergencyBloodRequest {
   EmergencyBloodRequest({
     required this.id,
     required this.hospital,
+    this.hospitalId = '',
     required this.bloodType,
     required this.urgency,
     required this.distance,
