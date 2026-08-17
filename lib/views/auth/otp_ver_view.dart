@@ -57,6 +57,17 @@ class _OtpVerViewState extends State<OtpVerView> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  // Separate from the resend cooldown above (_secondsRemaining/_timer),
+  // which only governs when the RESEND button re-enables. This tracks how
+  // long the *current* code itself stays valid server-side — driven by the
+  // real expiresIn the backend returns from request-otp (otp.js's
+  // OTP_TTL_SECONDS, 5 minutes by default), not a guessed client-side
+  // number, so it can never drift out of sync with what the backend
+  // actually enforces.
+  Timer? _expiryTimer;
+  int _secondsUntilExpiry = 300;
+  bool _codeExpired = false;
+
   @override
   void initState() {
     super.initState();
@@ -76,8 +87,15 @@ class _OtpVerViewState extends State<OtpVerView> {
   Future<bool> _sendOtp({bool showSnackBarOnSuccess = true}) async {
     final byEmail = _verificationMode == OtpVerificationMode.email;
     try {
-      await ApiService.requestOtp(_phoneNumber, channel: byEmail ? 'email' : 'sms', email: byEmail ? _email : null);
+      final response = await ApiService.requestOtp(
+        _phoneNumber,
+        channel: byEmail ? 'email' : 'sms',
+        email: byEmail ? _email : null,
+      );
       if (!mounted) return true;
+      // Falls back to 300s (5 min) only if an older backend build doesn't
+      // send expiresIn back — the real backend always does.
+      _startExpiryTimer((response['expiresIn'] as int?) ?? 300);
       if (showSnackBarOnSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -108,6 +126,7 @@ class _OtpVerViewState extends State<OtpVerView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _expiryTimer?.cancel();
     for (var controller in _controllers) {
       controller.dispose();
     }
@@ -131,6 +150,31 @@ class _OtpVerViewState extends State<OtpVerView> {
         _timer?.cancel();
       }
     });
+  }
+
+  /// Starts (or restarts) the code-expiry countdown. `seconds` should come
+  /// straight from request-otp's `expiresIn` — see _sendOtp below — so this
+  /// always reflects however long the backend actually honors the code for.
+  void _startExpiryTimer(int seconds) {
+    setState(() {
+      _secondsUntilExpiry = seconds;
+      _codeExpired = false;
+    });
+    _expiryTimer?.cancel();
+    _expiryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsUntilExpiry > 0) {
+        setState(() => _secondsUntilExpiry--);
+      } else {
+        setState(() => _codeExpired = true);
+        _expiryTimer?.cancel();
+      }
+    });
+  }
+
+  String _formatExpiry(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '$minutes:${secs.toString().padLeft(2, '0')}';
   }
 
   String get _otpCode => _controllers.map((c) => c.text).join();
@@ -161,6 +205,18 @@ class _OtpVerViewState extends State<OtpVerView> {
   }
 
   void _verifyOtp() async {
+    if (_codeExpired) {
+      // Catches it client-side with a clearer message than the backend's
+      // generic "Invalid or expired code." would give — the backend still
+      // enforces this independently regardless (verifyOtp in otp.js), this
+      // is purely a friendlier first check.
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'This code has expired. Tap "Resend Code" to get a new one.';
+      });
+      return;
+    }
+
     // Same check regardless of which tab is active — the code is always
     // bound to _phoneNumber server-side (see api_service.dart's
     // requestOtp), so verification itself doesn't branch on channel at all.
@@ -661,7 +717,34 @@ class _OtpVerViewState extends State<OtpVerView> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _codeExpired ? const Color(0xFFFEE2E2) : const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _codeExpired ? Icons.error_outline_rounded : Icons.timer_outlined,
+                      size: 14,
+                      color: _codeExpired ? Colors.red.shade700 : ResQTheme.textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _codeExpired ? 'Code expired' : 'Expires in ${_formatExpiry(_secondsUntilExpiry)}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: _codeExpired ? Colors.red.shade700 : ResQTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(
