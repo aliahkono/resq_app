@@ -4,13 +4,22 @@ import 'package:http/http.dart' as http;
 /// Base URL of the ResQ backend (server/src/app.js in the hospital-web-dashboard
 /// repo). It isn't deployed anywhere yet, so this has to point at a machine
 /// actually running it:
-///   - Android emulator, server running on the same computer: 10.0.2.2
+///   - Android emulator, server running on the same computer: normally
+///     10.0.2.2, but using 127.0.0.1 + `adb reverse tcp:4000 tcp:4000`
+///     instead here — some Mac network setups (VPNs, security software)
+///     block the 10.0.2.2 NAT route even with the firewall off, and
+///     adb reverse tunnels over the same USB/ADB connection Flutter
+///     already uses instead, sidestepping that entirely. Re-run the
+///     adb reverse command after every emulator restart — it doesn't
+///     persist.
 ///   - iOS simulator, server running on the same computer: 127.0.0.1
+///     (no adb reverse needed — the simulator shares the Mac's network
+///     stack directly)
 ///   - A real phone: your computer's LAN IP (e.g. 192.168.1.23), phone and
 ///     computer on the same Wi-Fi, or an ngrok tunnel URL if it's remote
 /// Change this before testing against a real backend — it will not work
 /// as-is on a physical device.
-const String kApiBaseUrl = "http://10.0.2.2:4000/api";
+const String kApiBaseUrl = "http://127.0.0.1:4000/api";
 
 /// Thrown for any non-2xx response. `message` is the backend's own `error`
 /// field when it sent one (see server/src/utils/asyncHandler.js and every
