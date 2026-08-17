@@ -95,9 +95,62 @@ class ApiService {
     return _post('/donor-auth/login', {'identifier': identifier, 'password': password});
   }
 
-  // Deliberately NOT adding request-otp / verify-otp / complete-profile
-  // wrappers here yet — that flow is still being worked out, don't want to
-  // build against a shape that's about to change.
+  /// POST /api/donor-auth/request-otp — { phone, channel, email? } -> { ok, channel }
+  /// Sends a 6-digit code. `phone` should be in +63XXXXXXXXXX form (the
+  /// registration wizard already builds it that way), though the backend
+  /// re-normalizes it regardless of exact input shape. The code is always
+  /// bound to `phone` server-side no matter which channel delivers it —
+  /// pass `channel: 'email'` with `email` set to have this one delivery
+  /// go out by email instead of SMS (matches the login screen's Phone
+  /// SMS / Email OTP tabs).
+  static Future<Map<String, dynamic>> requestOtp(String phone, {String channel = 'sms', String? email}) {
+    return _post('/donor-auth/request-otp', {
+      'phone': phone,
+      'channel': channel,
+      if (channel == 'email' && email != null) 'email': email,
+    });
+  }
+
+  /// POST /api/donor-auth/verify-otp — { phone, code } ->
+  ///   { needsProfile: true, token }  — no donor exists yet for this phone;
+  ///     `token` is a short-lived pending token, pass it to completeProfile.
+  ///   { needsProfile: false, token, expiresIn, donor } — a donor record
+  ///     already existed (e.g. an admin-created walk-in) — `token` here is
+  ///     already a full session token, nothing else to do.
+  static Future<Map<String, dynamic>> verifyOtp({required String phone, required String code}) {
+    return _post('/donor-auth/verify-otp', {'phone': phone, 'code': code});
+  }
+
+  /// POST /api/donor-auth/complete-profile — only valid right after
+  /// verifyOtp returned needsProfile: true. `pendingToken` is that
+  /// response's `token`, sent as the bearer token here (not a normal
+  /// session token yet). -> { token, expiresIn, donor }
+  static Future<Map<String, dynamic>> completeProfile({
+    required String pendingToken,
+    required String name,
+    required String bloodType,
+    required String password,
+    String? email,
+    int? age,
+    double? weightKg,
+    String? gender, // "male" | "female"
+    Map<String, dynamic>? healthScreening,
+  }) {
+    return _post(
+      '/donor-auth/complete-profile',
+      {
+        'name': name,
+        'bloodType': bloodType,
+        'password': password,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (age != null) 'age': age,
+        if (weightKg != null) 'weightKg': weightKg,
+        if (gender != null) 'gender': gender,
+        if (healthScreening != null) 'healthScreening': healthScreening,
+      },
+      token: pendingToken,
+    );
+  }
 
   // --- Donor portal (requires the session token from login) --------------
 

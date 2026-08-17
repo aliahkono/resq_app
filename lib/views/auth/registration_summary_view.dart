@@ -208,6 +208,7 @@ class RegistrationSummaryView extends StatelessWidget {
                           phoneNumber: userModel.phoneNum,
                           bloodType: profileModel.bloodType,
                           donorId: profileModel.profId,
+                          password: rawPassword,
                           screeningModel: screeningModel,
                           classificationResult: classificationResult,
                         ),

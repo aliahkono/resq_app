@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/services/api_service.dart';
+import 'package:resq/services/session_storage.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/home/home_view.dart';
@@ -13,6 +16,12 @@ class OtpVerView extends StatefulWidget {
   final String donorName;
   final String bloodType;
   final String donorId;
+  // Only required on a fresh registration (not currently reachable from any
+  // other flow — see registration_summary_view.dart) — carried through so
+  // this screen can call complete-profile once the code is verified. The
+  // backend hashes it immediately on arrival; nothing keeps it around
+  // beyond that single request.
+  final String password;
   final ScreenNPTModel? screeningModel;
   final ClassificationResult? classificationResult;
 
@@ -23,6 +32,7 @@ class OtpVerView extends StatefulWidget {
     required this.donorName,
     required this.bloodType,
     required this.donorId,
+    required this.password,
     this.screeningModel,
     this.classificationResult,
   });
@@ -54,6 +64,45 @@ class _OtpVerViewState extends State<OtpVerView> {
     _phoneNumber = widget.phoneNumber;
     _email = widget.email;
     _startResendTimer();
+    // Fire the actual SMS the moment this screen appears — the resend
+    // countdown above already assumes a code was just sent, so the first
+    // send has to happen here, not wait for the donor to tap anything.
+    _sendOtp(showSnackBarOnSuccess: false);
+  }
+
+  /// POST /api/donor-auth/request-otp. The code is always issued for
+  /// _phoneNumber server-side (see api_service.dart) — the active tab just
+  /// picks which channel this particular send goes out on.
+  Future<bool> _sendOtp({bool showSnackBarOnSuccess = true}) async {
+    final byEmail = _verificationMode == OtpVerificationMode.email;
+    try {
+      await ApiService.requestOtp(_phoneNumber, channel: byEmail ? 'email' : 'sms', email: byEmail ? _email : null);
+      if (!mounted) return true;
+      if (showSnackBarOnSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('A new 6-digit code was sent to ${byEmail ? _email : _phoneNumber}'),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return true;
+    } on ApiException catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _hasError = true;
+        _errorMessage = e.message;
+      });
+      return false;
+    } catch (_) {
+      if (!mounted) return false;
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'Could not reach the ResQ server. Check your connection and try again.';
+      });
+      return false;
+    }
   }
 
   @override
@@ -104,10 +153,17 @@ class _OtpVerViewState extends State<OtpVerView> {
       });
       _clearOtpInputs();
       _startResendTimer();
+      // Switching tabs means the donor wants the code somewhere else —
+      // send a fresh one on the newly-selected channel right away, same as
+      // the initial send in initState.
+      _sendOtp(showSnackBarOnSuccess: false);
     }
   }
 
   void _verifyOtp() async {
+    // Same check regardless of which tab is active — the code is always
+    // bound to _phoneNumber server-side (see api_service.dart's
+    // requestOtp), so verification itself doesn't branch on channel at all.
     if (_otpCode.length < 6) {
       setState(() {
         _hasError = true;
@@ -122,34 +178,91 @@ class _OtpVerViewState extends State<OtpVerView> {
       _errorMessage = '';
     });
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    try {
+      final verifyResponse = await ApiService.verifyOtp(phone: _phoneNumber, code: _otpCode);
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      Map<String, dynamic>? donor;
+      String sessionToken;
 
-    if (_otpCode == '000000') {
+      if (verifyResponse['needsProfile'] == true) {
+        // Brand-new donor — the token here is only a short-lived pending
+        // token good for exactly one call: complete-profile.
+        final screens = widget.screeningModel?.screensNPT;
+        final completeResponse = await ApiService.completeProfile(
+          pendingToken: verifyResponse['token'] as String,
+          name: widget.donorName,
+          bloodType: widget.bloodType,
+          password: widget.password,
+          email: widget.email,
+          age: screens?.age,
+          weightKg: screens?.weight,
+          gender: screens?.gender.name,
+          healthScreening: screens == null
+              ? null
+              : {
+                  'isFirstTimeDonor': screens.isFirstTimeDonor,
+                  'lastDonationDate': screens.lastDonationDate?.toIso8601String(),
+                  'totalDonations': screens.totalDonations,
+                  'hasTattsOrPierce': screens.hasTattsOrPierce,
+                  'hasAlcoholPast24hr': screens.hasAlcoholPast24hr,
+                  'hasActiveInfectOrMeds': screens.hasActiveInfectOrMeds,
+                  'isPregOrNursing': screens.isPregOrNursing,
+                  'lastMensPeriodDate': screens.lastMensPeriodDate?.toIso8601String(),
+                  'hasHighRiskExpo': screens.hasHighRiskExpo,
+                  if (widget.classificationResult != null)
+                    'classificationStatus': widget.classificationResult!.status.name,
+                },
+        );
+        sessionToken = completeResponse['token'] as String;
+        donor = completeResponse['donor'] as Map<String, dynamic>?;
+      } else {
+        // A donor record already existed for this phone (e.g. an admin
+        // walk-in entry) — verify-otp already logged them in, no
+        // complete-profile call needed or even valid at this point.
+        sessionToken = verifyResponse['token'] as String;
+        donor = verifyResponse['donor'] as Map<String, dynamic>?;
+      }
+
+      await SessionStorage.saveToken(sessionToken);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSuccessDialog(donor);
+    } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
+        _isLoading = false;
         _hasError = true;
-        _errorMessage = 'Invalid verification code. Please try again.';
+        _errorMessage = e.message;
       });
-    } else {
-      _showSuccessDialog();
+    } on SocketException {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'Network error: Cannot reach the ResQ server.';
+      });
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'The server took too long to respond. Please try again.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'Something went wrong. Please try again.';
+      });
     }
   }
 
-  void _resendCode() {
+  Future<void> _resendCode() async {
     _clearOtpInputs();
     _startResendTimer();
-
-    final target = _verificationMode == OtpVerificationMode.phone ? _phoneNumber : _email;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('A new 6-digit OTP code was dispatched to $target'),
-        backgroundColor: Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    await _sendOtp();
   }
 
   void _showChangeContactModal() {
@@ -255,7 +368,11 @@ class _OtpVerViewState extends State<OtpVerView> {
     );
   }
 
-  void _showSuccessDialog() {
+  // `donor` is the real record the backend just returned (from
+  // complete-profile or, for the already-existed branch, verify-otp
+  // itself) — used in place of the locally-generated placeholder id so
+  // HomeView gets the donor's actual database id, not a fake 'PRF-...' one.
+  void _showSuccessDialog(Map<String, dynamic>? donor) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -313,9 +430,9 @@ class _OtpVerViewState extends State<OtpVerView> {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
                         builder: (context) => HomeView(
-                          donorName: widget.donorName,
-                          bloodType: widget.bloodType,
-                          donorId: widget.donorId,
+                          donorName: (donor?['name'] as String?) ?? widget.donorName,
+                          bloodType: (donor?['bloodType'] as String?) ?? widget.bloodType,
+                          donorId: (donor?['id'] as String?) ?? widget.donorId,
                           phoneNum: _phoneNumber,
                           donorEmail: _email,
                           screeningModel: widget.screeningModel,
