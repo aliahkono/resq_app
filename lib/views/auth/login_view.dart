@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/home/home_view.dart';
@@ -32,6 +33,14 @@ class DonorProfileData {
   // only reflects the backend's much cruder "90 days since last donation"
   // check.
   final ClassificationResult? classificationResult;
+  // The donor's actual current screening answers (weight, age, gender,
+  // tattoos, alcohol, etc.), reconstructed from the same GET /api/donor/me
+  // response — without this, HomeView.screeningModel stayed null for any
+  // donor who just logged in normally (as opposed to just finishing
+  // registration in the same session), and the retake-screening wizard
+  // would silently fall back to its "create your account" Step 1 instead
+  // of pre-filling and jumping to the actual screening steps.
+  final ScreenNPTModel? screeningModel;
 
   DonorProfileData({
     required this.id,
@@ -40,6 +49,7 @@ class DonorProfileData {
     required this.isEligible,
     this.token,
     this.classificationResult,
+    this.screeningModel,
   });
 }
 
@@ -80,6 +90,7 @@ class AuthService {
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
           classificationResult: classifyDonorFromProfile(profile),
+          screeningModel: buildScreeningModelFromProfile(profile),
         ),
       );
     } on ApiException catch (e) {
@@ -111,6 +122,7 @@ class AuthService {
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
           classificationResult: classifyDonorFromProfile(profile),
+          screeningModel: buildScreeningModelFromProfile(profile),
         ),
       );
     } on ApiException catch (e) {
@@ -223,6 +235,7 @@ class _LoginViewState extends State<LoginView> {
           donorId: data.id,
           isEligible: data.isEligible,
           classificationResult: data.classificationResult,
+          screeningModel: data.screeningModel,
           token: data.token ?? '',
         );
       } else {
@@ -297,6 +310,7 @@ class _LoginViewState extends State<LoginView> {
           donorId: data.id,
           isEligible: data.isEligible,
           classificationResult: data.classificationResult,
+          screeningModel: data.screeningModel,
           token: data.token ?? '',
         );
       } else {
@@ -334,6 +348,7 @@ class _LoginViewState extends State<LoginView> {
     required bool isEligible,
     required String token,
     ClassificationResult? classificationResult,
+    ScreenNPTModel? screeningModel,
   }) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
@@ -353,6 +368,10 @@ class _LoginViewState extends State<LoginView> {
               ClassificationResult(
                 status: isEligible ? EligibleStats.eligible : EligibleStats.deferredInterval,
               ),
+          // Real current screening answers, reconstructed from the same
+          // profile fetch — pre-fills the retake-screening wizard instead
+          // of leaving it null (see DonorProfileData.screeningModel).
+          screeningModel: screeningModel,
           isFirstTimeDonor: false,
           token: token,
         ),

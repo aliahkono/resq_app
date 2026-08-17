@@ -1,3 +1,4 @@
+import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 
 /// Re-runs the same on-device decision tree used at registration
@@ -20,6 +21,39 @@ import 'package:resq/utils/algo/decision_tree_class.dart';
 /// collected. Callers should fall back to the backend's own `isEligible`
 /// flag in that case, since there's nothing else to go on.
 ClassificationResult? classifyDonorFromProfile(Map<String, dynamic> profile) {
+  final npt = screensFromProfile(profile);
+  if (npt == null) return null;
+  return DecisionTreeClassifier().classify(npt);
+}
+
+/// Reconstructs a full ScreenNPTModel (the donor's actual current answers,
+/// not just the pass/fail classification) from a GET /api/donor/me
+/// response. Used to pre-fill RegistrationWizView's retake flow with real
+/// data — without this, RegistrationWizView.initialScreening stayed null
+/// for any donor who hadn't just come from a same-session registration
+/// (i.e. anyone who logged in normally), and the wizard would silently
+/// fall back to its Step 1 "create your account" UI instead of jumping to
+/// the retake screening steps (see registration_wiz_view.dart's initState:
+/// `if (widget.isRetake && widget.initialScreening != null)`).
+///
+/// Same null-if-incomplete contract as classifyDonorFromProfile.
+ScreenNPTModel? buildScreeningModelFromProfile(Map<String, dynamic> profile) {
+  final npt = screensFromProfile(profile);
+  if (npt == null) return null;
+  return ScreenNPTModel(
+    donorProfId: (profile['id'] as String?) ?? '',
+    // The backend doesn't track a separate "screening last submitted"
+    // timestamp (health_screening is just a JSON blob on the donor row,
+    // no timestamp inside it) — this is only used for display bookkeeping
+    // in ScreenNPTModel, never read by the classifier itself, so "now" is
+    // an honest-enough stand-in rather than a real submission date.
+    submissionDate: DateTime.now(),
+    screensNPT: npt,
+  );
+}
+
+/// Shared parsing/validation for both functions above.
+DonorScreensNPT? screensFromProfile(Map<String, dynamic> profile) {
   final screening = profile['healthScreening'];
   if (screening is! Map) return null;
 
@@ -69,5 +103,5 @@ ClassificationResult? classifyDonorFromProfile(Map<String, dynamic> profile) {
     hasHighRiskExpo: screening['hasHighRiskExpo'] as bool?,
   );
 
-  return DecisionTreeClassifier().classify(npt);
+  return npt;
 }
