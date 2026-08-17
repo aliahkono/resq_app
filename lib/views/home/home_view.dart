@@ -139,9 +139,13 @@ class _HomeViewState extends State<HomeView> {
   /// for the same reason as _loadCurrentAppointment: background enrichment
   /// on open, not a donor-triggered action.
   Future<void> _loadOpenRequests() async {
-    if (widget.token.isEmpty) return;
+    if (widget.token.isEmpty) {
+      debugPrint('HomeView._loadOpenRequests: skipped — no session token.');
+      return;
+    }
     try {
       final raw = await ApiService.listOpenRequests(widget.token);
+      debugPrint('HomeView._loadOpenRequests: got ${raw.length} row(s): $raw');
       if (!mounted) return;
       setState(() {
         _activeRequests = raw
@@ -149,8 +153,11 @@ class _HomeViewState extends State<HomeView> {
             .map(_toEmergencyBloodRequest)
             .toList();
       });
-    } catch (_) {
-      // Intentionally silent — see method comment.
+    } catch (e, st) {
+      // Was silent before — logged now (debugPrint is a no-op cost-wise,
+      // stays out of the user's way, but makes failures visible while
+      // debugging instead of just always showing "no broadcasts").
+      debugPrint('HomeView._loadOpenRequests failed: $e\n$st');
     }
   }
 

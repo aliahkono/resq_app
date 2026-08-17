@@ -29,12 +29,15 @@ class NotificationService extends ChangeNotifier {
     try {
       final response = await ApiService.getMyNotifications(token);
       final rawList = (response['notifications'] as List<dynamic>?) ?? [];
+      debugPrint('NotificationService.refresh: got ${rawList.length} row(s): $rawList');
       final parsed = rawList
           .map((n) => BloodBroadcastNotification.fromJson(n as Map<String, dynamic>))
           .toList();
       syncHospitalBroadcasts(parsed);
-    } catch (_) {
-      // Keep the last-known list rather than clearing it on a network hiccup.
+    } catch (e, st) {
+      // Keep the last-known list rather than clearing it on a network hiccup
+      // — but log it now instead of failing completely silently.
+      debugPrint('NotificationService.refresh failed: $e\n$st');
     } finally {
       _loading = false;
       notifyListeners();
