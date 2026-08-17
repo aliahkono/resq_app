@@ -182,6 +182,19 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  /// Pull-to-refresh on the eligible Home tab (see EligibleHomeView's
+  /// onRefresh) — re-fetches everything that only ever loaded once on
+  /// initState, so a broadcast created on the admin dashboard *while* the
+  /// donor already has the app open actually shows up without them having
+  /// to fully restart the app.
+  Future<void> _refreshBroadcastData() async {
+    await Future.wait([
+      _loadOpenRequests(),
+      NotificationService().refresh(widget.token),
+      _loadCurrentAppointment(),
+    ]);
+  }
+
   String _formatSecondsAgo(int seconds) {
     if (seconds < 60) return 'Just now';
     final minutes = seconds ~/ 60;
@@ -425,6 +438,7 @@ class _HomeViewState extends State<HomeView> {
           bloodType: activeBloodType,
           token: widget.token,
           onBookingCompleted: _handleBookingCompleted,
+          onRefresh: _refreshBroadcastData,
           activeRequests: _activeRequests,
           // Real GET /api/donor/requests data now (see _loadOpenRequests
           // above) — "Reserve Slot" opens a real booking flow for that

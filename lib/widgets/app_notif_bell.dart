@@ -67,14 +67,25 @@ class AppNotificationBell extends StatelessWidget {
 
   void _showBroadcastSheet(BuildContext context) {
     final service = NotificationService();
-    final list = service.notifications;
+
+    // Re-fetch every time the bell is opened, not just once when HomeView
+    // first mounted — otherwise a broadcast sent while the donor already
+    // had the app open wouldn't show up here either without a full app
+    // restart, same gap the Priority Request Feed had. The AnimatedBuilder
+    // below re-reads service.notifications live, so the sheet updates in
+    // place once this resolves instead of only refreshing the bell icon's
+    // badge behind it.
+    service.refresh(token);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _BroadcastModalSheet(
-        notifications: list,
+      builder: (ctx) => AnimatedBuilder(
+        animation: service,
+        builder: (ctx, _) => _BroadcastModalSheet(
+        notifications: service.notifications,
+        isLoading: service.isLoading,
         isEligible: isEligible,
         onMarkAllRead: () => service.markAllAsReadRemote(token),
         onSelectBroadcast: (item) {
@@ -121,6 +132,7 @@ class AppNotificationBell extends StatelessWidget {
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -128,12 +140,14 @@ class AppNotificationBell extends StatelessWidget {
 
 class _BroadcastModalSheet extends StatelessWidget {
   final List<BloodBroadcastNotification> notifications;
+  final bool isLoading;
   final bool isEligible;
   final VoidCallback onMarkAllRead;
   final Function(BloodBroadcastNotification) onSelectBroadcast;
 
   const _BroadcastModalSheet({
     required this.notifications,
+    this.isLoading = false,
     required this.isEligible,
     required this.onMarkAllRead,
     required this.onSelectBroadcast,
@@ -167,14 +181,22 @@ class _BroadcastModalSheet extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.campaign_rounded, color: Color(0xFF7D1B22), size: 22),
-                    SizedBox(width: 8),
-                    Text(
+                    const Icon(Icons.campaign_rounded, color: Color(0xFF7D1B22), size: 22),
+                    const SizedBox(width: 8),
+                    const Text(
                       'Hospital Broadcasts & SMS',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E1E)),
                     ),
+                    if (isLoading) ...[
+                      const SizedBox(width: 10),
+                      const SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7D1B22)),
+                      ),
+                    ],
                   ],
                 ),
                 TextButton(

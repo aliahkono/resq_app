@@ -39,6 +39,13 @@ class EligibleHomeView extends StatelessWidget {
   // updating the real _confirmedAppointment state from the backend's
   // actual response, not just popping a snackbar and forgetting about it.
   final void Function(Map<String, dynamic> appointment) onBookingCompleted;
+  // Re-fetches both the Priority Request Feed (GET /api/donor/requests) and
+  // the notification bell (GET /api/donor/notifications) — see
+  // home_view.dart's _refreshBroadcastData. Without this, a broadcast
+  // created on the admin dashboard while a donor already had this screen
+  // open would never appear until they fully restarted the app, since the
+  // feed only ever fetched once on HomeView's initState.
+  final Future<void> Function()? onRefresh;
 
   const EligibleHomeView({
     super.key,
@@ -49,19 +56,27 @@ class EligibleHomeView extends StatelessWidget {
     this.onAcceptRequest,
     required this.token,
     required this.onBookingCompleted,
+    this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
+    final content = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+      child: isFirstTimeDonor
+          ? _buildFirstTimeDonorView(context)
+          : _buildActiveDonorView(context),
+    );
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F5),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-        child: isFirstTimeDonor
-            ? _buildFirstTimeDonorView(context)
-            : _buildActiveDonorView(context),
-      ),
+      body: onRefresh != null
+          ? RefreshIndicator(
+              color: const Color(0xFF7D1B22),
+              onRefresh: onRefresh!,
+              child: content,
+            )
+          : content,
     );
   }
 
