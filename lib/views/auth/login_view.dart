@@ -7,13 +7,13 @@ import 'package:local_auth/local_auth.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/home/home_view.dart';
-// Future DB integration: Import your actual service file here
-// import 'package:resq/services/auth_service.dart';
+import 'package:resq/services/api_service.dart';
+import 'package:resq/services/session_storage.dart';
 
 // =============================================================================
-// PLACEHOLDER STRUCTURES FOR FUTURE DB INTEGRATION
-// Copy these definitions to lib/model/auth_model.dart and lib/services/auth_service.dart
-// when ready to connect to the database.
+// AUTH RESULT MODELS — kept local to this file (small, only used here and
+// by AuthService right below). Move to lib/model/auth_model.dart later if
+// other screens end up needing them too.
 // =============================================================================
 
 /// Real-world model for returned donor profile data from database
@@ -42,40 +42,72 @@ class AuthResult {
   AuthResult({required this.success, this.errorMessage, this.donorData});
 }
 
-/// INTERFACE: Replace this with your actual DB/API service implementation
+/// Talks to the real ResQ backend (see lib/services/api_service.dart for
+/// the base URL you need to set for your machine/device).
 class AuthService {
-  // Static instance for singleton pattern if needed
-  // static final AuthService _instance = AuthService._internal();
-  // factory AuthService() => _instance;
-  // AuthService._internal();
-
-  /// Permanent Logic placeholder for email/phone login
+  /// identifier/password login — POST /api/donor-auth/login. The login
+  /// endpoint's own response doesn't include eligibility/last-donation
+  /// info (that's specific to GET /me), so this makes one extra call right
+  /// after to fetch the full profile rather than guessing isEligible.
   Future<AuthResult> signInWithCredentials({
     required String identifier, // Email or Phone
     required String password,
     required bool isEmail,
   }) async {
-    // --- INTEGRATE DATABASE HERE ---
-    // 1. Perform POST request to /api/v1/login
-    // 2. Map responses:
-    //    - 200 OK -> Map JSON to DonorProfileData, return AuthResult(success: true, donorData: mappedData)
-    //    - 401 Unauthorized -> return AuthResult(success: false, errorMessage: 'Invalid credentials')
-    //    - 404 Not Found -> return AuthResult(success: false, errorMessage: 'Account does not exist')
-    //    - 500/Network Error -> throw Exception or return success: false
+    try {
+      final loginResponse = await ApiService.loginWithPassword(identifier: identifier, password: password);
+      final token = loginResponse['token'] as String;
 
-    // Temporarily throw an error to demonstrate error handling is working without mock data
-    throw UnimplementedError("AuthService.signInWithCredentials is not yet implemented with a database.");
+      final profile = await ApiService.getMyProfile(token);
+      await SessionStorage.saveToken(token);
+
+      return AuthResult(
+        success: true,
+        donorData: DonorProfileData(
+          id: profile['id'] as String,
+          name: profile['name'] as String,
+          bloodType: profile['bloodType'] as String,
+          isEligible: profile['isEligible'] as bool? ?? true,
+          token: token,
+        ),
+      );
+    } on ApiException catch (e) {
+      // e.message is already the backend's own error text (e.g. "Account
+      // does not exist. Please register first.", "Incorrect password.",
+      // the 429 lockout message) — safe to show directly, see ApiException.
+      return AuthResult(success: false, errorMessage: e.message);
+    }
   }
 
-  /// Permanent Logic placeholder for biometric token-based session refresh
+  /// Biometric/PIN re-entry: re-validates whatever session token is saved
+  /// on-device against GET /api/donor/me, rather than a separate
+  /// refresh-token endpoint (the backend doesn't have one — a donor
+  /// session is a single 30-day token, not an access/refresh pair).
   Future<AuthResult> signInWithStoredSessionToken() async {
-    // --- INTEGRATE DATABASE / SECURE STORAGE HERE ---
-    // 1. Retrieve securely stored JWT/Refresh token (e.g., using flutter_secure_storage)
-    // 2. If token exists, call API /api/v1/refresh-session with token
-    // 3. Verify server response (success vs expired/revoked token)
-    // 4. Return appropriate AuthResult.
+    final token = await SessionStorage.readToken();
+    if (token == null) {
+      return AuthResult(success: false, errorMessage: 'No saved session. Please sign in with your credentials.');
+    }
 
-    throw UnimplementedError("AuthService.signInWithStoredSessionToken is not yet implemented with a database.");
+    try {
+      final profile = await ApiService.getMyProfile(token);
+      return AuthResult(
+        success: true,
+        donorData: DonorProfileData(
+          id: profile['id'] as String,
+          name: profile['name'] as String,
+          bloodType: profile['bloodType'] as String,
+          isEligible: profile['isEligible'] as bool? ?? true,
+          token: token,
+        ),
+      );
+    } on ApiException catch (e) {
+      // A 401 here means the token itself is dead (session logged out
+      // elsewhere, or the 30-day TTL lapsed) — clear it locally too so the
+      // app stops trying to reuse a token the backend will keep rejecting.
+      if (e.statusCode == 401) await SessionStorage.clearToken();
+      return AuthResult(success: false, errorMessage: e.message);
+    }
   }
 }
 // =============================================================================
@@ -156,8 +188,9 @@ class _LoginViewState extends State<LoginView> {
     final password = _passwordController.text;
 
     try {
-      // 3. CALL DB SERVICE INTERFACE
-      // This call will fail (throw UnimplementedError) until you connect your DB.
+      // 3. CALL API SERVICE (see lib/services/api_service.dart /
+      // lib/services/session_storage.dart — token is saved inside
+      // AuthService.signInWithCredentials itself once login succeeds)
       final AuthResult result = await _authService.signInWithCredentials(
         identifier: input,
         password: password,
@@ -171,8 +204,6 @@ class _LoginViewState extends State<LoginView> {
       if (result.success) {
         // Success path
         final data = result.donorData!;
-
-        // (Optional DB Prep: Store JWT/Session token locally here if service doesn't do it)
 
         _routeToHome(
           donorName: data.name,
