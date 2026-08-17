@@ -27,6 +27,13 @@ class EligibleHomeView extends StatelessWidget {
   final String bloodType;
   final List<EmergencyBloodRequest> activeRequests;
   final Function(EmergencyBloodRequest)? onAcceptRequest;
+  final String token;
+  // Shared with NoActiveSchedView's booking flow (see home_view.dart) so
+  // every "book an appointment" entry point in the app — this screen's two
+  // CTAs plus the Appointment tab's own — ends up in the same place:
+  // updating the real _confirmedAppointment state from the backend's
+  // actual response, not just popping a snackbar and forgetting about it.
+  final void Function(Map<String, dynamic> appointment) onBookingCompleted;
 
   const EligibleHomeView({
     super.key,
@@ -35,6 +42,8 @@ class EligibleHomeView extends StatelessWidget {
     this.bloodType = '',
     this.activeRequests = const [],
     this.onAcceptRequest,
+    required this.token,
+    required this.onBookingCompleted,
   });
 
   @override
@@ -120,15 +129,10 @@ class EligibleHomeView extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => EligibleAppointView(
                           isFirstTimeDonor: true,
-                          onBookingCompleted: () {
+                          token: token,
+                          onBookingCompleted: (appointment) {
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Donation slot booked successfully!'),
-                                backgroundColor: Color(0xFF2E7D32),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            onBookingCompleted(appointment);
                           },
                         ),
                       ),
@@ -318,15 +322,10 @@ class EligibleHomeView extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => EligibleAppointView(
                           isFirstTimeDonor: true,
-                          onBookingCompleted: () {
+                          token: token,
+                          onBookingCompleted: (appointment) {
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Quest appointment slot confirmed!'),
-                                backgroundColor: Color(0xFF2E7D32),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            onBookingCompleted(appointment);
                           },
                         ),
                       ),

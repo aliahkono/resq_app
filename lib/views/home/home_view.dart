@@ -13,6 +13,7 @@ import 'package:resq/views/profile/donor_profile_view.dart';
 import 'package:resq/views/settings/settings_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
+import 'package:resq/services/api_service.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
@@ -77,6 +78,118 @@ class _HomeViewState extends State<HomeView> {
       // Fail safe instead of crashing the whole dashboard
       _effectiveResult = ClassificationResult(status: EligibleStats.deferredWeight);
       _isFirstTime = widget.isFirstTimeDonor;
+    }
+
+    _loadCurrentAppointment();
+  }
+
+  /// GET /api/donor/appointments — populates _confirmedAppointment from
+  /// whatever the donor actually has booked server-side, instead of always
+  /// starting this screen with "no appointment" until the app fabricates
+  /// one locally. Silent on failure: this is a background enrichment on
+  /// open, not something the donor triggered, so a network hiccup here
+  /// shouldn't block the rest of the home screen from rendering.
+  Future<void> _loadCurrentAppointment() async {
+    if (widget.token.isEmpty) return;
+    try {
+      final raw = await ApiService.listMyAppointments(widget.token);
+      // Already ordered scheduled_at DESC by the backend (listMyAppointments,
+      // donorPortal.controller.js) — the first pending/confirmed row is the
+      // most relevant "active" appointment if a donor somehow has more than
+      // one. completed/cancelled rows don't count as "active".
+      final active = raw.cast<Map<String, dynamic>>().firstWhere(
+            (a) => a['status'] == 'pending' || a['status'] == 'confirmed',
+            orElse: () => const {},
+          );
+      if (active.isEmpty || !mounted) return;
+      setState(() => _confirmedAppointment = _toConfirmedAppointment(active));
+    } catch (_) {
+      // See method comment — intentionally silent.
+    }
+  }
+
+  /// Shared by both real appointment sources: the fetch-on-open above, and
+  /// EligibleAppointView's onBookingCompleted after a real booking succeeds.
+  ConfirmedAppointmentData _toConfirmedAppointment(Map<String, dynamic> appointment) {
+    final scheduledAt = DateTime.parse(appointment['scheduledAt'] as String).toLocal();
+    final id = appointment['id'] as String;
+    return ConfirmedAppointmentData(
+      id: id,
+      facility: (appointment['hospitalName'] as String?) ?? 'ResQ Partner Facility',
+      date: scheduledAt,
+      timeSlot: _formatTimeSlot(scheduledAt),
+      // The backend has no "queue number" concept (see bookAppointment,
+      // appointments.service.js) — this is just a short, stable reference
+      // to the real appointment id, not a fabricated random number like
+      // before.
+      queueNumber: 'APPT-${(id.length >= 8 ? id.substring(0, 8) : id).toUpperCase()}',
+    );
+  }
+
+  String _formatClockTime(DateTime dt) {
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final meridiem = dt.hour < 12 ? 'AM' : 'PM';
+    return '${hour12.toString().padLeft(2, '0')}:$minute $meridiem';
+  }
+
+  String _formatTimeSlot(DateTime start) {
+    final end = start.add(const Duration(hours: 1));
+    return '${_formatClockTime(start)} - ${_formatClockTime(end)}';
+  }
+
+  /// Shared success handler for every "book an appointment" entry point in
+  /// the app (EligibleHomeView's two CTAs, and the Appointment tab's own
+  /// NoActiveSchedView flow) — one place that updates the real
+  /// _confirmedAppointment state and jumps to the Appointment tab, so a
+  /// booking made from the Home tab actually shows up there instead of
+  /// just flashing a snackbar and being forgotten.
+  void _handleBookingCompleted(Map<String, dynamic> appointment) {
+    setState(() {
+      _confirmedAppointment = _toConfirmedAppointment(appointment);
+      _currentTabIndex = 1;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Appointment slot confirmed successfully!'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// PATCH /api/donor/appointments/:id/cancel — only clears the local
+  /// _confirmedAppointment once the backend actually confirms the
+  /// cancellation, so a failed request (network drop, already-cancelled
+  /// elsewhere) doesn't leave the app showing "no appointment" for a slot
+  /// that's still booked server-side.
+  Future<void> _cancelCurrentAppointment() async {
+    final appointment = _confirmedAppointment;
+    if (appointment == null) return;
+    try {
+      await ApiService.cancelAppointment(widget.token, appointment.id);
+      if (!mounted) return;
+      setState(() => _confirmedAppointment = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Appointment cancelled successfully.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not reach the ResQ server.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -168,6 +281,7 @@ class _HomeViewState extends State<HomeView> {
                   AppNotificationBell(
                     isEligible: _effectiveResult.isEligible,
                     donorBloodType: widget.bloodType,
+                    token: widget.token,
                   ),
                 ],
               ),
@@ -221,10 +335,19 @@ class _HomeViewState extends State<HomeView> {
           isFirstTimeDonor: _isFirstTime,
           donorName: activeDonorName,
           bloodType: activeBloodType,
+          token: widget.token,
+          onBookingCompleted: _handleBookingCompleted,
           activeRequests: _activeRequests,
+          // NOTE: _activeRequests is always empty right now — nothing
+          // populates it from the real GET /api/donor/requests endpoint yet
+          // (a separate, not-yet-done piece of work from the appointment
+          // booking fix below) — so this callback is currently unreachable.
+          // Still fake/local-only if it ever is reached; left as-is rather
+          // than half-wiring a flow whose data source doesn't exist yet.
           onAcceptRequest: (request) {
             setState(() {
               _confirmedAppointment = ConfirmedAppointmentData(
+                id: '',
                 facility: request.hospital,
                 date: DateTime.now().add(const Duration(days: 1)),
                 timeSlot: '09:00 AM - 10:00 AM',
@@ -246,17 +369,7 @@ class _HomeViewState extends State<HomeView> {
           if (_confirmedAppointment != null) {
             return ActiveSchedView(
               appointment: _confirmedAppointment!,
-              onCancelAppointment: () {
-                setState(() {
-                  _confirmedAppointment = null;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Appointment cancelled successfully.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
+              onCancelAppointment: _cancelCurrentAppointment,
             );
           } else {
             return NoActiveSchedView(
@@ -266,23 +379,10 @@ class _HomeViewState extends State<HomeView> {
                   MaterialPageRoute(
                     builder: (context) => EligibleAppointView(
                       isFirstTimeDonor: _isFirstTime,
-                      onBookingCompleted: () {
+                      token: widget.token,
+                      onBookingCompleted: (appointment) {
                         Navigator.pop(context);
-                        setState(() {
-                          _confirmedAppointment = ConfirmedAppointmentData(
-                            facility: 'Philippine Red Cross - Quezon Chapter',
-                            date: DateTime.now().add(const Duration(days: 2)),
-                            timeSlot: '09:00 AM - 10:00 AM',
-                            queueNumber: 'QUEUE-${DateTime.now().millisecondsSinceEpoch % 1000}',
-                          );
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Appointment slot confirmed successfully!'),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        _handleBookingCompleted(appointment);
                       },
                     ),
                   ),

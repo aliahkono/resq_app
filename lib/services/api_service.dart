@@ -78,6 +78,40 @@ class ApiService {
     return _decode(response);
   }
 
+  /// A handful of donor-portal endpoints (hospitals, appointments,
+  /// donations) return a raw JSON array, not an object — `_decode` above
+  /// only handles `Map` bodies and would silently return `{}` for these,
+  /// throwing the data away with no error. This mirrors `_decode`'s error
+  /// handling but for list responses.
+  static List<dynamic> _decodeList(http.Response response) {
+    final ok = response.statusCode >= 200 && response.statusCode < 300;
+
+    dynamic parsed;
+    if (response.body.isNotEmpty) {
+      try {
+        parsed = jsonDecode(response.body);
+      } catch (_) {
+        // see _decode's comment above — same reasoning applies here.
+      }
+    }
+
+    if (!ok) {
+      final errorBody = parsed is Map<String, dynamic> ? parsed : <String, dynamic>{};
+      throw ApiException(
+        response.statusCode,
+        errorBody['error']?.toString() ?? 'Something went wrong (HTTP ${response.statusCode}). Please try again.',
+      );
+    }
+    return parsed is List ? parsed : [];
+  }
+
+  static Future<List<dynamic>> _getList(String path, {String? token}) async {
+    final response = await http
+        .get(Uri.parse('$kApiBaseUrl$path'), headers: _headers(token))
+        .timeout(_timeout);
+    return _decodeList(response);
+  }
+
   static Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body, {String? token}) async {
     final response = await http
         .post(Uri.parse('$kApiBaseUrl$path'), headers: _headers(token), body: jsonEncode(body))
@@ -176,5 +210,43 @@ class ApiService {
   /// POST /api/donor-auth/logout
   static Future<void> logout(String token) {
     return _post('/donor-auth/logout', {}, token: token);
+  }
+
+  /// GET /api/donor/hospitals — public hospital list for the appointment
+  /// booking picker: [{id, code, name, city, address, latitude, longitude}].
+  static Future<List<dynamic>> listHospitals(String token) {
+    return _getList('/donor/hospitals', token: token);
+  }
+
+  /// GET /api/donor/appointments — this donor's own appointments (any
+  /// status), most recently scheduled first:
+  /// [{id, hospitalId, hospitalName, hospitalAddress, scheduledAt, status}].
+  static Future<List<dynamic>> listMyAppointments(String token) {
+    return _getList('/donor/appointments', token: token);
+  }
+
+  /// POST /api/donor/appointments — books a real slot at `hospitalId` for
+  /// `scheduledAt`. Throws ApiException with the backend's own message on
+  /// failure — most commonly a 409 "this time slot is fully booked" (see
+  /// bookAppointment, appointments.service.js), which is a real capacity
+  /// check, not a generic error.
+  static Future<Map<String, dynamic>> bookAppointment(
+    String token, {
+    required String hospitalId,
+    required DateTime scheduledAt,
+  }) {
+    return _post(
+      '/donor/appointments',
+      {
+        'hospitalId': hospitalId,
+        'scheduledAt': scheduledAt.toIso8601String(),
+      },
+      token: token,
+    );
+  }
+
+  /// PATCH /api/donor/appointments/:id/cancel
+  static Future<Map<String, dynamic>> cancelAppointment(String token, String appointmentId) {
+    return _patch('/donor/appointments/$appointmentId/cancel', {}, token: token);
   }
 }

@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 
 class ConfirmedAppointmentData {
+  // Real appointments.id from the backend — needed so Cancel can call
+  // PATCH /api/donor/appointments/:id/cancel for the right row. Empty for
+  // the still-fake Priority Request Feed accept path (see home_view.dart)
+  // since that one doesn't create a real backend appointment yet.
+  final String id;
   final String facility;
   final DateTime date;
   final String timeSlot;
   final String queueNumber;
 
   ConfirmedAppointmentData({
+    required this.id,
     required this.facility,
     required this.date,
     required this.timeSlot,

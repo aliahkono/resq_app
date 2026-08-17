@@ -6,11 +6,18 @@ import 'package:resq/views/appointment/eligible_appoint_view.dart';
 class AppNotificationBell extends StatelessWidget {
   final bool isEligible;
   final String donorBloodType;
+  // Only threaded through so the (currently unreachable, since
+  // NotificationService's broadcast list is never populated from the real
+  // backend yet) "accept slot" flow below can still open EligibleAppointView,
+  // which now requires a real session token to book for real. Not an
+  // attempt to make the broadcast feed itself functional.
+  final String token;
 
   const AppNotificationBell({
     super.key,
     required this.isEligible,
     required this.donorBloodType,
+    required this.token,
   });
 
   @override
@@ -73,11 +80,12 @@ class AppNotificationBell extends StatelessWidget {
               MaterialPageRoute(
                 builder: (context) => EligibleAppointView(
                   isFirstTimeDonor: false,
-                  onBookingCompleted: () {
+                  token: token,
+                  onBookingCompleted: (appointment) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Reserved slot for ${item.hospitalName}!'),
+                        content: Text('Reserved slot at ${appointment['hospitalName']}!'),
                         backgroundColor: const Color(0xFF2E7D32),
                         behavior: SnackBarBehavior.floating,
                       ),
