@@ -14,6 +14,7 @@ class DonorProfileView extends StatelessWidget {
   final String bloodType;
   final String donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onProfileUpdated;
+  final String token;
 
   const DonorProfileView({
     super.key,
@@ -25,6 +26,7 @@ class DonorProfileView extends StatelessWidget {
     required this.bloodType,
     required this.donorId,
     this.onProfileUpdated,
+    this.token = '',
   });
 
   String _formatDate(DateTime date) {
@@ -712,6 +714,7 @@ class DonorProfileView extends StatelessWidget {
                             donorName: donorName,
                             bloodType: bloodType,
                             donorId: donorId,
+                            token: token,
                             onRetakeCompleted: onProfileUpdated,
                           ),
                         ),

@@ -625,6 +625,7 @@ class _SettingsViewState extends State<SettingsView> {
                                         donorName: widget.donorName,
                                         bloodType: widget.bloodType,
                                         donorId: widget.donorId,
+                                        token: widget.token,
                                         onRetakeCompleted: widget.onRetakeCompleted,
                                       ),
                                     ),

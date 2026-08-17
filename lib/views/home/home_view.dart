@@ -202,25 +202,35 @@ class _HomeViewState extends State<HomeView> {
           donorName: widget.donorName,
           bloodType: widget.bloodType,
           donorId: widget.donorId,
-          onRetakeCompleted: (updatedModel, result) {
-            setState(() {
-              _currentScreeningModel = updatedModel;
-              _effectiveResult = result;
-              _isFirstTime = updatedModel.screensNPT.isFirstTimeDonor;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  result.isEligible
-                      ? 'Assessment updated: You are now verified eligible to donate!'
-                      : 'Assessment updated: Temporarily deferred (${result.status.name})',
-                ),
-                backgroundColor: result.isEligible ? Colors.green : Colors.orange,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
+          token: widget.token,
+          onRetakeCompleted: _handleRetakeCompleted,
         ),
+      ),
+    );
+  }
+
+  /// Shared by every retake entry point (this method's own trigger, plus
+  /// DonorProfileView's and IneligibleHomeView's own retake buttons, and
+  /// Settings' Edit Personal Details modal) — RegistrationWizView has
+  /// already saved the new answers to the backend by the time this runs
+  /// (see registration_wiz_view.dart's _finishAssessment), so this is just
+  /// refreshing this screen's in-memory copy to match what's now actually
+  /// persisted, plus telling the donor what changed.
+  void _handleRetakeCompleted(ScreenNPTModel updatedModel, ClassificationResult result) {
+    setState(() {
+      _currentScreeningModel = updatedModel;
+      _effectiveResult = result;
+      _isFirstTime = updatedModel.screensNPT.isFirstTimeDonor;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.isEligible
+              ? 'Assessment updated: You are now verified eligible to donate!'
+              : 'Assessment updated: Temporarily deferred (${result.status.name})',
+        ),
+        backgroundColor: result.isEligible ? Colors.green : Colors.orange,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -273,6 +283,17 @@ class _HomeViewState extends State<HomeView> {
                               userPhone: widget.phoneNum,
                               userEmail: widget.donorEmail,
                               token: widget.token,
+                              // Needed for the retake-screening button
+                              // inside Edit Personal Details — without
+                              // these, that flow used to open the wizard
+                              // completely blank and its result went
+                              // nowhere (onRetakeCompleted was never
+                              // supplied here before).
+                              screeningModel: _currentScreeningModel,
+                              donorName: widget.donorName,
+                              bloodType: widget.bloodType,
+                              donorId: widget.donorId,
+                              onRetakeCompleted: _handleRetakeCompleted,
                             ),
                           ),
                         );
@@ -363,6 +384,9 @@ class _HomeViewState extends State<HomeView> {
           donorName: activeDonorName,
           bloodType: activeBloodType,
           donorId: activeDonorId,
+          screeningModel: _currentScreeningModel,
+          token: widget.token,
+          onRetakeCompleted: _handleRetakeCompleted,
         );
       case 1:
         if (_effectiveResult.isEligible) {
@@ -405,13 +429,8 @@ class _HomeViewState extends State<HomeView> {
           donorName: activeDonorName,
           bloodType: activeBloodType,
           donorId: activeDonorId,
-          onProfileUpdated: (updatedModel, result) {
-            setState(() {
-              _currentScreeningModel = updatedModel;
-              _effectiveResult = result;
-              _isFirstTime = updatedModel.screensNPT.isFirstTimeDonor;
-            });
-          },
+          token: widget.token,
+          onProfileUpdated: _handleRetakeCompleted,
           clinicalVitals: _clinicalVitalsRecord,
         );
       default:

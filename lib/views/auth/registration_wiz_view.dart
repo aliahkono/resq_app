@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:resq/model/donor_profile_model.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/user_model.dart';
+import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/login_view.dart';
 import 'package:resq/views/auth/registration_summary_view.dart';
@@ -14,6 +15,10 @@ class RegistrationWizView extends StatefulWidget {
   final String? bloodType;
   final String? donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
+  // Only meaningful (and only ever used) when isRetake is true — the
+  // very first registration pass happens before a donor has a session
+  // token at all, so this stays empty for that path.
+  final String token;
 
   const RegistrationWizView({
     super.key,
@@ -23,6 +28,7 @@ class RegistrationWizView extends StatefulWidget {
     this.bloodType,
     this.donorId,
     this.onRetakeCompleted,
+    this.token = '',
   });
 
   @override
@@ -232,8 +238,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   Future<void> _finishAssessment() async {
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
     final double weight = double.tryParse(_weightController.text.trim()) ?? 52.0;
     int calculatedAge = 22;
     if (_dob != null) {
@@ -274,13 +278,67 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
     final ClassificationResult result = finalModel.evaluateEligibility();
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
     if (widget.isRetake) {
+      // Persist for real — PATCH /api/donor/me — instead of only updating
+      // in-memory state like every retake caller used to do. Without this,
+      // a retake looked correct until the donor logged out: the answers
+      // were never actually saved, so the next login re-evaluated
+      // eligibility against the *original* registration answers again
+      // (see eligibility_service.dart's classifyDonorFromProfile, which
+      // reads healthScreening straight from the backend).
+      try {
+        await ApiService.updateMyProfile(widget.token, {
+          'age': calculatedAge,
+          'weightKg': weight,
+          'gender': _gender.name,
+          'healthScreening': {
+            'isFirstTimeDonor': evaluatedParams.isFirstTimeDonor,
+            'lastDonationDate': evaluatedParams.lastDonationDate?.toIso8601String(),
+            'totalDonations': evaluatedParams.totalDonations,
+            'hasTattsOrPierce': evaluatedParams.hasTattsOrPierce,
+            'hasAlcoholPast24hr': evaluatedParams.hasAlcoholPast24hr,
+            'hasActiveInfectOrMeds': evaluatedParams.hasActiveInfectOrMeds,
+            'isPregOrNursing': evaluatedParams.isPregOrNursing,
+            'lastMensPeriodDate': evaluatedParams.lastMensPeriodDate?.toIso8601String(),
+            'hasHighRiskExpo': evaluatedParams.hasHighRiskExpo,
+            'classificationStatus': result.status.name,
+          },
+        });
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save your updated screening: ${e.message}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return; // stay on the wizard so the donor can retry, instead of
+        // silently discarding what they just answered.
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not reach the ResQ server. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       widget.onRetakeCompleted?.call(finalModel, result);
       Navigator.pop(context);
     } else {
+      // Cosmetic pacing only — no network call happens at this step for a
+      // brand-new registration; the real save happens later via
+      // completeProfile once the donor verifies their OTP (otp_ver_view.dart).
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
       final UserModel newUser = UserModel(
         id: activeUserId,
         email: _emailController.text.trim(),

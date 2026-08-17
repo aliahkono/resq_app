@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
@@ -10,6 +11,13 @@ class IneligibleHomeView extends StatefulWidget {
   final String donorName;
   final String bloodType;
   final String donorId;
+  // These three were all missing before — the retake button below used to
+  // open the wizard completely blank (no initialScreening) and its result
+  // went nowhere at all (no onRetakeCompleted), not even updating this
+  // screen's own local state.
+  final ScreenNPTModel? screeningModel;
+  final String token;
+  final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
 
   const IneligibleHomeView({
     super.key,
@@ -19,6 +27,9 @@ class IneligibleHomeView extends StatefulWidget {
     this.donorName = '',
     this.bloodType = '',
     this.donorId = '',
+    this.screeningModel,
+    this.token = '',
+    this.onRetakeCompleted,
   });
 
   @override
@@ -634,9 +645,12 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                   MaterialPageRoute(
                     builder: (context) => RegistrationWizView(
                       isRetake: true,
+                      initialScreening: widget.screeningModel,
                       donorName: widget.donorName,
                       bloodType: widget.bloodType,
                       donorId: widget.donorId,
+                      token: widget.token,
+                      onRetakeCompleted: widget.onRetakeCompleted,
                     ),
                   ),
                 );
