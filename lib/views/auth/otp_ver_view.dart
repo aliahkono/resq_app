@@ -812,20 +812,35 @@ class _OtpVerViewState extends State<OtpVerView> {
               ),
               if (_hasError) ...[
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      _errorMessage,
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                // Was a plain Row with an un-constrained Text — fine for
+                // short messages, but a longer one (like the "could not
+                // reach the server" fallback) has nowhere to go but off the
+                // right edge of the screen. Padding + Flexible lets it wrap
+                // onto a second line instead of overflowing.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 16),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 24),
