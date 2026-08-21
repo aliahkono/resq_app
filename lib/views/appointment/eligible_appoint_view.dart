@@ -432,7 +432,12 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
       }),
       child: Container(
         width: 56,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        // Was vertical: 8 — with three lines of text (weekday/day/month)
+        // stacked inside, that left the Column about 2px too tall for
+        // whatever fixed height its parent (the horizontal date-chip strip)
+        // gives this chip, overflowing on every render. 6 gives just enough
+        // slack without visibly changing the chip's proportions.
+        padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
           borderRadius: BorderRadius.circular(12),
