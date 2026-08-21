@@ -197,10 +197,15 @@ class DonorProfileView extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF7D1B22), width: 2.2),
                 ),
+                // No real donor photo asset exists in the project (this
+                // referenced "assets/images/donor_sample.jpg", which was
+                // never actually added) — CircleAvatar already renders its
+                // `child` as a perfectly good default appearance without a
+                // backgroundImage, so dropping it just stops the repeated
+                // "Unable to load asset" console error with no visual change.
                 child: const CircleAvatar(
                   radius: 38,
                   backgroundColor: Color(0xFFF3E5E6),
-                  backgroundImage: AssetImage('assets/images/donor_sample.jpg'),
                   child: Icon(Icons.person_rounded, size: 44, color: Color(0xFF7D1B22)),
                 ),
               ),

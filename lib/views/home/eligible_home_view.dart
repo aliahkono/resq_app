@@ -595,14 +595,22 @@ class EligibleHomeView extends StatelessWidget {
         const SizedBox(height: 20),
 
         // Educational Image Banner
+        // Was referencing "assets/images/donor_sample.jpg", which was never
+        // actually added to the project (there's no real donor photo asset
+        // to use) — swapped to an existing bundled image instead of leaving
+        // a broken reference that just failed to load every render. Height
+        // bumped 150->160: at exactly 150 the two-line caption below plus
+        // its padding was tight enough to overflow by ~2px on some font
+        // renders — a little extra headroom fixes it regardless of the
+        // small font-metric rounding that caused it.
         Container(
           width: double.infinity,
-          height: 150,
+          height: 160,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: const Color(0xFF7D1B22),
             image: const DecorationImage(
-              image: AssetImage('assets/images/donor_sample.jpg'),
+              image: AssetImage('assets/images/SaveALife.png'),
               fit: BoxFit.cover,
             ),
           ),
