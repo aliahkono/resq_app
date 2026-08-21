@@ -72,7 +72,7 @@ class EligibleHomeView extends StatelessWidget {
       backgroundColor: const Color(0xFFF3F3F5),
       body: onRefresh != null
           ? RefreshIndicator(
-              color: const Color(0xFF7D1B22),
+              color: const Color(0xFF9B1B20),
               onRefresh: onRefresh!,
               child: content,
             )
@@ -91,11 +91,11 @@ class EligibleHomeView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
           decoration: BoxDecoration(
-            color: const Color(0xFF8A1E26),
+            color: const Color(0xFF9B1B20),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7D1B22).withValues(alpha: 0.25),
+                color: const Color(0xFF9B1B20).withValues(alpha: 0.25),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -160,7 +160,7 @@ class EligibleHomeView extends StatelessWidget {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE9E5E2),
-                    foregroundColor: const Color(0xFF7D1B22),
+                    foregroundColor: const Color(0xFF9B1B20),
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
@@ -176,7 +176,7 @@ class EligibleHomeView extends StatelessWidget {
         const SizedBox(height: 20),
         const Row(
           children: [
-            Icon(Icons.map_outlined, color: Color(0xFF7D1B22), size: 18),
+            Icon(Icons.map_outlined, color: Color(0xFF9B1B20), size: 18),
             SizedBox(width: 8),
             Text(
               "Your Hero's Path",
@@ -206,7 +206,7 @@ class EligibleHomeView extends StatelessWidget {
                   ),
                   Text(
                     '33%',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
                   ),
                 ],
               ),
@@ -216,7 +216,7 @@ class EligibleHomeView extends StatelessWidget {
                 child: const LinearProgressIndicator(
                   value: 0.33,
                   backgroundColor: Color(0xFFE5E7EB),
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8A1E26)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF9B1B20)),
                   minHeight: 6,
                 ),
               ),
@@ -255,7 +255,7 @@ class EligibleHomeView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFF8A1E26),
+            color: const Color(0xFF9B1B20),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -295,7 +295,7 @@ class EligibleHomeView extends StatelessWidget {
                           child: CircleAvatar(
                             radius: 14,
                             backgroundColor: Color(0xFFF3E5E6),
-                            child: Icon(Icons.person, size: 16, color: Color(0xFF7D1B22)),
+                            child: Icon(Icons.person, size: 16, color: Color(0xFF9B1B20)),
                           ),
                         ),
                         const Positioned(
@@ -372,7 +372,7 @@ class EligibleHomeView extends StatelessWidget {
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
             children: [
               TextSpan(text: 'First-Time Donor Guide '),
-              TextSpan(text: '| ', style: TextStyle(color: Color(0xFF7D1B22))),
+              TextSpan(text: '| ', style: TextStyle(color: Color(0xFF9B1B20))),
               TextSpan(text: 'What to Expect'),
             ],
           ),
@@ -402,7 +402,7 @@ class EligibleHomeView extends StatelessWidget {
           child: ElevatedButton(
             onPressed: () => _showWalkthroughModal(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7D1B22),
+              backgroundColor: const Color(0xFF9B1B20),
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -488,7 +488,7 @@ class EligibleHomeView extends StatelessWidget {
               const TextSpan(text: 'Your blood type ('),
               TextSpan(
                 text: bloodType.isNotEmpty ? bloodType : 'Compatible',
-                style: const TextStyle(color: Color(0xFF8A1E26), fontWeight: FontWeight.bold),
+                style: const TextStyle(color: Color(0xFF9B1B20), fontWeight: FontWeight.bold),
               ),
               const TextSpan(text: ') is on standby for hospital broadcasts.'),
             ],
@@ -499,12 +499,12 @@ class EligibleHomeView extends StatelessWidget {
         // Urgent Blood Requests Header
         Row(
           children: [
-            Container(width: 3.5, height: 16, decoration: BoxDecoration(color: const Color(0xFF7D1B22), borderRadius: BorderRadius.circular(2))),
+            Container(width: 3.5, height: 16, decoration: BoxDecoration(color: const Color(0xFF9B1B20), borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 8),
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Urgent Blood Requests', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+                Text('Urgent Blood Requests', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
                 Text('Nearby clinics in critical need', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
               ],
             ),
@@ -525,11 +525,11 @@ class EligibleHomeView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFF8A1E26),
+            color: const Color(0xFF9B1B20),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7D1B22).withValues(alpha: 0.2),
+                color: const Color(0xFF9B1B20).withValues(alpha: 0.2),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -608,7 +608,7 @@ class EligibleHomeView extends StatelessWidget {
           height: 160,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: const Color(0xFF7D1B22),
+            color: const Color(0xFF9B1B20),
             image: const DecorationImage(
               image: AssetImage('assets/images/SaveALife.png'),
               fit: BoxFit.cover,
@@ -668,12 +668,12 @@ class EligibleHomeView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF7D1B22).withValues(alpha: 0.08),
+              color: const Color(0xFF9B1B20).withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.sensors_rounded,
-              color: Color(0xFF7D1B22),
+              color: Color(0xFF9B1B20),
               size: 28,
             ),
           ),
@@ -749,7 +749,7 @@ class EligibleHomeView extends StatelessWidget {
             child: ElevatedButton(
               onPressed: onAcceptRequest != null ? () => onAcceptRequest!(req) : () {},
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8A1E26),
+                backgroundColor: const Color(0xFF9B1B20),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 elevation: 0,
@@ -795,21 +795,21 @@ class EligibleHomeView extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: isDone ? const Color(0xFF8A1E26) : Colors.white,
+                color: isDone ? const Color(0xFF9B1B20) : Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF8A1E26), width: 1.8),
+                border: Border.all(color: const Color(0xFF9B1B20), width: 1.8),
               ),
               child: Icon(
                 icon,
                 size: 18,
-                color: isDone ? Colors.white : const Color(0xFF8A1E26),
+                color: isDone ? Colors.white : const Color(0xFF9B1B20),
               ),
             ),
             if (showConnectingLine)
               Container(
                 width: 2,
                 height: 24,
-                color: const Color(0xFF8A1E26),
+                color: const Color(0xFF9B1B20),
               ),
           ],
         ),
@@ -845,7 +845,7 @@ class EligibleHomeView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+        border: Border.all(color: const Color(0xFF9B1B20), width: 1.2),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -885,7 +885,7 @@ class EligibleHomeView extends StatelessWidget {
           children: [
             const Text(
               'Step-by-Step Donation Walkthrough',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF7D1B22)),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF9B1B20)),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -897,7 +897,7 @@ class EligibleHomeView extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
               ),
             ),

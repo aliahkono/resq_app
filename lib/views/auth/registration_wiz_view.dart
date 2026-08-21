@@ -55,6 +55,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   DateTime? _dob;
   BioSex _gender = BioSex.male;
   final _weightController = TextEditingController();
+  // Retake-only stand-in for the Date of Birth picker — see _prefilledAge's
+  // comment below for why a retake can't just re-show the real DOB picker.
+  // Editable, so a donor whose age changed since last time can still update
+  // it, but it starts filled with their real last-known age instead of
+  // looking reset/blank the way the DOB picker did.
+  final _ageController = TextEditingController();
   DateTime? _lastDonationDate;
   bool _isFirstTimeDonor = false;
   int _totalDonations = 0;
@@ -101,6 +107,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       _hasTattoosOrPiercings = initial.hasTattsOrPierce;
       _tattooDate = initial.tattooDate;
       _prefilledAge = initial.age > 0 ? initial.age : null;
+      _ageController.text = _prefilledAge?.toString() ?? '';
       _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
       _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
       _lastMensDate = initial.lastMensPeriodDate;
@@ -120,6 +127,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _weightController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -144,7 +152,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF7D1B22),
+              primary: Color(0xFF9B1B20),
               onPrimary: Colors.white,
               onSurface: Color(0xFF1E1E1E),
             ),
@@ -171,7 +179,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
             'Lifetime Donation History',
-            style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(color: Color(0xFF9B1B20), fontWeight: FontWeight.bold, fontSize: 16),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -208,7 +216,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
               child: const Text('Save', style: TextStyle(color: Colors.white)),
             ),
           ],
@@ -248,16 +256,18 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
     final double weight = double.tryParse(_weightController.text.trim()) ?? 52.0;
     int calculatedAge;
-    if (_dob != null) {
+    if (widget.isRetake) {
+      // Retake shows an editable Age field (see build(), Step 2) instead of
+      // the DOB picker — use whatever the donor left it at, which starts
+      // out prefilled with their real last-known age.
+      final editedAge = int.tryParse(_ageController.text.trim());
+      calculatedAge = (editedAge != null && editedAge > 0) ? editedAge : (_prefilledAge ?? 22);
+    } else if (_dob != null) {
       final now = DateTime.now();
       calculatedAge = now.year - _dob!.year;
       if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
         calculatedAge--;
       }
-    } else if (_prefilledAge != null) {
-      // Retake, and the donor didn't touch the DOB picker — keep their
-      // last-known age instead of silently overwriting it with a default.
-      calculatedAge = _prefilledAge!;
     } else {
       calculatedAge = 22;
     }
@@ -396,7 +406,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       backgroundColor: const Color(0xFFF3F3F5),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF7D1B22)))
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF9B1B20)))
             : Column(
           children: [
             if (_currentStep > 1) _buildCurvedTopHeader(),
@@ -424,7 +434,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       width: double.infinity,
       padding: const EdgeInsets.only(top: 14, bottom: 22, left: 18, right: 18),
       decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
+        color: Color(0xFF9B1B20),
         borderRadius: BorderRadius.vertical(bottom: Radius.elliptical(240, 30)),
       ),
       child: Row(
@@ -461,11 +471,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              color: const Color(0xFF7D1B22),
+              color: const Color(0xFF9B1B20),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF7D1B22).withOpacity(0.2),
+                  color: const Color(0xFF9B1B20).withOpacity(0.2),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -522,7 +532,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_rounded, size: 16, color: Color(0xFF7D1B22)),
+              const Icon(Icons.info_rounded, size: 16, color: Color(0xFF9B1B20)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -579,17 +589,17 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7D1B22).withOpacity(0.1),
+                    color: const Color(0xFF9B1B20).withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
+                  child: const Icon(Icons.shield_rounded, color: Color(0xFF9B1B20), size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
-                      Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
+                      Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF9B1B20))),
                       SizedBox(height: 4),
                       Text(
                         'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
@@ -613,7 +623,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                     MaterialPageRoute(builder: (context) => const LoginView()),
                   );
                 },
-                child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+                child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
               ),
             ],
           ),
@@ -658,7 +668,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
+          borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2),
         ),
       ),
     );
@@ -706,9 +716,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
+                  color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF7D1B22), width: 1.4),
+                  border: Border.all(color: const Color(0xFF9B1B20), width: 1.4),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -716,7 +726,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : const Color(0xFF7D1B22),
+                    color: isSelected ? Colors.white : const Color(0xFF9B1B20),
                   ),
                 ),
               ),
@@ -730,8 +740,8 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           child: OutlinedButton(
             onPressed: () => setState(() => _selectedBloodType = "I'm not sure"),
             style: OutlinedButton.styleFrom(
-              backgroundColor: _selectedBloodType == "I'm not sure" ? const Color(0xFF7D1B22) : Colors.white,
-              side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
+              backgroundColor: _selectedBloodType == "I'm not sure" ? const Color(0xFF9B1B20) : Colors.white,
+              side: const BorderSide(color: Color(0xFF9B1B20), width: 1.4),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
@@ -739,24 +749,40 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: _selectedBloodType == "I'm not sure" ? Colors.white : const Color(0xFF7D1B22),
+                color: _selectedBloodType == "I'm not sure" ? Colors.white : const Color(0xFF9B1B20),
               ),
             ),
           ),
         ),
         const SizedBox(height: 18),
-        const Text('Date of Birth', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        _buildCrimsonDateButton(
-          title: _dob != null ? _formatDate(_dob) : 'Date Picker',
-          onTap: () => _pickDate(
-            context: context,
-            initialDate: DateTime(2002),
-            firstDate: DateTime(1940),
-            lastDate: DateTime.now(),
-            onPicked: (d) => _dob = d,
+        if (!widget.isRetake) ...[
+          const Text('Date of Birth', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _buildCrimsonDateButton(
+            title: _dob != null ? _formatDate(_dob) : 'Date Picker',
+            onTap: () => _pickDate(
+              context: context,
+              initialDate: DateTime(2002),
+              firstDate: DateTime(1940),
+              lastDate: DateTime.now(),
+              onPicked: (d) => _dob = d,
+            ),
           ),
-        ),
+        ] else ...[
+          // No real DOB is ever stored server-side (only a computed age), so
+          // a retake can't re-show the actual date picker with the donor's
+          // real birthdate — that would just always look reset to blank.
+          // This shows their real last-known age instead, and lets them
+          // update it directly if it's changed since their last screening.
+          const Text('Age', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _buildBorderedInput(
+            controller: _ageController,
+            hintText: 'Enter your age',
+            icon: Icons.cake_outlined,
+            keyboardType: TextInputType.number,
+          ),
+        ],
         const SizedBox(height: 16),
         const Text('Biological Sex', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
@@ -856,7 +882,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 width: 20,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: _isFirstTimeDonor ? const Color(0xFF7D1B22) : Colors.white,
+                  color: _isFirstTimeDonor ? const Color(0xFF9B1B20) : Colors.white,
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                 ),
@@ -1036,7 +1062,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Switch(
                   value: _isBreastfeeding,
                   onChanged: (val) => setState(() => _isBreastfeeding = val),
-                  activeColor: const Color(0xFF7D1B22),
+                  activeColor: const Color(0xFF9B1B20),
                 ),
               ],
             ),
@@ -1127,7 +1153,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Checkbox(
                   value: _hasRecentSexualRisk,
                   onChanged: (val) => setState(() => _hasRecentSexualRisk = val ?? false),
-                  activeColor: const Color(0xFF7D1B22),
+                  activeColor: const Color(0xFF9B1B20),
                 ),
                 const SizedBox(width: 4),
                 const Expanded(
@@ -1212,7 +1238,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         fillColor: Colors.white,
         hintText: hintText,
         hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.normal),
-        prefixIcon: Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        prefixIcon: Icon(icon, color: const Color(0xFF9B1B20), size: 20),
         suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1220,7 +1246,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
+          borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1241,7 +1267,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFF8A1E26),
+          color: const Color(0xFF9B1B20),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -1273,7 +1299,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
+            color: isSelected ? const Color(0xFF9B1B20) : Colors.transparent,
             width: 1.4,
           ),
         ),
@@ -1281,7 +1307,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           children: [
             Icon(
               isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
-              color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFF64748B),
+              color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFF64748B),
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -1310,7 +1336,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
+            color: isSelected ? const Color(0xFF9B1B20) : Colors.transparent,
             width: 1.4,
           ),
         ),
@@ -1320,7 +1346,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               width: 16,
               height: 16,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF8A1E26) : Colors.white,
+                color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF94A3B8), width: 1.5),
               ),
@@ -1344,10 +1370,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       child: Container(
         height: 44,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : Colors.white,
+          color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFCBD5E1),
+            color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFFCBD5E1),
             width: 1.2,
           ),
         ),
@@ -1374,7 +1400,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF8A1E26),
+          backgroundColor: const Color(0xFF9B1B20),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
           elevation: 0,
@@ -1390,7 +1416,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF8A1E26), size: 14),
+              child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF9B1B20), size: 14),
             ),
           ],
         ),

@@ -49,6 +49,14 @@ class _OtpVerViewState extends State<OtpVerView> {
   // _showSuccessDialog (a separate method, out of _verifyOtp's local scope)
   // can pass it into HomeView -> SettingsView.
   String? _sessionToken;
+  // True when verify-otp found a donor record already existing for this
+  // phone number and logged straight into it instead of running
+  // complete-profile — see the `else` branch below. _showSuccessDialog uses
+  // this to tell that donor they've been logged into their existing
+  // account, instead of implying a brand-new one was just created (which,
+  // silently, it wasn't — whatever they just typed on this screen was
+  // never saved).
+  bool _isExistingAccount = false;
 
   final List<TextEditingController> _controllers =
   List.generate(6, (index) => TextEditingController());
@@ -278,8 +286,13 @@ class _OtpVerViewState extends State<OtpVerView> {
         donor = completeResponse['donor'] as Map<String, dynamic>?;
       } else {
         // A donor record already existed for this phone (e.g. an admin
-        // walk-in entry) — verify-otp already logged them in, no
-        // complete-profile call needed or even valid at this point.
+        // walk-in entry, or this donor registering again on a number
+        // they've already used) — verify-otp already logged them in, no
+        // complete-profile call needed or even valid at this point. Whatever
+        // name/email/password they just typed on the registration form was
+        // never sent anywhere; _showSuccessDialog below makes that explicit
+        // instead of implying a fresh account was created.
+        _isExistingAccount = true;
         sessionToken = verifyResponse['token'] as String;
         donor = verifyResponse['donor'] as Map<String, dynamic>?;
       }
@@ -462,7 +475,7 @@ class _OtpVerViewState extends State<OtpVerView> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Account Verified!',
+                _isExistingAccount ? 'Welcome Back!' : 'Account Verified!',
                 textAlign: TextAlign.center,
                 style: ResQTheme.heading1.copyWith(
                   fontSize: 20,
@@ -472,9 +485,11 @@ class _OtpVerViewState extends State<OtpVerView> {
               ),
               const SizedBox(height: 8),
               Text(
-                _verificationMode == OtpVerificationMode.phone
-                    ? 'Your phone number ($_phoneNumber) has been verified.'
-                    : 'Your email address ($_email) has been verified.',
+                _isExistingAccount
+                    ? 'This phone number ($_phoneNumber) is already registered. We\'ve logged you into your existing account instead of creating a new one.'
+                    : (_verificationMode == OtpVerificationMode.phone
+                        ? 'Your phone number ($_phoneNumber) has been verified.'
+                        : 'Your email address ($_email) has been verified.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 12.5,
@@ -496,7 +511,12 @@ class _OtpVerViewState extends State<OtpVerView> {
                           bloodType: (donor?['bloodType'] as String?) ?? widget.bloodType,
                           donorId: (donor?['id'] as String?) ?? widget.donorId,
                           phoneNum: _phoneNumber,
-                          donorEmail: _email,
+                          // Was `_email` (whatever was typed into this
+                          // registration attempt's form) — wrong for the
+                          // existing-account branch, where that value was
+                          // never saved. The donor object straight from the
+                          // backend is the actual source of truth here.
+                          donorEmail: (donor?['email'] as String?) ?? _email,
                           screeningModel: widget.screeningModel,
                           classificationResult: widget.classificationResult,
                           isFirstTimeDonor:

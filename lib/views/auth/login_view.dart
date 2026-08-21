@@ -390,7 +390,7 @@ class _LoginViewState extends State<LoginView> {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: const Color(0xFF8A1E26),
+        backgroundColor: const Color(0xFF9B1B20),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -416,7 +416,7 @@ class _LoginViewState extends State<LoginView> {
                     width: 110,
                     height: 110,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF7D1B22),
+                      color: Color(0xFF9B1B20),
                       shape: BoxShape.circle,
                     ),
                     padding: const EdgeInsets.all(22),
@@ -567,13 +567,13 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: Color(0xFF8A1E26), size: 18),
+                          const Icon(Icons.error_outline_rounded, color: Color(0xFF9B1B20), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _errorMessage!,
                               style: const TextStyle(
-                                color: Color(0xFF8A1E26),
+                                color: Color(0xFF9B1B20),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -603,15 +603,15 @@ class _LoginViewState extends State<LoginView> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2.0),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2.0),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -645,15 +645,15 @@ class _LoginViewState extends State<LoginView> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2.0),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2.0),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -685,7 +685,7 @@ class _LoginViewState extends State<LoginView> {
                       child: const Text(
                         'Forgot my password?',
                         style: TextStyle(
-                          color: Color(0xFF7D1B22),
+                          color: Color(0xFF9B1B20),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -703,7 +703,7 @@ class _LoginViewState extends State<LoginView> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7D1B22).withValues(alpha: 0.35),
+                          color: const Color(0xFF9B1B20).withValues(alpha: 0.35),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -712,7 +712,7 @@ class _LoginViewState extends State<LoginView> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleLogin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8A1E26),
+                        backgroundColor: const Color(0xFF9B1B20),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -742,7 +742,7 @@ class _LoginViewState extends State<LoginView> {
                     icon: const Icon(
                       Icons.fingerprint_rounded,
                       size: 34,
-                      color: Color(0xFF7D1B22),
+                      color: Color(0xFF9B1B20),
                     ),
                     onPressed: _handleDeviceBiometricAuth,
                     tooltip: 'Sign in with Fingerprint / PIN',
@@ -762,7 +762,7 @@ class _LoginViewState extends State<LoginView> {
                         TextSpan(
                           text: 'Sign Up',
                           style: const TextStyle(
-                            color: Color(0xFF7D1B22),
+                            color: Color(0xFF9B1B20),
                             fontWeight: FontWeight.bold,
                           ),
                           recognizer: TapGestureRecognizer()

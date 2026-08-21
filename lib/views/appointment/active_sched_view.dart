@@ -78,7 +78,7 @@ class ActiveSchedView extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+                border: Border.all(color: const Color(0xFF9B1B20), width: 1.2),
                 boxShadow: [
                   BoxShadow(
                       color: Colors.black.withOpacity(0.04),
@@ -93,7 +93,7 @@ class ActiveSchedView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: const BoxDecoration(
-                      color: Color(0xFF7D1B22),
+                      color: Color(0xFF9B1B20),
                       borderRadius:
                           BorderRadius.vertical(top: Radius.circular(16)),
                     ),
@@ -160,7 +160,7 @@ class ActiveSchedView extends StatelessWidget {
                             onCancelAppointment();
                           },
                           style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF7D1B22)),
+                              backgroundColor: const Color(0xFF9B1B20)),
                           child: const Text('Yes, Cancel',
                               style: TextStyle(color: Colors.white)),
                         ),
@@ -169,16 +169,16 @@ class ActiveSchedView extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.cancel_outlined,
-                    size: 18, color: Color(0xFF7D1B22)),
+                    size: 18, color: Color(0xFF9B1B20)),
                 label: const Text(
                   'Cancel This Appointment',
                   style: TextStyle(
-                      color: Color(0xFF7D1B22),
+                      color: Color(0xFF9B1B20),
                       fontSize: 13,
                       fontWeight: FontWeight.bold),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.2),
+                  side: const BorderSide(color: Color(0xFF9B1B20), width: 1.2),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -194,7 +194,7 @@ class ActiveSchedView extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        Icon(icon, color: const Color(0xFF9B1B20), size: 20),
         const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

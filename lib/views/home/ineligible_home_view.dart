@@ -192,7 +192,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
         children: [
           const Text(
             'Ineligible Home Active',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
           ),
           const SizedBox(height: 10),
           _buildDetailInfoCard('REASON', reasonTitle),
@@ -212,7 +212,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             child: ElevatedButton(
               onPressed: () => _showScreeningDetailsModal(context, reasonTitle, reasonDesc, clearanceDateStr),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7D1B22),
+                backgroundColor: const Color(0xFF9B1B20),
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -271,11 +271,11 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF8A1E26),
+            color: const Color(0xFF9B1B20),
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF7D1B22).withOpacity(0.2),
+                color: const Color(0xFF9B1B20).withOpacity(0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -362,7 +362,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                         onPressed: () => _showScreeningDetailsModal(context, reasonTitle, reasonDesc, clearanceDateStr),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF8A1E26),
+                          foregroundColor: const Color(0xFF9B1B20),
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -394,7 +394,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             Text(
               '$completedCount OF ${_checklistTasks.length} COMPLETED',
               style: const TextStyle(
-                color: Color(0xFF8A1E26),
+                color: Color(0xFF9B1B20),
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -428,10 +428,10 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                       width: 22,
                       height: 22,
                       decoration: BoxDecoration(
-                        color: isDone ? const Color(0xFF8A1E26) : Colors.white,
+                        color: isDone ? const Color(0xFF9B1B20) : Colors.white,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: isDone ? const Color(0xFF8A1E26) : const Color(0xFFD4D4D4),
+                          color: isDone ? const Color(0xFF9B1B20) : const Color(0xFFD4D4D4),
                           width: 1.5,
                         ),
                       ),
@@ -580,7 +580,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
               const SizedBox(height: 12),
               Text(
                 '$effectiveDays Days Left in Recovery',
-                style: const TextStyle(color: Color(0xFF8A1E26), fontSize: 13.5, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: Color(0xFF9B1B20), fontSize: 13.5, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
@@ -596,7 +596,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 child: LinearProgressIndicator(
                   value: (daysPassed / totalCycleDays).clamp(0.0, 1.0),
                   backgroundColor: const Color(0xFFFFDDE0),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8A1E26)),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9B1B20)),
                   minHeight: 8,
                 ),
               ),
@@ -656,7 +656,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7D1B22),
+                backgroundColor: const Color(0xFF9B1B20),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
@@ -676,7 +676,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           width: 4,
           height: 16,
           decoration: BoxDecoration(
-            color: const Color(0xFF8A1E26),
+            color: const Color(0xFF9B1B20),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -709,7 +709,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF8A1E26), letterSpacing: 0.6),
+            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20), letterSpacing: 0.6),
           ),
           const SizedBox(height: 3),
           Text(
@@ -737,13 +737,13 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
               const SizedBox(height: 8),
               Text(desc, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.35)),
               const SizedBox(height: 12),
-              Text('Projected Clearance: $clearDate', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+              Text('Projected Clearance: $clearDate', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                   child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
                 ),
               ),

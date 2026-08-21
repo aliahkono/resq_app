@@ -95,7 +95,7 @@ class AppNotificationBell extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('You are temporarily deferred. Please complete your recovery period before accepting slots.'),
-                backgroundColor: Color(0xFF7D1B22),
+                backgroundColor: Color(0xFF9B1B20),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -105,7 +105,7 @@ class AppNotificationBell extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('This request has already been closed out — check the Home tab for other open broadcasts.'),
-                backgroundColor: Color(0xFF7D1B22),
+                backgroundColor: Color(0xFF9B1B20),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -183,7 +183,7 @@ class _BroadcastModalSheet extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.campaign_rounded, color: Color(0xFF7D1B22), size: 22),
+                    const Icon(Icons.campaign_rounded, color: Color(0xFF9B1B20), size: 22),
                     const SizedBox(width: 8),
                     const Text(
                       'Hospital Broadcasts & SMS',
@@ -194,14 +194,14 @@ class _BroadcastModalSheet extends StatelessWidget {
                       const SizedBox(
                         width: 13,
                         height: 13,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7D1B22)),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF9B1B20)),
                       ),
                     ],
                   ],
                 ),
                 TextButton(
                   onPressed: onMarkAllRead,
-                  child: const Text('Mark all read', style: TextStyle(fontSize: 12, color: Color(0xFF7D1B22), fontWeight: FontWeight.bold)),
+                  child: const Text('Mark all read', style: TextStyle(fontSize: 12, color: Color(0xFF9B1B20), fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -261,7 +261,7 @@ class _BroadcastModalSheet extends StatelessWidget {
           color: item.isRead ? Colors.white : const Color(0xFFFFF7F7),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF7D1B22),
+            color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF9B1B20),
             width: item.isRead ? 1.0 : 1.4,
           ),
         ),
@@ -300,7 +300,7 @@ class _BroadcastModalSheet extends StatelessWidget {
                       Container(
                         width: 7,
                         height: 7,
-                        decoration: const BoxDecoration(color: Color(0xFF7D1B22), shape: BoxShape.circle),
+                        decoration: const BoxDecoration(color: Color(0xFF9B1B20), shape: BoxShape.circle),
                       ),
                   ],
                 ),
@@ -324,8 +324,8 @@ class _BroadcastModalSheet extends StatelessWidget {
                 onPressed: () => onSelectBroadcast(item),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: item.urgency == UrgencyLevel.critical
-                      ? const Color(0xFF8A1E26)
-                      : const Color(0xFF7D1B22),
+                      ? const Color(0xFF9B1B20)
+                      : const Color(0xFF9B1B20),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,

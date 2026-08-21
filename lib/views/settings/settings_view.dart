@@ -268,7 +268,7 @@ class _SettingsViewState extends State<SettingsView> {
       width: double.infinity,
       padding: const EdgeInsets.only(top: 10, bottom: 14, left: 8, right: 14),
       decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
+        color: Color(0xFF9B1B20),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -406,7 +406,7 @@ class _SettingsViewState extends State<SettingsView> {
             value: value,
             onChanged: enabled ? onChanged : null,
             activeColor: Colors.white,
-            activeTrackColor: const Color(0xFF7D1B22),
+            activeTrackColor: const Color(0xFF9B1B20),
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFD1D5DB),
           ),
@@ -450,11 +450,11 @@ class _SettingsViewState extends State<SettingsView> {
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF7D1B22),
+                          color: Color(0xFF9B1B20),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF7D1B22)),
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF9B1B20)),
                     ],
                   ),
                 ),
@@ -540,7 +540,7 @@ class _SettingsViewState extends State<SettingsView> {
           children: [
             const Text(
               'Select Urgent Alert Radius',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
             ),
             const SizedBox(height: 12),
             ...List.generate(_radiusOptions.length, (index) {
@@ -548,7 +548,7 @@ class _SettingsViewState extends State<SettingsView> {
               return ListTile(
                 title: Text(option, style: const TextStyle(fontWeight: FontWeight.w600)),
                 trailing: _selectedRadius == option
-                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF7D1B22))
+                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF9B1B20))
                     : null,
                 onTap: () {
                   setState(() => _selectedRadius = option);
@@ -586,7 +586,7 @@ class _SettingsViewState extends State<SettingsView> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Personal Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+                  const Text('Personal Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
                   const SizedBox(height: 14),
                   TextField(
                     controller: nameCtrl,
@@ -631,7 +631,7 @@ class _SettingsViewState extends State<SettingsView> {
                                     ),
                                   );
                                 },
-                          child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF7D1B22), fontSize: 11.5)),
+                          child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 11.5)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -682,7 +682,7 @@ class _SettingsViewState extends State<SettingsView> {
                                     });
                                   }
                                 },
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                           child: saving
                               ? const SizedBox(
                                   height: 16,
@@ -720,7 +720,7 @@ class _SettingsViewState extends State<SettingsView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Change Password & Security', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+                const Text('Change Password & Security', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
                 const SizedBox(height: 14),
                 // currentPassword is only checked server-side if the donor
                 // already has a password set — an OTP-only donor setting
@@ -769,7 +769,7 @@ class _SettingsViewState extends State<SettingsView> {
                               });
                             }
                           },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                     child: saving
                         ? const SizedBox(
                             height: 16,
@@ -797,7 +797,7 @@ class _SettingsViewState extends State<SettingsView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Medical Data Privacy & Encryption', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const Text('Medical Data Privacy & Encryption', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
             const SizedBox(height: 10),
             const Text(
               'All donor health evaluations, biometrics, and clinical vitals logged by hospital staff are secured using AES-256 end-to-end encryption in compliance with the Philippine Data Privacy Act of 2012 (RA 10173).',
@@ -808,7 +808,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -828,7 +828,7 @@ class _SettingsViewState extends State<SettingsView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Terms of Service & Health Guidelines', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const Text('Terms of Service & Health Guidelines', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
             const SizedBox(height: 10),
             const Text(
               'ResQ operates under National Voluntary Blood Services Program (NVBSP) and Department of Health (DOH) clinical donor safety criteria. Voluntary donors agree to accurate disclosure of physical metrics.',
@@ -839,7 +839,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('AGREE & CLOSE', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -859,7 +859,7 @@ class _SettingsViewState extends State<SettingsView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('ResQ Donor Support & Help', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const Text('ResQ Donor Support & Help', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
             const SizedBox(height: 10),
             const Text(
               'Need assistance with emergency blood requests, screening retakes, or booking queue slots? Contact your local Red Cross chapter or email support@resq.ph.',
@@ -870,7 +870,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -898,7 +898,7 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7D1B22),
+              backgroundColor: const Color(0xFF9B1B20),
               foregroundColor: Colors.white,
             ),
             onPressed: () async {

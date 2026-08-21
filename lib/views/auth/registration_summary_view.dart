@@ -35,7 +35,7 @@ class RegistrationSummaryView extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF7D1B22),
+        backgroundColor: const Color(0xFF9B1B20),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
@@ -216,7 +216,7 @@ class RegistrationSummaryView extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7D1B22),
+                    backgroundColor: const Color(0xFF9B1B20),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
@@ -236,9 +236,9 @@ class RegistrationSummaryView extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF7D1B22), width: 1.2),
+                    side: const BorderSide(color: Color(0xFF9B1B20), width: 1.2),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    foregroundColor: const Color(0xFF7D1B22),
+                    foregroundColor: const Color(0xFF9B1B20),
                   ),
                   child: const Text(
                     'EDIT INFORMATION',

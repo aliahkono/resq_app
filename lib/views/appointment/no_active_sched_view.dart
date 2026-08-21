@@ -25,13 +25,13 @@ class NoActiveSchedView extends StatelessWidget {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: const Color(0xFF7D1B22).withValues(alpha: 0.08),
+                color: const Color(0xFF9B1B20).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.event_available_rounded,
                 size: 48,
-                color: Color(0xFF7D1B22),
+                color: Color(0xFF9B1B20),
               ),
             ),
             const SizedBox(height: 24),
@@ -71,7 +71,7 @@ class NoActiveSchedView extends StatelessWidget {
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7D1B22),
+                  backgroundColor: const Color(0xFF9B1B20),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -92,7 +92,7 @@ class NoActiveSchedView extends StatelessWidget {
                 children: [
                   Row(
                     children: const [
-                      Icon(Icons.info_outline_rounded, color: Color(0xFF7D1B22), size: 18),
+                      Icon(Icons.info_outline_rounded, color: Color(0xFF9B1B20), size: 18),
                       SizedBox(width: 8),
                       Text(
                         'What to remember before booking',

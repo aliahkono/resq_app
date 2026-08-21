@@ -212,7 +212,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
                     if (_loadingHospitals)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: CircularProgressIndicator(color: Color(0xFF7D1B22))),
+                        child: Center(child: CircularProgressIndicator(color: Color(0xFF9B1B20))),
                       )
                     else if (_loadError != null)
                       _buildLoadErrorCard()
@@ -266,7 +266,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
                         child: ElevatedButton(
                           onPressed: (_selectedTime != null && !_booking) ? _confirmBooking : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7D1B22),
+                            backgroundColor: const Color(0xFF9B1B20),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             elevation: 0,
@@ -307,7 +307,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
           const SizedBox(height: 10),
           OutlinedButton(
             onPressed: _loadHospitals,
-            child: const Text('RETRY', style: TextStyle(color: Color(0xFF7D1B22), fontSize: 12)),
+            child: const Text('RETRY', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 12)),
           ),
         ],
       ),
@@ -318,7 +318,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(color: Color(0xFF7D1B22)),
+      decoration: const BoxDecoration(color: Color(0xFF9B1B20)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -379,7 +379,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF7D1B22) : Colors.transparent,
+            color: isSelected ? const Color(0xFF9B1B20) : Colors.transparent,
             width: 2,
           ),
           boxShadow: [
@@ -403,7 +403,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
                   ),
                 ),
                 if (isSelected)
-                  const Icon(Icons.check_circle_rounded, color: Color(0xFF7D1B22), size: 20),
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF9B1B20), size: 20),
               ],
             ),
             const SizedBox(height: 6),
@@ -439,9 +439,9 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
         // slack without visibly changing the chip's proportions.
         padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
+          color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? const Color(0xFF7D1B22) : const Color(0xFFD1D5DB)),
+          border: Border.all(color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFFD1D5DB)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -486,10 +486,10 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
+          color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFF7D1B22) : const Color(0xFFD1D5DB),
+            color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFFD1D5DB),
           ),
         ),
         child: Text(

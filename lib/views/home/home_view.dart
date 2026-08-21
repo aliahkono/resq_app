@@ -327,7 +327,7 @@ class _HomeViewState extends State<HomeView> {
     if (_currentTabIndex == 2) title = 'Profile & Records';
 
     return Container(
-      color: const Color(0xFF7D1B22),
+      color: const Color(0xFF9B1B20),
       child: SafeArea(
         bottom: false,
         child: Container(
