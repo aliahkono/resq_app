@@ -14,6 +14,7 @@ class DonorProfileView extends StatelessWidget {
   final String bloodType;
   final String donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onProfileUpdated;
+  final String token;
 
   const DonorProfileView({
     super.key,
@@ -25,6 +26,7 @@ class DonorProfileView extends StatelessWidget {
     required this.bloodType,
     required this.donorId,
     this.onProfileUpdated,
+    this.token = '',
   });
 
   String _formatDate(DateTime date) {
@@ -193,13 +195,18 @@ class DonorProfileView extends StatelessWidget {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF7D1B22), width: 2.2),
+                  border: Border.all(color: const Color(0xFF9B1B20), width: 2.2),
                 ),
+                // No real donor photo asset exists in the project (this
+                // referenced "assets/images/donor_sample.jpg", which was
+                // never actually added) — CircleAvatar already renders its
+                // `child` as a perfectly good default appearance without a
+                // backgroundImage, so dropping it just stops the repeated
+                // "Unable to load asset" console error with no visual change.
                 child: const CircleAvatar(
                   radius: 38,
                   backgroundColor: Color(0xFFF3E5E6),
-                  backgroundImage: AssetImage('assets/images/donor_sample.jpg'),
-                  child: Icon(Icons.person_rounded, size: 44, color: Color(0xFF7D1B22)),
+                  child: Icon(Icons.person_rounded, size: 44, color: Color(0xFF9B1B20)),
                 ),
               ),
               Container(
@@ -210,7 +217,7 @@ class DonorProfileView extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.verified_user_rounded,
-                  color: Color(0xFF7D1B22),
+                  color: Color(0xFF9B1B20),
                   size: 18,
                 ),
               ),
@@ -283,7 +290,7 @@ class DonorProfileView extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF7D1B22),
+                              color: Color(0xFF9B1B20),
                             ),
                           ),
                           TextSpan(
@@ -329,7 +336,7 @@ class DonorProfileView extends StatelessWidget {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8A1E26),
+                backgroundColor: const Color(0xFF9B1B20),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
@@ -367,7 +374,7 @@ class DonorProfileView extends StatelessWidget {
               children: [
                 const Text(
                   'LAST DONATION',
-                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22), letterSpacing: 0.5),
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20), letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -391,7 +398,7 @@ class DonorProfileView extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(info.reasonDescription),
-                  backgroundColor: isEligible ? const Color(0xFF2E7D32) : const Color(0xFF7D1B22),
+                  backgroundColor: isEligible ? const Color(0xFF2E7D32) : const Color(0xFF9B1B20),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -463,7 +470,7 @@ class DonorProfileView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+        border: Border.all(color: const Color(0xFF9B1B20), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,7 +479,7 @@ class DonorProfileView extends StatelessWidget {
             padding: const EdgeInsets.only(top: 12, left: 14, right: 14, bottom: 8),
             child: Row(
               children: const [
-                Icon(Icons.favorite_border_rounded, color: Color(0xFF7D1B22), size: 18),
+                Icon(Icons.favorite_border_rounded, color: Color(0xFF9B1B20), size: 18),
                 SizedBox(width: 8),
                 Text(
                   'Lifetime Impact Record',
@@ -481,7 +488,7 @@ class DonorProfileView extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF7D1B22)),
+          const Divider(height: 1, color: Color(0xFF9B1B20)),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16.0),
             child: Row(
@@ -491,7 +498,7 @@ class DonorProfileView extends StatelessWidget {
                     children: [
                       Text(
                         liters > 0 ? liters.toStringAsFixed(1) : '0.0',
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
                       ),
                       const SizedBox(height: 2),
                       const Text('LITERS DONATED', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF6B7280), letterSpacing: 0.5)),
@@ -526,7 +533,7 @@ class DonorProfileView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
+        border: Border.all(color: const Color(0xFF9B1B20), width: 1.2),
       ),
       child: Column(
         children: [
@@ -534,10 +541,10 @@ class DonorProfileView extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Text(
               'Clinical & Donation Records',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF7D1B22)),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF9B1B20)),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF7D1B22)),
+          const Divider(height: 1, color: Color(0xFF9B1B20)),
           _buildRecordTile(
             icon: Icons.local_hospital_outlined,
             title: 'Vitals & Hemoglobin History',
@@ -589,7 +596,7 @@ class DonorProfileView extends StatelessWidget {
           color: const Color(0xFFFDE8E9),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        child: Icon(icon, color: const Color(0xFF9B1B20), size: 20),
       ),
       title: Text(
         title,
@@ -602,7 +609,7 @@ class DonorProfileView extends StatelessWidget {
       trailing: Icon(
         isDownload ? Icons.download_rounded : Icons.arrow_forward_ios_rounded,
         size: isDownload ? 18 : 14,
-        color: isDownload ? const Color(0xFF7D1B22) : const Color(0xFF9CA3AF),
+        color: isDownload ? const Color(0xFF9B1B20) : const Color(0xFF9CA3AF),
       ),
     );
   }
@@ -665,7 +672,7 @@ class DonorProfileView extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -712,19 +719,20 @@ class DonorProfileView extends StatelessWidget {
                             donorName: donorName,
                             bloodType: bloodType,
                             donorId: donorId,
+                            token: token,
                             onRetakeCompleted: onProfileUpdated,
                           ),
                         ),
                       );
                     },
-                    child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF7D1B22), fontSize: 12)),
+                    child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 12)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                     child: const Text('CLOSE', style: TextStyle(color: Colors.white, fontSize: 12)),
                   ),
                 ),

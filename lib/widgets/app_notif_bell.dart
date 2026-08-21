@@ -6,11 +6,23 @@ import 'package:resq/views/appointment/eligible_appoint_view.dart';
 class AppNotificationBell extends StatelessWidget {
   final bool isEligible;
   final String donorBloodType;
+  // Needed both to load the real notification list (NotificationService
+  // .refresh(token), triggered by HomeView on open) and so the "accept
+  // slot" flow below can open EligibleAppointView, which requires a real
+  // session token to book for real.
+  final String token;
+  // Shared with every other "book an appointment" entry point (see
+  // home_view.dart's _handleBookingCompleted) so a booking accepted from a
+  // broadcast notification also shows up on the Appointment tab, instead of
+  // being the one entry point that silently forgets about it.
+  final void Function(Map<String, dynamic> appointment)? onBookingCompleted;
 
   const AppNotificationBell({
     super.key,
     required this.isEligible,
     required this.donorBloodType,
+    required this.token,
+    this.onBookingCompleted,
   });
 
   @override
@@ -29,8 +41,8 @@ class AppNotificationBell extends StatelessWidget {
             ),
             if (unreadCount > 0)
               Positioned(
-                right: 8,
-                top: 8,
+                right: 6,
+                top: -2,
                 child: Container(
                   padding: const EdgeInsets.all(3.5),
                   decoration: const BoxDecoration(
@@ -55,47 +67,72 @@ class AppNotificationBell extends StatelessWidget {
 
   void _showBroadcastSheet(BuildContext context) {
     final service = NotificationService();
-    final list = service.notifications;
+
+    // Re-fetch every time the bell is opened, not just once when HomeView
+    // first mounted — otherwise a broadcast sent while the donor already
+    // had the app open wouldn't show up here either without a full app
+    // restart, same gap the Priority Request Feed had. The AnimatedBuilder
+    // below re-reads service.notifications live, so the sheet updates in
+    // place once this resolves instead of only refreshing the bell icon's
+    // badge behind it.
+    service.refresh(token);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _BroadcastModalSheet(
-        notifications: list,
+      builder: (ctx) => AnimatedBuilder(
+        animation: service,
+        builder: (ctx, _) => _BroadcastModalSheet(
+        notifications: service.notifications,
+        isLoading: service.isLoading,
         isEligible: isEligible,
-        onMarkAllRead: () => service.markAllAsRead(),
+        onMarkAllRead: () => service.markAllAsReadRemote(token),
         onSelectBroadcast: (item) {
           service.markAsRead(item.id);
           Navigator.pop(ctx);
-          if (isEligible) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => EligibleAppointView(
-                  isFirstTimeDonor: false,
-                  onBookingCompleted: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Reserved slot for ${item.hospitalName}!'),
-                        backgroundColor: const Color(0xFF2E7D32),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            );
-          } else {
+          if (!isEligible) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('You are temporarily deferred. Please complete your recovery period before accepting slots.'),
-                backgroundColor: Color(0xFF7D1B22),
+                backgroundColor: Color(0xFF9B1B20),
                 behavior: SnackBarBehavior.floating,
               ),
             );
+            return;
           }
+          if (!item.isStillOpen) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This request has already been closed out — check the Home tab for other open broadcasts.'),
+                backgroundColor: Color(0xFF9B1B20),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => EligibleAppointView(
+                isFirstTimeDonor: false,
+                token: token,
+                preselectedHospitalId: item.hospitalId,
+                onBookingCompleted: (appointment) {
+                  Navigator.pop(context);
+                  onBookingCompleted?.call(appointment);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Reserved slot at ${appointment['hospitalName']}!'),
+                      backgroundColor: const Color(0xFF2E7D32),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
         },
+        ),
       ),
     );
   }
@@ -103,12 +140,14 @@ class AppNotificationBell extends StatelessWidget {
 
 class _BroadcastModalSheet extends StatelessWidget {
   final List<BloodBroadcastNotification> notifications;
+  final bool isLoading;
   final bool isEligible;
   final VoidCallback onMarkAllRead;
   final Function(BloodBroadcastNotification) onSelectBroadcast;
 
   const _BroadcastModalSheet({
     required this.notifications,
+    this.isLoading = false,
     required this.isEligible,
     required this.onMarkAllRead,
     required this.onSelectBroadcast,
@@ -142,19 +181,27 @@ class _BroadcastModalSheet extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.campaign_rounded, color: Color(0xFF7D1B22), size: 22),
-                    SizedBox(width: 8),
-                    Text(
+                    const Icon(Icons.campaign_rounded, color: Color(0xFF9B1B20), size: 22),
+                    const SizedBox(width: 8),
+                    const Text(
                       'Hospital Broadcasts & SMS',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E1E)),
                     ),
+                    if (isLoading) ...[
+                      const SizedBox(width: 10),
+                      const SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF9B1B20)),
+                      ),
+                    ],
                   ],
                 ),
                 TextButton(
                   onPressed: onMarkAllRead,
-                  child: const Text('Mark all read', style: TextStyle(fontSize: 12, color: Color(0xFF7D1B22), fontWeight: FontWeight.bold)),
+                  child: const Text('Mark all read', style: TextStyle(fontSize: 12, color: Color(0xFF9B1B20), fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -214,7 +261,7 @@ class _BroadcastModalSheet extends StatelessWidget {
           color: item.isRead ? Colors.white : const Color(0xFFFFF7F7),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF7D1B22),
+            color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF9B1B20),
             width: item.isRead ? 1.0 : 1.4,
           ),
         ),
@@ -253,7 +300,7 @@ class _BroadcastModalSheet extends StatelessWidget {
                       Container(
                         width: 7,
                         height: 7,
-                        decoration: const BoxDecoration(color: Color(0xFF7D1B22), shape: BoxShape.circle),
+                        decoration: const BoxDecoration(color: Color(0xFF9B1B20), shape: BoxShape.circle),
                       ),
                   ],
                 ),
@@ -277,8 +324,8 @@ class _BroadcastModalSheet extends StatelessWidget {
                 onPressed: () => onSelectBroadcast(item),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: item.urgency == UrgencyLevel.critical
-                      ? const Color(0xFF8A1E26)
-                      : const Color(0xFF7D1B22),
+                      ? const Color(0xFF9B1B20)
+                      : const Color(0xFF9B1B20),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,

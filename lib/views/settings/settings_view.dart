@@ -3,6 +3,8 @@ import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
+import 'package:resq/services/api_service.dart';
+import 'package:resq/services/session_storage.dart';
 
 class SettingsView extends StatefulWidget {
   final ScreenNPTModel? screeningModel;
@@ -13,6 +15,9 @@ class SettingsView extends StatefulWidget {
   final String? userName;
   final String? userPhone;
   final String? userEmail;
+  // Session token (see HomeView.token) — required for every real call this
+  // screen makes (GET/PATCH /api/donor/me, POST /donor-auth/logout).
+  final String token;
 
   const SettingsView({
     super.key,
@@ -24,6 +29,7 @@ class SettingsView extends StatefulWidget {
     this.userName,
     this.userPhone,
     this.userEmail,
+    this.token = '',
   });
 
   @override
@@ -31,19 +37,115 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  // Account & Security Toggles
+  // Account & Security Toggles — no backend feature behind this yet (no
+  // biometric/device-credential endpoint exists), so it stays local-only
+  // until that's built.
   bool _biometricLogin = false;
 
-  // Alert & Notification Preferences Toggles
-  bool _emergencyShortageAlerts = false;
-  bool _smsAlerts = false;
-  bool _appointmentReminders = false;
+  // Alert & Notification Preferences — real donor.notify_sms /
+  // donor.notify_email columns (see donorPortal.controller.js
+  // updateMyProfile), fetched fresh on open via GET /api/donor/me rather
+  // than trusted from whatever HomeView happened to pass down. Seeded to
+  // `true` before the fetch resolves since that's the backend's own
+  // default for a new donor.
+  bool _notifySms = true;
+  bool _notifyEmail = true;
+  bool _loadingPrefs = true;
 
-  // Location & Emergency Radius
+  // The backend has no separate "appointment reminder" notification type —
+  // notify_sms/notify_email only ever gate the broadcast-alert emails/SMS
+  // (see notifications.service.js). This toggle has nothing to connect to
+  // yet, so it's shown disabled rather than pretending to work.
+  static const bool _appointmentRemindersImplemented = false;
+
+  // Editable profile fields — start from whatever HomeView passed down (so
+  // the screen isn't blank on first paint), then get overwritten by the
+  // GET /api/donor/me fetch below once it resolves, since that's the real
+  // source of truth.
+  late String _name;
+  late String _phone;
+  late String _email;
+
+  // Location & Emergency Radius — no geofencing feature on the backend
+  // (hospitals aren't matched to donors by a radius anywhere server-side),
+  // local-only for the same reason as biometric login above.
   bool _locationServices = false;
   String _selectedRadius = '15 km';
 
   final List<String> _radiusOptions = ['5 km', '10 km', '15 km', '25 km', '50 km'];
+
+  @override
+  void initState() {
+    super.initState();
+    _name = widget.userName ?? (widget.donorName.isNotEmpty ? widget.donorName : '');
+    _phone = widget.userPhone ?? '';
+    _email = widget.userEmail ?? '';
+    _loadProfile();
+  }
+
+  /// GET /api/donor/me — refreshes name/phone/email and the two real
+  /// notification toggles from the backend. Silent on failure (keeps
+  /// whatever was passed down from HomeView) since this runs automatically
+  /// on open, not in response to a donor action — a network hiccup here
+  /// shouldn't block the whole Settings screen with an error banner.
+  Future<void> _loadProfile() async {
+    if (widget.token.isEmpty) {
+      setState(() => _loadingPrefs = false);
+      return;
+    }
+    try {
+      final profile = await ApiService.getMyProfile(widget.token);
+      if (!mounted) return;
+      setState(() {
+        _name = (profile['name'] as String?) ?? _name;
+        _phone = (profile['phone'] as String?) ?? _phone;
+        _email = (profile['email'] as String?) ?? _email;
+        _notifySms = (profile['notifySms'] as bool?) ?? _notifySms;
+        _notifyEmail = (profile['notifyEmail'] as bool?) ?? _notifyEmail;
+        _loadingPrefs = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingPrefs = false);
+    }
+  }
+
+  /// PATCH /api/donor/me — optimistically flips the switch, then confirms
+  /// against the backend; reverts and shows the real error message if the
+  /// save fails, rather than leaving the UI showing a preference that never
+  /// actually took effect.
+  Future<void> _updateNotifyPref({bool? sms, bool? email}) async {
+    final prevSms = _notifySms;
+    final prevEmail = _notifyEmail;
+    setState(() {
+      if (sms != null) _notifySms = sms;
+      if (email != null) _notifyEmail = email;
+    });
+    try {
+      await ApiService.updateMyProfile(widget.token, {
+        if (sms != null) 'notifySms': sms,
+        if (email != null) 'notifyEmail': email,
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _notifySms = prevSms;
+        _notifyEmail = prevEmail;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red.shade700),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _notifySms = prevSms;
+        _notifyEmail = prevEmail;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reach the ResQ server.'), backgroundColor: Colors.red.shade700),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,21 +190,25 @@ class _SettingsViewState extends State<SettingsView> {
                     const SizedBox(height: 8),
                     _buildCardGroup([
                       _buildSwitchTile(
-                        title: 'Emergency Blood Shortage Alerts',
-                        value: _emergencyShortageAlerts,
-                        onChanged: (val) => setState(() => _emergencyShortageAlerts = val),
+                        title: 'SMS Alerts (Urgent Hospital Broadcasts)',
+                        value: _notifySms,
+                        enabled: !_loadingPrefs,
+                        onChanged: (val) => _updateNotifyPref(sms: val),
                       ),
                       const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildSwitchTile(
-                        title: 'SMS Alerts (Urgent Hospital Broadcasts)',
-                        value: _smsAlerts,
-                        onChanged: (val) => setState(() => _smsAlerts = val),
+                        title: 'Email Alerts (Broadcast Notifications)',
+                        value: _notifyEmail,
+                        enabled: !_loadingPrefs,
+                        onChanged: (val) => _updateNotifyPref(email: val),
                       ),
                       const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildSwitchTile(
                         title: 'Appointment Reminders & Tips',
-                        value: _appointmentReminders,
-                        onChanged: (val) => setState(() => _appointmentReminders = val),
+                        subtitle: 'Coming soon',
+                        value: false,
+                        enabled: _appointmentRemindersImplemented,
+                        onChanged: (val) {},
                       ),
                     ]),
 
@@ -162,7 +268,7 @@ class _SettingsViewState extends State<SettingsView> {
       width: double.infinity,
       padding: const EdgeInsets.only(top: 10, bottom: 14, left: 8, right: 14),
       decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
+        color: Color(0xFF9B1B20),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -265,6 +371,8 @@ class _SettingsViewState extends State<SettingsView> {
     required String title,
     required bool value,
     required ValueChanged<bool> onChanged,
+    bool enabled = true,
+    String? subtitle,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -272,20 +380,33 @@ class _SettingsViewState extends State<SettingsView> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF1E2432),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: enabled ? const Color(0xFF1E2432) : const Color(0xFF9CA3AF),
+                  ),
+                ),
+                if (subtitle != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2.0),
+                    child: Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF9CA3AF)),
+                    ),
+                  ),
+              ],
             ),
           ),
           Switch(
             value: value,
-            onChanged: onChanged,
+            onChanged: enabled ? onChanged : null,
             activeColor: Colors.white,
-            activeTrackColor: const Color(0xFF7D1B22),
+            activeTrackColor: const Color(0xFF9B1B20),
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFD1D5DB),
           ),
@@ -329,11 +450,11 @@ class _SettingsViewState extends State<SettingsView> {
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF7D1B22),
+                          color: Color(0xFF9B1B20),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF7D1B22)),
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF9B1B20)),
                     ],
                   ),
                 ),
@@ -419,7 +540,7 @@ class _SettingsViewState extends State<SettingsView> {
           children: [
             const Text(
               'Select Urgent Alert Radius',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
             ),
             const SizedBox(height: 12),
             ...List.generate(_radiusOptions.length, (index) {
@@ -427,7 +548,7 @@ class _SettingsViewState extends State<SettingsView> {
               return ListTile(
                 title: Text(option, style: const TextStyle(fontWeight: FontWeight.w600)),
                 trailing: _selectedRadius == option
-                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF7D1B22))
+                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF9B1B20))
                     : null,
                 onTap: () {
                   setState(() => _selectedRadius = option);
@@ -442,90 +563,143 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showEditPersonalDetailsModal(BuildContext context) {
-    // Dynamic initialization using passed user details
-    final initialName = widget.userName ?? (widget.donorName.isNotEmpty ? widget.donorName : '');
-    final initialPhone = widget.userPhone ?? '';
-    final initialEmail = widget.userEmail ?? '';
-
-    final nameCtrl = TextEditingController(text: initialName);
-    final phoneCtrl = TextEditingController(text: initialPhone);
-    final emailCtrl = TextEditingController(text: initialEmail);
+    final nameCtrl = TextEditingController(text: _name);
+    final phoneCtrl = TextEditingController(text: _phone);
+    final emailCtrl = TextEditingController(text: _email);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Personal Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
-            const SizedBox(height: 14),
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+      builder: (ctx) {
+        bool saving = false;
+        String? error;
+        return StatefulBuilder(
+          builder: (ctx, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => RegistrationWizView(
-                            isRetake: true,
-                            initialScreening: widget.screeningModel,
-                            donorName: widget.donorName,
-                            bloodType: widget.bloodType,
-                            donorId: widget.donorId,
-                            onRetakeCompleted: widget.onRetakeCompleted,
-                          ),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Personal Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: saving
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => RegistrationWizView(
+                                        isRetake: true,
+                                        initialScreening: widget.screeningModel,
+                                        donorName: widget.donorName,
+                                        bloodType: widget.bloodType,
+                                        donorId: widget.donorId,
+                                        token: widget.token,
+                                        onRetakeCompleted: widget.onRetakeCompleted,
+                                      ),
+                                    ),
+                                  );
+                                },
+                          child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 11.5)),
                         ),
-                      );
-                    },
-                    child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF7D1B22), fontSize: 11.5)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  final newName = nameCtrl.text.trim();
+                                  final newPhone = phoneCtrl.text.trim();
+                                  final newEmail = emailCtrl.text.trim();
+                                  final updates = <String, dynamic>{};
+                                  if (newName != _name) updates['name'] = newName;
+                                  if (newPhone != _phone) updates['phone'] = newPhone;
+                                  if (newEmail != _email) updates['email'] = newEmail;
+
+                                  if (updates.isEmpty) {
+                                    Navigator.pop(ctx);
+                                    return;
+                                  }
+
+                                  setModalState(() {
+                                    saving = true;
+                                    error = null;
+                                  });
+
+                                  try {
+                                    final updated = await ApiService.updateMyProfile(widget.token, updates);
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _name = (updated['name'] as String?) ?? newName;
+                                      _phone = (updated['phone'] as String?) ?? newPhone;
+                                      _email = (updated['email'] as String?) ?? newEmail;
+                                    });
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Personal profile details saved successfully!'), backgroundColor: Color(0xFF2E7D32)),
+                                    );
+                                  } on ApiException catch (e) {
+                                    setModalState(() {
+                                      saving = false;
+                                      error = e.message;
+                                    });
+                                  } catch (_) {
+                                    setModalState(() {
+                                      saving = false;
+                                      error = 'Could not reach the ResQ server.';
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
+                          child: saving
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontSize: 11.5)),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Personal profile details saved successfully!'), backgroundColor: Color(0xFF2E7D32)),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-                    child: const Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontSize: 11.5)),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
-    );
+          );
+        },
+      );
   }
 
   void _showChangePasswordModal(BuildContext context) {
@@ -536,34 +710,80 @@ class _SettingsViewState extends State<SettingsView> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Change Password & Security', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
-            const SizedBox(height: 14),
-            TextField(controller: currentPw, obscureText: true, decoration: const InputDecoration(labelText: 'Current Password', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            TextField(controller: newPw, obscureText: true, decoration: const InputDecoration(labelText: 'New Password', border: OutlineInputBorder())),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Account security credentials updated!'), backgroundColor: Color(0xFF2E7D32)),
-                  );
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-                child: const Text('UPDATE PASSWORD', style: TextStyle(color: Colors.white)),
-              ),
+      builder: (ctx) {
+        bool saving = false;
+        String? error;
+        return StatefulBuilder(
+          builder: (ctx, setModalState) => Padding(
+            padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Change Password & Security', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
+                const SizedBox(height: 14),
+                // currentPassword is only checked server-side if the donor
+                // already has a password set — an OTP-only donor setting
+                // their first one here can leave it blank (see
+                // updateMyProfile, donorPortal.controller.js).
+                TextField(controller: currentPw, obscureText: true, decoration: const InputDecoration(labelText: 'Current Password', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(controller: newPw, obscureText: true, decoration: const InputDecoration(labelText: 'New Password (min. 8 characters)', border: OutlineInputBorder())),
+                if (error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            if (newPw.text.length < 8) {
+                              setModalState(() => error = 'New password must be at least 8 characters.');
+                              return;
+                            }
+                            setModalState(() {
+                              saving = true;
+                              error = null;
+                            });
+                            try {
+                              await ApiService.updateMyProfile(widget.token, {
+                                'password': newPw.text,
+                                'currentPassword': currentPw.text,
+                              });
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Account security credentials updated!'), backgroundColor: Color(0xFF2E7D32)),
+                              );
+                            } on ApiException catch (e) {
+                              setModalState(() {
+                                saving = false;
+                                error = e.message;
+                              });
+                            } catch (_) {
+                              setModalState(() {
+                                saving = false;
+                                error = 'Could not reach the ResQ server.';
+                              });
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
+                    child: saving
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('UPDATE PASSWORD', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -577,7 +797,7 @@ class _SettingsViewState extends State<SettingsView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Medical Data Privacy & Encryption', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const Text('Medical Data Privacy & Encryption', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
             const SizedBox(height: 10),
             const Text(
               'All donor health evaluations, biometrics, and clinical vitals logged by hospital staff are secured using AES-256 end-to-end encryption in compliance with the Philippine Data Privacy Act of 2012 (RA 10173).',
@@ -588,7 +808,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -608,7 +828,7 @@ class _SettingsViewState extends State<SettingsView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Terms of Service & Health Guidelines', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const Text('Terms of Service & Health Guidelines', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
             const SizedBox(height: 10),
             const Text(
               'ResQ operates under National Voluntary Blood Services Program (NVBSP) and Department of Health (DOH) clinical donor safety criteria. Voluntary donors agree to accurate disclosure of physical metrics.',
@@ -619,7 +839,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('AGREE & CLOSE', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -639,7 +859,7 @@ class _SettingsViewState extends State<SettingsView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('ResQ Donor Support & Help', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+            const Text('ResQ Donor Support & Help', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
             const SizedBox(height: 10),
             const Text(
               'Need assistance with emergency blood requests, screening retakes, or booking queue slots? Contact your local Red Cross chapter or email support@resq.ph.',
@@ -650,7 +870,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
                 child: const Text('GOT IT', style: TextStyle(color: Colors.white)),
               ),
             ),
@@ -678,12 +898,22 @@ class _SettingsViewState extends State<SettingsView> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7D1B22),
+              backgroundColor: const Color(0xFF9B1B20),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
+              final navigator = Navigator.of(context);
               Navigator.pop(context);
-              Navigator.of(context).pushAndRemoveUntil(
+              // Best-effort: invalidate the session server-side (POST
+              // /donor-auth/logout deletes the Redis session row). If this
+              // fails — no connection, token already expired — sign the
+              // donor out locally anyway; there's nothing else useful to do
+              // with a stale/unreachable token.
+              try {
+                await ApiService.logout(widget.token);
+              } catch (_) {}
+              await SessionStorage.clearToken();
+              navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const AuthLandingView()),
                     (route) => false,
               );

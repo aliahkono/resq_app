@@ -45,6 +45,18 @@ class _OtpVerViewState extends State<OtpVerView> {
   late OtpVerificationMode _verificationMode;
   late String _phoneNumber;
   late String _email;
+  // Session token issued by verify-otp/complete-profile — held here so
+  // _showSuccessDialog (a separate method, out of _verifyOtp's local scope)
+  // can pass it into HomeView -> SettingsView.
+  String? _sessionToken;
+  // True when verify-otp found a donor record already existing for this
+  // phone number and logged straight into it instead of running
+  // complete-profile — see the `else` branch below. _showSuccessDialog uses
+  // this to tell that donor they've been logged into their existing
+  // account, instead of implying a brand-new one was just created (which,
+  // silently, it wasn't — whatever they just typed on this screen was
+  // never saved).
+  bool _isExistingAccount = false;
 
   final List<TextEditingController> _controllers =
   List.generate(6, (index) => TextEditingController());
@@ -260,6 +272,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                   'lastDonationDate': screens.lastDonationDate?.toIso8601String(),
                   'totalDonations': screens.totalDonations,
                   'hasTattsOrPierce': screens.hasTattsOrPierce,
+                  'tattooDate': screens.tattooDate?.toIso8601String(),
                   'hasAlcoholPast24hr': screens.hasAlcoholPast24hr,
                   'hasActiveInfectOrMeds': screens.hasActiveInfectOrMeds,
                   'isPregOrNursing': screens.isPregOrNursing,
@@ -273,13 +286,19 @@ class _OtpVerViewState extends State<OtpVerView> {
         donor = completeResponse['donor'] as Map<String, dynamic>?;
       } else {
         // A donor record already existed for this phone (e.g. an admin
-        // walk-in entry) — verify-otp already logged them in, no
-        // complete-profile call needed or even valid at this point.
+        // walk-in entry, or this donor registering again on a number
+        // they've already used) — verify-otp already logged them in, no
+        // complete-profile call needed or even valid at this point. Whatever
+        // name/email/password they just typed on the registration form was
+        // never sent anywhere; _showSuccessDialog below makes that explicit
+        // instead of implying a fresh account was created.
+        _isExistingAccount = true;
         sessionToken = verifyResponse['token'] as String;
         donor = verifyResponse['donor'] as Map<String, dynamic>?;
       }
 
       await SessionStorage.saveToken(sessionToken);
+      _sessionToken = sessionToken;
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -456,7 +475,7 @@ class _OtpVerViewState extends State<OtpVerView> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Account Verified!',
+                _isExistingAccount ? 'Welcome Back!' : 'Account Verified!',
                 textAlign: TextAlign.center,
                 style: ResQTheme.heading1.copyWith(
                   fontSize: 20,
@@ -466,9 +485,11 @@ class _OtpVerViewState extends State<OtpVerView> {
               ),
               const SizedBox(height: 8),
               Text(
-                _verificationMode == OtpVerificationMode.phone
-                    ? 'Your phone number ($_phoneNumber) has been verified.'
-                    : 'Your email address ($_email) has been verified.',
+                _isExistingAccount
+                    ? 'This phone number ($_phoneNumber) is already registered. We\'ve logged you into your existing account instead of creating a new one.'
+                    : (_verificationMode == OtpVerificationMode.phone
+                        ? 'Your phone number ($_phoneNumber) has been verified.'
+                        : 'Your email address ($_email) has been verified.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 12.5,
@@ -490,11 +511,17 @@ class _OtpVerViewState extends State<OtpVerView> {
                           bloodType: (donor?['bloodType'] as String?) ?? widget.bloodType,
                           donorId: (donor?['id'] as String?) ?? widget.donorId,
                           phoneNum: _phoneNumber,
-                          donorEmail: _email,
+                          // Was `_email` (whatever was typed into this
+                          // registration attempt's form) — wrong for the
+                          // existing-account branch, where that value was
+                          // never saved. The donor object straight from the
+                          // backend is the actual source of truth here.
+                          donorEmail: (donor?['email'] as String?) ?? _email,
                           screeningModel: widget.screeningModel,
                           classificationResult: widget.classificationResult,
                           isFirstTimeDonor:
                           widget.screeningModel?.screensNPT.isFirstTimeDonor ?? true,
+                          token: _sessionToken ?? '',
                         ),
                       ),
                           (route) => false,
@@ -805,20 +832,35 @@ class _OtpVerViewState extends State<OtpVerView> {
               ),
               if (_hasError) ...[
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      _errorMessage,
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                // Was a plain Row with an un-constrained Text — fine for
+                // short messages, but a longer one (like the "could not
+                // reach the server" fallback) has nowhere to go but off the
+                // right edge of the screen. Padding + Flexible lets it wrap
+                // onto a second line instead of overflowing.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 16),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 24),

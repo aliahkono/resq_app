@@ -2,15 +2,32 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 /// Base URL of the ResQ backend (server/src/app.js in the hospital-web-dashboard
-/// repo). It isn't deployed anywhere yet, so this has to point at a machine
-/// actually running it:
-///   - Android emulator, server running on the same computer: 10.0.2.2
+/// repo). Defaults to your local dev server:
+///   - Android emulator, server running on the same computer: normally
+///     10.0.2.2, but using 127.0.0.1 + `adb reverse tcp:4000 tcp:4000`
+///     instead here — some Mac network setups (VPNs, security software)
+///     block the 10.0.2.2 NAT route even with the firewall off, and
+///     adb reverse tunnels over the same USB/ADB connection Flutter
+///     already uses instead, sidestepping that entirely. Re-run the
+///     adb reverse command after every emulator restart — it doesn't
+///     persist.
 ///   - iOS simulator, server running on the same computer: 127.0.0.1
+///     (no adb reverse needed — the simulator shares the Mac's network
+///     stack directly)
 ///   - A real phone: your computer's LAN IP (e.g. 192.168.1.23), phone and
 ///     computer on the same Wi-Fi, or an ngrok tunnel URL if it's remote
-/// Change this before testing against a real backend — it will not work
-/// as-is on a physical device.
-const String kApiBaseUrl = "http://10.0.2.2:4000/api";
+///
+/// To test against the deployed backend (e.g. to see app-booked data show
+/// up on the deployed admin dashboard, instead of only your own local
+/// Postgres) run with an override instead of editing this file:
+///   flutter run --dart-define=API_BASE_URL=https://your-backend.onrender.com/api
+/// Whichever backend you point at is also whichever *database* the data
+/// lands in — local dev server and the deployed one are two entirely
+/// separate databases that never sync with each other.
+const String kApiBaseUrl = String.fromEnvironment(
+  "API_BASE_URL",
+  defaultValue: "http://127.0.0.1:4000/api",
+);
 
 /// Thrown for any non-2xx response. `message` is the backend's own `error`
 /// field when it sent one (see server/src/utils/asyncHandler.js and every
@@ -67,6 +84,40 @@ class ApiService {
         .get(Uri.parse('$kApiBaseUrl$path'), headers: _headers(token))
         .timeout(_timeout);
     return _decode(response);
+  }
+
+  /// A handful of donor-portal endpoints (hospitals, appointments,
+  /// donations) return a raw JSON array, not an object — `_decode` above
+  /// only handles `Map` bodies and would silently return `{}` for these,
+  /// throwing the data away with no error. This mirrors `_decode`'s error
+  /// handling but for list responses.
+  static List<dynamic> _decodeList(http.Response response) {
+    final ok = response.statusCode >= 200 && response.statusCode < 300;
+
+    dynamic parsed;
+    if (response.body.isNotEmpty) {
+      try {
+        parsed = jsonDecode(response.body);
+      } catch (_) {
+        // see _decode's comment above — same reasoning applies here.
+      }
+    }
+
+    if (!ok) {
+      final errorBody = parsed is Map<String, dynamic> ? parsed : <String, dynamic>{};
+      throw ApiException(
+        response.statusCode,
+        errorBody['error']?.toString() ?? 'Something went wrong (HTTP ${response.statusCode}). Please try again.',
+      );
+    }
+    return parsed is List ? parsed : [];
+  }
+
+  static Future<List<dynamic>> _getList(String path, {String? token}) async {
+    final response = await http
+        .get(Uri.parse('$kApiBaseUrl$path'), headers: _headers(token))
+        .timeout(_timeout);
+    return _decodeList(response);
   }
 
   static Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body, {String? token}) async {
@@ -167,5 +218,70 @@ class ApiService {
   /// POST /api/donor-auth/logout
   static Future<void> logout(String token) {
     return _post('/donor-auth/logout', {}, token: token);
+  }
+
+  /// GET /api/donor/hospitals — public hospital list for the appointment
+  /// booking picker: [{id, code, name, city, address, latitude, longitude}].
+  static Future<List<dynamic>> listHospitals(String token) {
+    return _getList('/donor/hospitals', token: token);
+  }
+
+  /// GET /api/donor/appointments — this donor's own appointments (any
+  /// status), most recently scheduled first:
+  /// [{id, hospitalId, hospitalName, hospitalAddress, scheduledAt, status}].
+  static Future<List<dynamic>> listMyAppointments(String token) {
+    return _getList('/donor/appointments', token: token);
+  }
+
+  /// POST /api/donor/appointments — books a real slot at `hospitalId` for
+  /// `scheduledAt`. Throws ApiException with the backend's own message on
+  /// failure — most commonly a 409 "this time slot is fully booked" (see
+  /// bookAppointment, appointments.service.js), which is a real capacity
+  /// check, not a generic error.
+  static Future<Map<String, dynamic>> bookAppointment(
+    String token, {
+    required String hospitalId,
+    required DateTime scheduledAt,
+  }) {
+    return _post(
+      '/donor/appointments',
+      {
+        'hospitalId': hospitalId,
+        'scheduledAt': scheduledAt.toIso8601String(),
+      },
+      token: token,
+    );
+  }
+
+  /// PATCH /api/donor/appointments/:id/cancel
+  static Future<Map<String, dynamic>> cancelAppointment(String token, String appointmentId) {
+    return _patch('/donor/appointments/$appointmentId/cancel', {}, token: token);
+  }
+
+  /// GET /api/donor/requests — open hospital broadcasts matching this
+  /// donor's blood type (see listOpenRequestsForDonor,
+  /// donorPortal.controller.js), ranked by urgency then, if lat/lng are
+  /// supplied, proximity. This app doesn't collect donor GPS yet (no
+  /// location package wired in), so lat/lng are left out for now — the
+  /// backend just falls back to newest-first ordering, same as it does for
+  /// any caller that skips them.
+  /// [{requestCode, bloodType, priority, ward, unitsNeeded, unitsFulfilled,
+  ///   status, secondsOpen, hospitalId, hospitalName, hospitalAddress,
+  ///   latitude, longitude, distanceKm}]
+  static Future<List<dynamic>> listOpenRequests(String token) {
+    return _getList('/donor/requests', token: token);
+  }
+
+  /// GET /api/donor/notifications — {notifications: [...], unreadCount: n}.
+  /// One row per broadcast the donor was actually sent (see
+  /// listMyNotifications, donorPortal.controller.js).
+  static Future<Map<String, dynamic>> getMyNotifications(String token) {
+    return _get('/donor/notifications', token: token);
+  }
+
+  /// PATCH /api/donor/notifications/read — marks every one of this donor's
+  /// notification rows read in one shot (204 No Content on success).
+  static Future<void> markNotificationsRead(String token) {
+    return _patch('/donor/notifications/read', {}, token: token);
   }
 }
