@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 /// Base URL of the ResQ backend (server/src/app.js in the hospital-web-dashboard
-/// repo). It isn't deployed anywhere yet, so this has to point at a machine
-/// actually running it:
+/// repo). Defaults to your local dev server:
 ///   - Android emulator, server running on the same computer: normally
 ///     10.0.2.2, but using 127.0.0.1 + `adb reverse tcp:4000 tcp:4000`
 ///     instead here — some Mac network setups (VPNs, security software)
@@ -17,9 +16,18 @@ import 'package:http/http.dart' as http;
 ///     stack directly)
 ///   - A real phone: your computer's LAN IP (e.g. 192.168.1.23), phone and
 ///     computer on the same Wi-Fi, or an ngrok tunnel URL if it's remote
-/// Change this before testing against a real backend — it will not work
-/// as-is on a physical device.
-const String kApiBaseUrl = "http://127.0.0.1:4000/api";
+///
+/// To test against the deployed backend (e.g. to see app-booked data show
+/// up on the deployed admin dashboard, instead of only your own local
+/// Postgres) run with an override instead of editing this file:
+///   flutter run --dart-define=API_BASE_URL=https://your-backend.onrender.com/api
+/// Whichever backend you point at is also whichever *database* the data
+/// lands in — local dev server and the deployed one are two entirely
+/// separate databases that never sync with each other.
+const String kApiBaseUrl = String.fromEnvironment(
+  "API_BASE_URL",
+  defaultValue: "http://127.0.0.1:4000/api",
+);
 
 /// Thrown for any non-2xx response. `message` is the backend's own `error`
 /// field when it sent one (see server/src/utils/asyncHandler.js and every
