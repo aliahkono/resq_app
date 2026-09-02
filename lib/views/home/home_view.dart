@@ -227,12 +227,10 @@ class _HomeViewState extends State<HomeView> {
             });
           },
         )
-            : IneligibleHomeView(
-          classificationResult: _effectiveResult,
-          isFirstTimeDonor: _isFirstTime,
-          donorName: activeDonorName,
-          bloodType: activeBloodType,
-          donorId: activeDonorId,
+            : _buildIneligibleHomeSafe(
+          activeDonorName: activeDonorName,
+          activeBloodType: activeBloodType,
+          activeDonorId: activeDonorId,
         );
       case 1:
         if (_effectiveResult.isEligible) {
@@ -309,6 +307,67 @@ class _HomeViewState extends State<HomeView> {
         );
       default:
         return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildIneligibleHomeSafe({
+    required String activeDonorName,
+    required String activeBloodType,
+    required String activeDonorId,
+  }) {
+    try {
+      return IneligibleHomeView(
+        key: ValueKey(
+          'ineligible_${_effectiveResult.status.name}_${_effectiveResult.daysRemaining}_${_isFirstTime ? 'first' : 'repeat'}',
+        ),
+        classificationResult: _effectiveResult,
+        isFirstTimeDonor: _isFirstTime,
+        donorName: activeDonorName,
+        bloodType: activeBloodType,
+        donorId: activeDonorId,
+      );
+    } catch (e) {
+      debugPrint('HomeView: ineligible tab fallback due to build error: $e');
+      return ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFCA5A5)),
+            ),
+            child: const Text(
+              'Temporary deferral details could not be rendered. Please tap Update Health Assessment to continue.',
+              style: TextStyle(
+                color: Color(0xFF7D1B22),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 46,
+            child: ElevatedButton(
+              onPressed: _openRetakeScreening,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7D1B22),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Update Health Assessment',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      );
     }
   }
 }
