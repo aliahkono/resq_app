@@ -2,31 +2,27 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 /// Base URL of the ResQ backend (server/src/app.js in the hospital-web-dashboard
-/// repo). Defaults to your local dev server:
-///   - Android emulator, server running on the same computer: normally
-///     10.0.2.2, but using 127.0.0.1 + `adb reverse tcp:4000 tcp:4000`
-///     instead here — some Mac network setups (VPNs, security software)
-///     block the 10.0.2.2 NAT route even with the firewall off, and
-///     adb reverse tunnels over the same USB/ADB connection Flutter
-///     already uses instead, sidestepping that entirely. Re-run the
-///     adb reverse command after every emulator restart — it doesn't
-///     persist.
-///   - iOS simulator, server running on the same computer: 127.0.0.1
-///     (no adb reverse needed — the simulator shares the Mac's network
-///     stack directly)
+/// repo). Defaults to the deployed backend on Render, so anyone can just
+/// `flutter run` and immediately see/create real data that shows up on the
+/// deployed admin dashboard too — no local server needed.
+///
+/// To point at a local dev server instead, run with an override:
+///   flutter run --dart-define=API_BASE_URL=http://127.0.0.1:4000/api
+/// Local-server tips if you do this:
+///   - Android emulator: 127.0.0.1 + `adb reverse tcp:4000 tcp:4000` (some
+///     Mac network setups block the usual 10.0.2.2 NAT route; adb reverse
+///     tunnels over USB/ADB instead. Re-run after every emulator restart —
+///     it doesn't persist.)
+///   - iOS simulator: 127.0.0.1 directly (shares the Mac's network stack)
 ///   - A real phone: your computer's LAN IP (e.g. 192.168.1.23), phone and
 ///     computer on the same Wi-Fi, or an ngrok tunnel URL if it's remote
 ///
-/// To test against the deployed backend (e.g. to see app-booked data show
-/// up on the deployed admin dashboard, instead of only your own local
-/// Postgres) run with an override instead of editing this file:
-///   flutter run --dart-define=API_BASE_URL=https://your-backend.onrender.com/api
 /// Whichever backend you point at is also whichever *database* the data
 /// lands in — local dev server and the deployed one are two entirely
 /// separate databases that never sync with each other.
 const String kApiBaseUrl = String.fromEnvironment(
   "API_BASE_URL",
-  defaultValue: "http://127.0.0.1:4000/api",
+  defaultValue: "https://hospital-web-dashboard.onrender.com/api",
 );
 
 /// Thrown for any non-2xx response. `message` is the backend's own `error`
