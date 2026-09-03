@@ -468,10 +468,10 @@ class DonorProfileView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 12, left: 14, right: 14, bottom: 8),
+          const Padding(
+            padding: EdgeInsets.only(top: 12, left: 14, right: 14, bottom: 8),
             child: Row(
-              children: const [
+              children: [
                 Icon(Icons.favorite_border_rounded, color: Color(0xFF7D1B22), size: 18),
                 SizedBox(width: 8),
                 Text(

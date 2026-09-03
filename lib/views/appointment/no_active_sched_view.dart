@@ -90,8 +90,8 @@ class NoActiveSchedView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: const [
+                  const Row(
+                    children: [
                       Icon(Icons.info_outline_rounded, color: Color(0xFF7D1B22), size: 18),
                       SizedBox(width: 8),
                       Text(

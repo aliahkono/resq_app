@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
 
 class IneligibleAppointView extends StatelessWidget {
   final bool isFirstTimeDonor;

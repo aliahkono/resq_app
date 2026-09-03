@@ -49,9 +49,9 @@ class ActiveSchedView extends StatelessWidget {
                 color: const Color(0xFFDCFCE7),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Icon(Icons.check_circle_rounded,
                       color: Color(0xFF16A34A), size: 14),
                   SizedBox(width: 6),
@@ -74,7 +74,7 @@ class ActiveSchedView extends StatelessWidget {
                 border: Border.all(color: const Color(0xFF7D1B22), width: 1.2),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 10,
                       offset: const Offset(0, 3)),
                 ],

@@ -519,9 +519,9 @@ class EligibleHomeView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
+                children: [
                   Text(
                     'Community Impact',
                     style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
@@ -539,9 +539,9 @@ class EligibleHomeView extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Column(
+                      child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text('Units Donated', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
                           SizedBox(height: 4),
                           Text('4', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
@@ -557,9 +557,9 @@ class EligibleHomeView extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Column(
+                      child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text('Lives Saved', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
                           SizedBox(height: 4),
                           Text('12', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
@@ -601,10 +601,10 @@ class EligibleHomeView extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(16),
             alignment: Alignment.bottomLeft,
-            child: Column(
+            child: const Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   'What happens to your blood?',
                   style: TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.bold),

@@ -63,9 +63,9 @@ class RegistrationSummaryView extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFBFDBFE)),
                 ),
-                child: Row(
+                child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Icon(Icons.fact_check_outlined, color: Color(0xFF1D4ED8), size: 20),
                     SizedBox(width: 10),
                     Expanded(

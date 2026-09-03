@@ -170,10 +170,10 @@ class _SettingsViewState extends State<SettingsView> {
           InkWell(
             onTap: () => Navigator.of(context).pop(),
             borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: Row(
-                children: const [
+                children: [
                   Icon(Icons.arrow_back, color: Colors.white, size: 18),
                   SizedBox(width: 4),
                   Text(
@@ -220,7 +220,7 @@ class _SettingsViewState extends State<SettingsView> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -284,7 +284,7 @@ class _SettingsViewState extends State<SettingsView> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: const Color(0xFF7D1B22),
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFD1D5DB),
@@ -351,11 +351,11 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Widget _buildVersionTile() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: const [
+        children: [
           Text(
             'App Version 2.4.0 (Up to date)',
             style: TextStyle(
@@ -379,7 +379,7 @@ class _SettingsViewState extends State<SettingsView> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -388,9 +388,9 @@ class _SettingsViewState extends State<SettingsView> {
       child: InkWell(
         onTap: () => _showSignOutDialog(context),
         borderRadius: BorderRadius.circular(16),
-        child: Row(
+        child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(Icons.logout_rounded, color: Color(0xFF1E2432), size: 20),
             SizedBox(width: 8),
             Text(

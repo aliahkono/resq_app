@@ -556,10 +556,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
                       SizedBox(height: 4),
                       Text(
@@ -861,9 +861,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               color: const Color(0xFFE2EDFE),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
                 SizedBox(width: 10),
                 Expanded(
@@ -1047,9 +1047,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               color: const Color(0xFFFEF3C7),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 20),
                 SizedBox(width: 10),
                 Expanded(
@@ -1117,9 +1117,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text('Currently Breastfeeding', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     SizedBox(height: 2),
                     Text('Toggle if nursing a child', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
@@ -1489,15 +1489,21 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF8A1E26),
           foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
           elevation: 0,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+            Flexible(
+              child: Text(
+                title,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+              ),
             ),
             const SizedBox(width: 8),
             Container(
@@ -1745,9 +1751,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
                   shape: const StadiumBorder(),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(Icons.arrow_back_rounded, size: 17, color: Color(0xFF7D1B22)),
                     SizedBox(width: 6),
                     Text('Prev', style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 13.5)),

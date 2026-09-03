@@ -382,7 +382,7 @@ class _OtpVerViewState extends State<OtpVerView> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: ResQTheme.primaryCrimson, width: 1.5),
+                  borderSide: const BorderSide(color: ResQTheme.primaryCrimson, width: 1.5),
                 ),
               ),
             ),
