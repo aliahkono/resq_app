@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 ///     computer on the same Wi-Fi, or an ngrok tunnel URL if it's remote
 /// Change this before testing against a real backend — it will not work
 /// as-is on a physical device.
-const String kApiBaseUrl = "http://10.0.2.2:4000/api";
+const String kApiBaseUrl = "https://hospital-web-dashboard.onrender.com/api";
 
 /// Thrown for any non-2xx response. `message` is the backend's own `error`
 /// field when it sent one (see server/src/utils/asyncHandler.js and every
@@ -20,6 +20,7 @@ const String kApiBaseUrl = "http://10.0.2.2:4000/api";
 class ApiException implements Exception {
   final int statusCode;
   final String message;
+
   ApiException(this.statusCode, this.message);
 
   @override

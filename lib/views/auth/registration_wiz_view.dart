@@ -6,12 +6,13 @@ import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/login_view.dart';
 import 'package:resq/views/auth/registration_summary_view.dart';
 import 'package:resq/widgets/custom_input_field.dart';
+import 'package:resq/utils/helpers/responsive.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
   final ScreenNPTModel? initialScreening;
   final String? donorName;
-  final String? bloodType;
+  final String bloodType;
   final String? donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
 
@@ -20,7 +21,7 @@ class RegistrationWizView extends StatefulWidget {
     this.isRetake = false,
     this.initialScreening,
     this.donorName,
-    this.bloodType,
+    this.bloodType = '',
     this.donorId,
     this.onRetakeCompleted,
   });
@@ -32,8 +33,6 @@ class RegistrationWizView extends StatefulWidget {
 class _RegistrationWizViewState extends State<RegistrationWizView> {
   final _formKey = GlobalKey<FormState>();
   int _currentStep = 1;
-  // Steps: 1 Account, 2 Physical Metrics, 3 Health Screening,
-  // 4 Medical History & Risk Factors, 5 Final Screening (sex-specific)
   final int _totalSteps = 5;
   bool _isLoading = false;
 
@@ -57,12 +56,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   bool _hasTattoosOrPiercings = false;
   DateTime? _tattooDate;
 
-  // Step 3: Immediate Readiness State (NEW)
+  // Step 3: Immediate Readiness State
   bool _feelsWellToday = true;
   bool _hasEatenRecently = true;
   bool _hasAlcoholPast24hr = false;
 
-  // Step 4: Medical History & Risk Factors State (NEW)
+  // Step 4: Medical History & Risk Factors State
   static const List<String> _medProcedureOptions = [
     'Antibiotics',
     'Aspirin',
@@ -76,17 +75,14 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   bool _hasTravelOrNeedleStick = false;
 
   // Step 5: Final Screening (Sex-Specific) State & Controllers
-  // Female Specific
   DateTime? _lastMensDate;
-  int _pregnancyStatusIndex = 0; // 0: Not pregnant, 1: Currently pregnant, 2: Within last 6 weeks
+  int _pregnancyStatusIndex = 0;
   bool _isBreastfeeding = false;
 
-  // Male Specific
   bool _hasStiHistory = false;
   bool _hasHighRiskContact = false;
-  int _msmHistoryIndex = 0; // 0: Never, 1: >3 mos ago, 2: Within 3 mos
+  int _msmHistoryIndex = 0;
 
-  // Shared Lifestyle / Medical
   bool _hasRecentSexualRisk = false;
   bool _hasActiveInfectOrMeds = false;
 
@@ -97,9 +93,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     super.initState();
     if (widget.isRetake && widget.initialScreening != null) {
       final initial = widget.initialScreening!.screensNPT;
-      _currentStep = 2; // Skip account creation on retake
+      _currentStep = 2;
       _nameController.text = widget.donorName ?? '';
-      _selectedBloodType = widget.bloodType ?? 'O+';
+      _selectedBloodType = widget.bloodType.isNotEmpty ? widget.bloodType : 'O+';
       _weightController.text = initial.weight > 0 ? initial.weight.toString() : '';
       _gender = initial.gender;
       _isFirstTimeDonor = initial.isFirstTimeDonor;
@@ -338,7 +334,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         lastDonationDate: _lastDonationDate,
       );
 
-      // Navigate to Summary View to allow donor review before SMS OTP verification
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => RegistrationSummaryView(
@@ -362,30 +357,35 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFF7D1B22)))
             : Column(
-          children: [
-            if (_currentStep > 1) _buildCurvedTopHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  children: [
-                    if (_currentStep == 1) _buildStep1AccountUI(),
-                    if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
-                    if (_currentStep == 3) _buildStep3HealthScreeningUI(),
-                    if (_currentStep == 4) _buildStep4MedicalHistoryUI(),
-                    if (_currentStep == 5) _buildStep5FinalScreeningUI(),
-                  ],
-                ),
+                children: [
+                  if (_currentStep > 1) _buildCurvedTopHeader(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.horizontalPadding(context),
+                        vertical: 16,
+                      ),
+                      child: ResponsiveContentArea(
+                        child: Column(
+                          children: [
+                            if (_currentStep == 1) _buildStep1AccountUI(),
+                            if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
+                            if (_currentStep == 3) _buildStep3HealthScreeningUI(),
+                            if (_currentStep == 4) _buildStep4MedicalHistoryUI(),
+                            if (_currentStep == 5) _buildStep5FinalScreeningUI(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_currentStep == 3 || _currentStep == 4)
+                    _buildStepNavRow(
+                      onPrev: _prevStep,
+                      onNext: _nextStep,
+                    ),
+                ],
               ),
-            ),
-            if (_currentStep == 3 || _currentStep == 4)
-              _buildStepNavRow(
-                onPrev: _prevStep,
-                onNext: _nextStep,
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -436,7 +436,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF7D1B22).withOpacity(0.2),
+                  color: const Color(0xFF7D1B22).withValues(alpha: 0.2),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -542,7 +542,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             decoration: BoxDecoration(
               color: const Color(0xFFFFF6F6),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEAA1A5).withOpacity(0.5)),
+              border: Border.all(color: const Color(0xFFEAA1A5).withValues(alpha: 0.5)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,7 +550,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7D1B22).withOpacity(0.1),
+                    color: const Color(0xFF7D1B22).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
@@ -899,7 +899,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// Step 3: Immediate Readiness (Health Screening) — NEW
   Widget _buildStep3HealthScreeningUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -948,7 +947,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// Step 4: Medical History & Risk Factors — NEW
   Widget _buildStep4MedicalHistoryUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1130,7 +1128,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Switch(
                   value: _isBreastfeeding,
                   onChanged: (val) => setState(() => _isBreastfeeding = val),
-                  activeColor: const Color(0xFF7D1B22),
+                  activeThumbColor: const Color(0xFF7D1B22),
                 ),
               ],
             ),
@@ -1245,7 +1243,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
             ],
           ),
           child: Column(
@@ -1513,9 +1511,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  // --- New shared widgets for Health Screening / Medical History steps ---
-
-  /// Blue info banner, matches the HIPAA-style disclosure box in the design.
   Widget _buildInfoBanner(String text) {
     return Container(
       width: double.infinity,
@@ -1540,7 +1535,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// Red icon + bold title section header, e.g. "⏱ Immediate Readiness".
   Widget _buildSectionHeader(IconData icon, String title) {
     return Row(
       children: [
@@ -1554,8 +1548,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// White card with a question (+ optional subtitle) on the left and a
-  /// compact Yes/No pill selector on the right.
   Widget _buildYesNoCard({
     required String question,
     String? subtitle,
@@ -1651,7 +1643,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// Rounded pill chip used for the "Check all that apply" medical history list.
   Widget _buildChipToggle({
     required String label,
     required bool isSelected,
@@ -1682,9 +1673,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// Decorative reassurance banner shown at the end of Medical History /
-  /// Risk Factors, matching the "Your comfort is our priority" panel.
-  /// Swap the icon container for an Image.asset(...) once you have a photo.
   Widget _buildComfortBanner() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -1704,7 +1692,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
@@ -1732,7 +1720,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  /// Fixed footer nav row with Prev / Next pill buttons, matching the design.
   Widget _buildStepNavRow({
     required VoidCallback onPrev,
     required VoidCallback onNext,
@@ -1743,7 +1730,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       decoration: BoxDecoration(
         color: const Color(0xFFF3F3F5),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2)),
         ],
       ),
       child: Row(
