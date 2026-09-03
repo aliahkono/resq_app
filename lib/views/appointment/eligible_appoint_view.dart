@@ -34,10 +34,12 @@ class EligibleAppointView extends StatefulWidget {
   // donor taps a button.
   final void Function(Map<String, dynamic> appointment) onBookingCompleted;
   // Set when arriving here from a specific broadcast/priority request (the
-  // notification bell's "accept slot", or the Home tab's Priority Request
-  // Feed "Reserve Slot") — jumps straight past hospital selection to
-  // date/time picking for that exact hospital instead of dropping the donor
-  // into a blank picker they'd have to re-find it in.
+  // notification bell's "accept slot", the Home tab's Priority Request Feed
+  // "Reserve Slot", or the Appointment tab's "Schedule New Appointment").
+  // When set, the picker is skipped entirely — the donor is responding to
+  // one specific hospital's active request, not free-browsing every
+  // partner hospital, so letting them tap a different card here would let
+  // them silently book against a hospital with no open request at all.
   final String? preselectedHospitalId;
 
   const EligibleAppointView({
@@ -204,9 +206,9 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
                   children: [
                     if (widget.isFirstTimeDonor) _buildFirstTimeBadge(),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Choose a Donation Center',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+                    Text(
+                      widget.preselectedHospitalId != null ? 'Booking With' : 'Choose a Donation Center',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
                     ),
                     const SizedBox(height: 12),
                     if (_loadingHospitals)
@@ -223,6 +225,18 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
                           'No partner hospitals are on file yet. Check back later.',
                           style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
                         ),
+                      )
+                    else if (widget.preselectedHospitalId != null)
+                      // Locked to whichever hospital's active request the
+                      // donor is responding to — no picker, so there's no
+                      // way to accidentally book against a different
+                      // hospital that has no open request at all.
+                      _buildClinicCard(
+                        _hospitals.firstWhere(
+                          (h) => h.id == widget.preselectedHospitalId,
+                          orElse: () => _hospitals.first,
+                        ),
+                        locked: true,
                       )
                     else
                       ..._hospitals.map((h) => _buildClinicCard(h)),
@@ -364,14 +378,16 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
     );
   }
 
-  Widget _buildClinicCard(_Hospital hospital) {
-    bool isSelected = _selectedHospitalId == hospital.id;
+  Widget _buildClinicCard(_Hospital hospital, {bool locked = false}) {
+    bool isSelected = locked || _selectedHospitalId == hospital.id;
     return GestureDetector(
-      onTap: () => setState(() {
-        _selectedHospitalId = hospital.id;
-        _selectedTime = null;
-        _bookingError = null;
-      }),
+      onTap: locked
+          ? null
+          : () => setState(() {
+                _selectedHospitalId = hospital.id;
+                _selectedTime = null;
+                _bookingError = null;
+              }),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),

@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
+import 'package:resq/views/home/eligible_home_view.dart' show EmergencyBloodRequest;
 
 class NoActiveSchedView extends StatelessWidget {
   final bool isFirstTimeDonor;
-  final VoidCallback onBookAppointment;
+  // The donor's only bookable appointment source: an active broadcast from
+  // the Philippine Red Cross - Quezon Chapter (see COORDINATING_HOSPITAL_NAME,
+  // donorPortal.controller.js — the backend already only ever returns PRC
+  // requests here). Null means PRC has no open request right now, so there
+  // is nothing to book against yet.
+  final EmergencyBloodRequest? activeRequest;
+  final void Function(String hospitalId) onBookAppointment;
 
   const NoActiveSchedView({
     super.key,
     required this.isFirstTimeDonor,
+    required this.activeRequest,
     required this.onBookAppointment,
   });
 
   @override
   Widget build(BuildContext context) {
+    final request = activeRequest;
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F5),
       body: SingleChildScrollView(
@@ -28,17 +37,18 @@ class NoActiveSchedView extends StatelessWidget {
                 color: const Color(0xFF9B1B20).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.event_available_rounded,
+              child: Icon(
+                request == null ? Icons.event_busy_rounded : Icons.event_available_rounded,
                 size: 48,
-                color: Color(0xFF9B1B20),
+                color: const Color(0xFF9B1B20),
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              isFirstTimeDonor
-                  ? 'Ready for Your 1st Session?'
-                  : 'No Active Appointment',
+              request == null
+                  ? 'No request from Hospitals yet.'
+                  : (isFirstTimeDonor ? 'Ready for Your 1st Session?' : 'A Blood Drive Is Open'),
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -47,9 +57,9 @@ class NoActiveSchedView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              isFirstTimeDonor
-                  ? 'You are verified and eligible to donate blood. Pick a convenient time slot at your nearest hospital or Red Cross chapter.'
-                  : 'You currently do not have any pending or confirmed blood donation bookings. Reserve a time slot anytime.',
+              request == null
+                  ? 'The Philippine Red Cross - Quezon Chapter hasn\'t posted a blood request yet. This screen updates automatically as soon as one goes out — check back later.'
+                  : 'Philippine Red Cross - Quezon Chapter is requesting ${request.bloodType} donors right now. Reserve a time slot below.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -58,26 +68,27 @@ class NoActiveSchedView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: onBookAppointment,
-                icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                label: Text(
-                  isFirstTimeDonor
-                      ? 'Book 1st Donation Appointment'
-                      : 'Schedule New Appointment',
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9B1B20),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            if (request != null)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () => onBookAppointment(request.hospitalId),
+                  icon: const Icon(Icons.calendar_month_rounded, size: 18),
+                  label: Text(
+                    isFirstTimeDonor
+                        ? 'Book 1st Donation Appointment'
+                        : 'Schedule New Appointment',
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9B1B20),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,

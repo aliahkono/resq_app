@@ -488,12 +488,18 @@ class _HomeViewState extends State<HomeView> {
           } else {
             return NoActiveSchedView(
               isFirstTimeDonor: _isFirstTime,
-              onBookAppointment: () {
+              // Backend already scopes GET /api/donor/requests to PRC-Quezon
+              // Chapter only (see COORDINATING_HOSPITAL_NAME), so the first
+              // entry in _activeRequests — if any — is the one and only
+              // bookable request. No client-side name filtering needed.
+              activeRequest: _activeRequests.isNotEmpty ? _activeRequests.first : null,
+              onBookAppointment: (hospitalId) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => EligibleAppointView(
                       isFirstTimeDonor: _isFirstTime,
                       token: widget.token,
+                      preselectedHospitalId: hospitalId,
                       onBookingCompleted: (appointment) {
                         Navigator.pop(context);
                         _handleBookingCompleted(appointment);
