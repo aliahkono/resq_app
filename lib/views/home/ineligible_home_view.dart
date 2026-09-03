@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
-import 'package:resq/views/profile/qr_pass_modal_view.dart';
 
 class IneligibleHomeView extends StatefulWidget {
   final ClassificationResult? classificationResult;
@@ -37,19 +36,6 @@ class IneligibleHomeView extends StatefulWidget {
 }
 
 class _IneligibleHomeViewState extends State<IneligibleHomeView> {
-  late final List<Map<String, dynamic>> _checklistTasks;
-
-  @override
-  void initState() {
-    super.initState();
-    _checklistTasks = [
-      {'title': 'Maintain a high-iron, protein-rich diet', 'completed': true},
-      {'title': 'Reach baseline body weight (≥ 50.0 kg)', 'completed': false},
-      {'title': 'Routine wellness & hydration check (2.5L/day)', 'completed': false},
-      {'title': 'Review deferral clearance guidelines', 'completed': false},
-    ];
-  }
-
   // Defensive, string-safe enum resolver to prevent enum-mismatch crashes
   String _getReasonTitle(EligibleStats? status) {
     if (status == null) return 'Temporary Health Deferral';
@@ -105,20 +91,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     if (s.contains('weight')) return 'Until >= 50.0 kg baseline';
     if (s.contains('maternal')) return '6 Months Postpartum';
     return '$days Days Window';
-  }
-
-  String _resolveSafetyNote(EligibleStats? status) {
-    final s = (status ?? '').toString().toLowerCase();
-    if (s.contains('tatts') || s.contains('pierce')) {
-      return 'DOH transfusion safety protocol for skin procedures.';
-    }
-    if (s.contains('weight')) {
-      return 'Required by clinical standards to prevent donor fainting or hypotension.';
-    }
-    if (s.contains('alcohol')) {
-      return 'Ensures plasma hydration and prevents adverse vasovagal reactions.';
-    }
-    return 'Clinical protocol prioritizing donor recovery and safety.';
   }
 
   String _getRecommendedAction(EligibleStats? status) {
@@ -313,26 +285,6 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 16,
-          decoration: BoxDecoration(
-            color: const Color(0xFF9B1B20),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-        ),
-      ],
     );
   }
 

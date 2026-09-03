@@ -652,8 +652,8 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: const Column(
+                const Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
