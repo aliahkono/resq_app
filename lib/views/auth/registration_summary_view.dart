@@ -124,7 +124,36 @@ class RegistrationSummaryView extends StatelessWidget {
 
               const SizedBox(height: 18),
 
-              // SECTION 4: SEX-SPECIFIC & HEALTH SCREENING DISCLOSURES
+              // SECTION 4: IMMEDIATE READINESS (Step 3 of the wizard)
+              _buildSectionHeader('Immediate Readiness'),
+              const SizedBox(height: 8),
+              _buildSummaryCard([
+                _buildDataRow('Feeling Well Today', screens.feelsWellToday ? 'Yes' : 'No'),
+                const Divider(height: 1),
+                _buildDataRow('Meal & Fluids (Last 4-6 hrs)', screens.hasEatenRecently ? 'Yes' : 'No'),
+              ]),
+
+              const SizedBox(height: 18),
+
+              // SECTION 5: MEDICAL HISTORY & RISK FACTORS (Step 4 of the wizard)
+              _buildSectionHeader('Medical History & Risk Factors'),
+              const SizedBox(height: 8),
+              _buildSummaryCard([
+                _buildDataRow(
+                  'Recent Meds / Procedures (4 wks)',
+                  screens.recentMedProcedures.isEmpty ? 'None' : screens.recentMedProcedures.join(', '),
+                ),
+                const Divider(height: 1),
+                _buildDataRow('Major Medical History', screens.hasMajorMedicalHistory ? 'Reported' : 'None'),
+                const Divider(height: 1),
+                _buildDataRow('Transfusion or Surgery (12 mos)', screens.hasTransfusionOrSurgery ? 'Yes' : 'No'),
+                const Divider(height: 1),
+                _buildDataRow('Travel or Needle Stick (12 mos)', screens.hasTravelOrNeedleStick ? 'Yes' : 'No'),
+              ]),
+
+              const SizedBox(height: 18),
+
+              // SECTION 6: SEX-SPECIFIC & HEALTH SCREENING DISCLOSURES
               _buildSectionHeader('Health & Screening Disclosures'),
               const SizedBox(height: 8),
               _buildSummaryCard([
@@ -145,7 +174,7 @@ class RegistrationSummaryView extends StatelessWidget {
 
               const SizedBox(height: 18),
 
-              // SECTION 5: INITIAL VERIFICATION STATUS BADGE
+              // SECTION 7: INITIAL VERIFICATION STATUS BADGE
               _buildSectionHeader('Preliminary Evaluation'),
               const SizedBox(height: 8),
               Container(
