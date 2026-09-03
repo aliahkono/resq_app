@@ -32,7 +32,9 @@ class RegistrationWizView extends StatefulWidget {
 class _RegistrationWizViewState extends State<RegistrationWizView> {
   final _formKey = GlobalKey<FormState>();
   int _currentStep = 1;
-  final int _totalSteps = 3;
+  // Steps: 1 Account, 2 Physical Metrics, 3 Health Screening,
+  // 4 Medical History & Risk Factors, 5 Final Screening (sex-specific)
+  final int _totalSteps = 5;
   bool _isLoading = false;
 
   // Step 1: Account Controllers & Toggles
@@ -55,7 +57,25 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   bool _hasTattoosOrPiercings = false;
   DateTime? _tattooDate;
 
-  // Step 3: Final Screening (Sex-Specific) State & Controllers
+  // Step 3: Immediate Readiness State (NEW)
+  bool _feelsWellToday = true;
+  bool _hasEatenRecently = true;
+  bool _hasAlcoholPast24hr = false;
+
+  // Step 4: Medical History & Risk Factors State (NEW)
+  static const List<String> _medProcedureOptions = [
+    'Antibiotics',
+    'Aspirin',
+    'Vaccines',
+    'Dental Work',
+    'Minor Surgery',
+  ];
+  final Set<String> _recentMedProcedures = {};
+  bool _hasMajorMedicalHistory = false;
+  bool _hasTransfusionOrSurgery = false;
+  bool _hasTravelOrNeedleStick = false;
+
+  // Step 5: Final Screening (Sex-Specific) State & Controllers
   // Female Specific
   DateTime? _lastMensDate;
   int _pregnancyStatusIndex = 0; // 0: Not pregnant, 1: Currently pregnant, 2: Within last 6 weeks
@@ -69,7 +89,6 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   // Shared Lifestyle / Medical
   bool _hasRecentSexualRisk = false;
   bool _hasActiveInfectOrMeds = false;
-  bool _hasAlcoholPast24hr = false;
 
   final List<String> _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
@@ -89,6 +108,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       _hasTattoosOrPiercings = initial.hasTattsOrPierce;
       _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
       _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
+      _feelsWellToday = initial.feelsWellToday;
+      _hasEatenRecently = initial.hasEatenRecently;
+      _recentMedProcedures.addAll(initial.recentMedProcedures);
+      _hasMajorMedicalHistory = initial.hasMajorMedicalHistory;
+      _hasTransfusionOrSurgery = initial.hasTransfusionOrSurgery;
+      _hasTravelOrNeedleStick = initial.hasTravelOrNeedleStick;
       _lastMensDate = initial.lastMensPeriodDate;
       _hasHighRiskContact = initial.hasHighRiskExpo ?? false;
       if (initial.isPregOrNursing == true) {
@@ -229,6 +254,13 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     }
   }
 
+  void _prevStep() {
+    final int floor = widget.isRetake ? 2 : 1;
+    if (_currentStep > floor) {
+      setState(() => _currentStep--);
+    }
+  }
+
   Future<void> _finishAssessment() async {
     setState(() => _isLoading = true);
 
@@ -254,9 +286,15 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       isFirstTimeDonor: _isFirstTimeDonor,
       lastDonationDate: _isFirstTimeDonor ? null : _lastDonationDate,
       totalDonations: _isFirstTimeDonor ? 0 : _totalDonations,
+      feelsWellToday: _feelsWellToday,
+      hasEatenRecently: _hasEatenRecently,
       hasTattsOrPierce: _hasTattoosOrPiercings,
       hasAlcoholPast24hr: _hasAlcoholPast24hr,
       hasActiveInfectOrMeds: _hasActiveInfectOrMeds,
+      recentMedProcedures: _recentMedProcedures,
+      hasMajorMedicalHistory: _hasMajorMedicalHistory,
+      hasTransfusionOrSurgery: _hasTransfusionOrSurgery,
+      hasTravelOrNeedleStick: _hasTravelOrNeedleStick,
       isPregOrNursing: _gender == BioSex.female ? isPregOrNursing : null,
       lastMensPeriodDate: _gender == BioSex.female ? _lastMensDate : null,
       hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,
@@ -334,11 +372,18 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   children: [
                     if (_currentStep == 1) _buildStep1AccountUI(),
                     if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
-                    if (_currentStep == 3) _buildStep3FinalScreeningUI(),
+                    if (_currentStep == 3) _buildStep3HealthScreeningUI(),
+                    if (_currentStep == 4) _buildStep4MedicalHistoryUI(),
+                    if (_currentStep == 5) _buildStep5FinalScreeningUI(),
                   ],
                 ),
               ),
             ),
+            if (_currentStep == 3 || _currentStep == 4)
+              _buildStepNavRow(
+                onPrev: _prevStep,
+                onNext: _nextStep,
+              ),
           ],
         ),
       ),
@@ -846,7 +891,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ],
         const SizedBox(height: 24),
         _buildPrimaryCTA(
-          title: 'Continue to Final Screening',
+          title: 'Continue to Health Screening',
           onTap: _nextStep,
         ),
         const SizedBox(height: 16),
@@ -854,7 +899,130 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  Widget _buildStep3FinalScreeningUI() {
+  /// Step 3: Immediate Readiness (Health Screening) — NEW
+  Widget _buildStep3HealthScreeningUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        const Center(
+          child: Text(
+            'Health Screening',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Center(
+          child: Text(
+            'Answer truthfully to ensure donor and recipient safety.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
+          ),
+        ),
+        const SizedBox(height: 18),
+        _buildInfoBanner(
+          'Your data is encrypted and handled according to medical privacy standards (HIPAA compliance). We only use this information to determine eligibility.',
+        ),
+        const SizedBox(height: 20),
+        _buildSectionHeader(Icons.access_time_filled_rounded, 'Immediate Readiness'),
+        const SizedBox(height: 12),
+        _buildYesNoCard(
+          question: 'Are you feeling well and healthy today?',
+          value: _feelsWellToday,
+          onChanged: (val) => setState(() => _feelsWellToday = val),
+        ),
+        const SizedBox(height: 10),
+        _buildYesNoCard(
+          question: 'Have you had a full meal & fluids in the last 4-6 hrs?',
+          value: _hasEatenRecently,
+          onChanged: (val) => setState(() => _hasEatenRecently = val),
+        ),
+        const SizedBox(height: 10),
+        _buildYesNoCard(
+          question: 'Have you consumed alcohol in the past 24 hours?',
+          value: _hasAlcoholPast24hr,
+          onChanged: (val) => setState(() => _hasAlcoholPast24hr = val),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  /// Step 4: Medical History & Risk Factors — NEW
+  Widget _buildStep4MedicalHistoryUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        _buildSectionHeader(Icons.assignment_rounded, 'Medical History'),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Check all that apply in the last 4 weeks:',
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _medProcedureOptions.map((option) {
+                  final isSelected = _recentMedProcedures.contains(option);
+                  return _buildChipToggle(
+                    label: option,
+                    isSelected: isSelected,
+                    onTap: () => setState(() {
+                      if (isSelected) {
+                        _recentMedProcedures.remove(option);
+                      } else {
+                        _recentMedProcedures.add(option);
+                      }
+                    }),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildYesNoCard(
+          question: 'Major Medical History',
+          subtitle: 'Heart disease, Asthma, Diabetes, etc.',
+          value: _hasMajorMedicalHistory,
+          onChanged: (val) => setState(() => _hasMajorMedicalHistory = val),
+        ),
+        const SizedBox(height: 22),
+        _buildSectionHeader(Icons.warning_rounded, 'Risk Factors'),
+        const SizedBox(height: 12),
+        _buildYesNoCard(
+          question: 'Transfusions or Surgeries?',
+          subtitle: 'In the last 12 months',
+          value: _hasTransfusionOrSurgery,
+          onChanged: (val) => setState(() => _hasTransfusionOrSurgery = val),
+        ),
+        const SizedBox(height: 10),
+        _buildYesNoCard(
+          question: 'Travel or Needle Sticks?',
+          subtitle: 'International travel or accidental sticks (12 mos)',
+          value: _hasTravelOrNeedleStick,
+          onChanged: (val) => setState(() => _hasTravelOrNeedleStick = val),
+        ),
+        const SizedBox(height: 20),
+        _buildComfortBanner(),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildStep5FinalScreeningUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1106,9 +1274,30 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           ),
         ),
         const SizedBox(height: 20),
-        _buildPrimaryCTA(
-          title: 'Review Registration Summary',
-          onTap: _nextStep,
+        Row(
+          children: [
+            SizedBox(
+              width: 56,
+              height: 50,
+              child: OutlinedButton(
+                onPressed: _prevStep,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF7D1B22)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildPrimaryCTA(
+                title: 'Review Registration Summary',
+                onTap: _nextStep,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 20),
       ],
@@ -1320,6 +1509,289 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // --- New shared widgets for Health Screening / Medical History steps ---
+
+  /// Blue info banner, matches the HIPAA-style disclosure box in the design.
+  Widget _buildInfoBanner(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2EDFE),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A), height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Red icon + bold title section header, e.g. "⏱ Immediate Readiness".
+  Widget _buildSectionHeader(IconData icon, String title) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+        ),
+      ],
+    );
+  }
+
+  /// White card with a question (+ optional subtitle) on the left and a
+  /// compact Yes/No pill selector on the right.
+  Widget _buildYesNoCard({
+    required String question,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  question,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E), height: 1.3),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          _buildCompactYesNo(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactYesNo({
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildCompactYesNoOption(label: 'Yes', isSelected: value, onTap: () => onChanged(true), isLeft: true),
+          _buildCompactYesNoOption(label: 'No', isSelected: !value, onTap: () => onChanged(false), isLeft: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactYesNoOption({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isLeft,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.horizontal(
+        left: isLeft ? const Radius.circular(9) : Radius.zero,
+        right: !isLeft ? const Radius.circular(9) : Radius.zero,
+      ),
+      child: Container(
+        width: 52,
+        height: 34,
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
+          borderRadius: BorderRadius.horizontal(
+            left: isLeft ? const Radius.circular(9) : Radius.zero,
+            right: !isLeft ? const Radius.circular(9) : Radius.zero,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.white : const Color(0xFF6B7280),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Rounded pill chip used for the "Check all that apply" medical history list.
+  Widget _buildChipToggle({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFE2E8F0),
+            width: 1.2,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF334155),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Decorative reassurance banner shown at the end of Medical History /
+  /// Risk Factors, matching the "Your comfort is our priority" panel.
+  /// Swap the icon container for an Image.asset(...) once you have a photo.
+  Widget _buildComfortBanner() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF7D1B22), Color(0xFF3A0C10)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your comfort is our priority.',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Medical professionals are on-site for any questions.',
+                    style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Fixed footer nav row with Prev / Next pill buttons, matching the design.
+  Widget _buildStepNavRow({
+    required VoidCallback onPrev,
+    required VoidCallback onNext,
+    String nextLabel = 'Next',
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F3F5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 46,
+              child: OutlinedButton(
+                onPressed: onPrev,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
+                  shape: const StadiumBorder(),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.arrow_back_rounded, size: 17, color: Color(0xFF7D1B22)),
+                    SizedBox(width: 6),
+                    Text('Prev', style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: SizedBox(
+              height: 46,
+              child: ElevatedButton(
+                onPressed: onNext,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8A1E26),
+                  shape: const StadiumBorder(),
+                  elevation: 0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(nextLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward_rounded, size: 17, color: Colors.white),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
