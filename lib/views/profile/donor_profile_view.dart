@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
+import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
@@ -326,12 +327,29 @@ class DonorProfileView extends StatelessWidget {
             width: double.infinity,
             height: 44,
             child: ElevatedButton.icon(
-              onPressed: () {
+              // The QR needs the donor's donor_code ("D-1234") — the thing
+              // Donor Management's own search actually matches on — not the
+              // raw internal id shown as `id` here. GET /api/donor/me is the
+              // only place this app has fetched donorCode from so far, so
+              // it's fetched fresh right before showing the pass rather
+              // than threading a new field through login/Home/here.
+              onPressed: () async {
+                String qrValue = id;
+                try {
+                  final profile = await ApiService.getMyProfile(token);
+                  final code = profile['donorCode'] as String?;
+                  if (code != null && code.isNotEmpty) qrValue = code;
+                } catch (_) {
+                  // Falls back to `id` below — still shows a pass, just one
+                  // that won't resolve via the scan-to-lookup link if the
+                  // fetch failed.
+                }
+                if (!context.mounted) return;
                 QrPassModalView.show(
                   context,
                   donorName: name,
                   bloodType: bType,
-                  donorId: id,
+                  donorId: qrValue,
                   isEligible: isEligible,
                 );
               },

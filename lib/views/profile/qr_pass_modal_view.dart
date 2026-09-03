@@ -168,13 +168,14 @@ class QrPassModalView extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      // Encodes the donor's real donor_code (e.g. "D-4321") —
-                      // the same value Donor Management's search bar already
-                      // matches on server-side (donor_code ILIKE, see
-                      // donors.controller.js), so any generic QR scanner (or
-                      // a triage staffer just reading it off-screen) can look
-                      // this donor up immediately without a dedicated
-                      // in-app scanner having to exist yet.
+                      // A plain code (e.g. "D-4321") just makes a phone's
+                      // camera offer to *search the web* for it — nothing to
+                      // scan to. Encoding a real link to that donor's record
+                      // in Donor Management's Walk-in lookup (pre-filled and
+                      // auto-searched via the `checkin` query param — see
+                      // DonorManagement.jsx) means scanning it actually opens
+                      // something useful, as long as the staffer scanning is
+                      // already logged into the dashboard on that device.
                       Opacity(
                         opacity: isEligible ? 1 : 0.5,
                         child: donorId.trim().isEmpty
@@ -186,7 +187,7 @@ class QrPassModalView extends StatelessWidget {
                                 ),
                               )
                             : QrImageView(
-                                data: donorId,
+                                data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(donorId)}',
                                 version: QrVersions.auto,
                                 size: 190,
                                 backgroundColor: Colors.white,
