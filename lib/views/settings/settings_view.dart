@@ -85,18 +85,24 @@ class _SettingsViewState extends State<SettingsView> {
     _loadLocalPrefs();
   }
 
-  /// Restores toggles that have no backend field yet (biometric login,
-  /// location services, alert radius) from on-device storage, so they
-  /// reflect what the donor last set instead of always resetting to their
-  /// hardcoded defaults on every re-login.
+  /// Restores toggles that have no backend field yet from on-device storage.
+  /// Location services / alert radius persist per donor across logins.
+  /// Biometric login is intentionally session-scoped, not donor-scoped (see
+  /// SessionStorage.isBiometricEnabled) — off by default on every fresh
+  /// login, has to be explicitly re-enabled, rather than silently carrying
+  /// over from whoever last used this device.
   Future<void> _loadLocalPrefs() async {
-    if (widget.donorId.isEmpty) return;
-    final biometric = await LocalPrefs.getBool(widget.donorId, 'biometricLogin');
+    final biometric = await SessionStorage.isBiometricEnabled();
+    if (widget.donorId.isEmpty) {
+      if (!mounted) return;
+      setState(() => _biometricLogin = biometric);
+      return;
+    }
     final location = await LocalPrefs.getBool(widget.donorId, 'locationServices');
     final radius = await LocalPrefs.getString(widget.donorId, 'alertRadius');
     if (!mounted) return;
     setState(() {
-      if (biometric != null) _biometricLogin = biometric;
+      _biometricLogin = biometric;
       if (location != null) _locationServices = location;
       if (radius != null) _selectedRadius = radius;
     });
@@ -200,7 +206,7 @@ class _SettingsViewState extends State<SettingsView> {
                         value: _biometricLogin,
                         onChanged: (val) {
                           setState(() => _biometricLogin = val);
-                          LocalPrefs.setBool(widget.donorId, 'biometricLogin', val);
+                          SessionStorage.setBiometricEnabled(val);
                         },
                       ),
                     ]),

@@ -164,6 +164,19 @@ class _LoginViewState extends State<LoginView> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  // Only show the biometric shortcut when the donor whose session is
+  // currently saved on this device explicitly turned it on from Settings —
+  // see SessionStorage.isBiometricEnabled. Off (and hidden) by default.
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SessionStorage.isBiometricEnabled().then((enabled) {
+      if (!mounted) return;
+      setState(() => _biometricAvailable = enabled);
+    });
+  }
 
   // --- MOCK REGISTERED ACCOUNTS LIST REMOVED ---
 
@@ -751,18 +764,21 @@ class _LoginViewState extends State<LoginView> {
                     ),
                   ),
 
-                  const SizedBox(height: 18),
-
-                  // Quick Biometric Icon Button (Device Fingerprint / PIN)
-                  IconButton(
-                    icon: const Icon(
-                      Icons.fingerprint_rounded,
-                      size: 34,
-                      color: Color(0xFF9B1B20),
+                  if (_biometricAvailable) ...[
+                    const SizedBox(height: 18),
+                    // Quick Biometric Icon Button (Device Fingerprint / PIN)
+                    // — only shown once a donor has explicitly turned this
+                    // on for their account from Settings.
+                    IconButton(
+                      icon: const Icon(
+                        Icons.fingerprint_rounded,
+                        size: 34,
+                        color: Color(0xFF9B1B20),
+                      ),
+                      onPressed: _handleDeviceBiometricAuth,
+                      tooltip: 'Sign in with Fingerprint / PIN',
                     ),
-                    onPressed: _handleDeviceBiometricAuth,
-                    tooltip: 'Sign in with Fingerprint / PIN',
-                  ),
+                  ],
 
                   const SizedBox(height: 10),
 
