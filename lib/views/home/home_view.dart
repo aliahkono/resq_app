@@ -48,7 +48,7 @@ class HomeView extends StatefulWidget {
   State<HomeView> createState() => _HomeViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   int _currentTabIndex = 0;
   ClassificationResult _effectiveResult = ClassificationResult(status: EligibleStats.deferredWeight);
   ScreenNPTModel? _currentScreeningModel;
@@ -61,6 +61,7 @@ class _HomeViewState extends State<HomeView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentScreeningModel = widget.screeningModel;
 
     try {
@@ -86,6 +87,28 @@ class _HomeViewState extends State<HomeView> {
     NotificationService().refresh(widget.token);
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // The app has no push/WebSocket channel of its own (see
+  // COORDINATING_HOSPITAL_NAME's donor-side counterpart, the realtime hub,
+  // which only pushes to the *admin* dashboard) — so a check-in a hospital
+  // staffer records by scanning this donor's QR pass (donors.controller.js's
+  // completeAppointment) has no way to reach this screen instantly. Instead,
+  // re-checking whenever the app comes back to the foreground means the
+  // donor's own screen "closes" that appointment on its own the next time
+  // they glance at their phone, without needing a manual pull-to-refresh.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadCurrentAppointment();
+      _loadOpenRequests();
+    }
+  }
+
   /// GET /api/donor/appointments — populates _confirmedAppointment from
   /// whatever the donor actually has booked server-side, instead of always
   /// starting this screen with "no appointment" until the app fabricates
@@ -104,8 +127,13 @@ class _HomeViewState extends State<HomeView> {
             (a) => a['status'] == 'pending' || a['status'] == 'confirmed',
             orElse: () => const {},
           );
-      if (active.isEmpty || !mounted) return;
-      setState(() => _confirmedAppointment = _toConfirmedAppointment(active));
+      if (!mounted) return;
+      // Explicitly cleared (not just left alone) when nothing active comes
+      // back — otherwise an appointment that just got checked in/completed
+      // server-side would keep showing as "confirmed" on this screen
+      // forever, since this used to only ever set _confirmedAppointment,
+      // never unset it.
+      setState(() => _confirmedAppointment = active.isEmpty ? null : _toConfirmedAppointment(active));
     } catch (_) {
       // See method comment — intentionally silent.
     }
