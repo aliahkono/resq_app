@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 
 class QrPassModalView extends StatelessWidget {
@@ -167,12 +168,34 @@ class QrPassModalView extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 190,
-                        color: isEligible
-                            ? ResQTheme.textDark
-                            : ResQTheme.textMuted.withValues(alpha: 0.6),
+                      // Encodes the donor's real donor_code (e.g. "D-4321") —
+                      // the same value Donor Management's search bar already
+                      // matches on server-side (donor_code ILIKE, see
+                      // donors.controller.js), so any generic QR scanner (or
+                      // a triage staffer just reading it off-screen) can look
+                      // this donor up immediately without a dedicated
+                      // in-app scanner having to exist yet.
+                      Opacity(
+                        opacity: isEligible ? 1 : 0.5,
+                        child: donorId.trim().isEmpty
+                            ? const SizedBox(
+                                width: 190,
+                                height: 190,
+                                child: Center(
+                                  child: Icon(Icons.qr_code_2_rounded, size: 96, color: ResQTheme.textMuted),
+                                ),
+                              )
+                            : QrImageView(
+                                data: donorId,
+                                version: QrVersions.auto,
+                                size: 190,
+                                backgroundColor: Colors.white,
+                                eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1E1E1E)),
+                                dataModuleStyle: const QrDataModuleStyle(
+                                  dataModuleShape: QrDataModuleShape.square,
+                                  color: Color(0xFF1E1E1E),
+                                ),
+                              ),
                       ),
                       const SizedBox(height: 8),
                       Text(
