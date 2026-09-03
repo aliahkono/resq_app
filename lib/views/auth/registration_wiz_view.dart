@@ -2,28 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:resq/model/donor_profile_model.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/user_model.dart';
+import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/login_view.dart';
 import 'package:resq/views/auth/registration_summary_view.dart';
 import 'package:resq/widgets/custom_input_field.dart';
-import 'package:resq/utils/helpers/responsive.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
   final ScreenNPTModel? initialScreening;
   final String? donorName;
-  final String bloodType;
+  final String? bloodType;
   final String? donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
+  final String token;
 
   const RegistrationWizView({
     super.key,
     this.isRetake = false,
     this.initialScreening,
     this.donorName,
-    this.bloodType = '',
+    this.bloodType,
     this.donorId,
     this.onRetakeCompleted,
+    this.token = '',
   });
 
   @override
@@ -33,10 +35,9 @@ class RegistrationWizView extends StatefulWidget {
 class _RegistrationWizViewState extends State<RegistrationWizView> {
   final _formKey = GlobalKey<FormState>();
   int _currentStep = 1;
-  final int _totalSteps = 5;
+  final int _totalSteps = 3;
   bool _isLoading = false;
 
-  // Step 1: Account Controllers & Toggles
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -45,36 +46,18 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  // Step 2: Physical Metrics State & Controllers
   String _selectedBloodType = 'O+';
   DateTime? _dob;
   BioSex _gender = BioSex.male;
   final _weightController = TextEditingController();
+  final _ageController = TextEditingController();
   DateTime? _lastDonationDate;
   bool _isFirstTimeDonor = false;
   int _totalDonations = 0;
   bool _hasTattoosOrPiercings = false;
   DateTime? _tattooDate;
+  int? _prefilledAge;
 
-  // Step 3: Immediate Readiness State
-  bool _feelsWellToday = true;
-  bool _hasEatenRecently = true;
-  bool _hasAlcoholPast24hr = false;
-
-  // Step 4: Medical History & Risk Factors State
-  static const List<String> _medProcedureOptions = [
-    'Antibiotics',
-    'Aspirin',
-    'Vaccines',
-    'Dental Work',
-    'Minor Surgery',
-  ];
-  final Set<String> _recentMedProcedures = {};
-  bool _hasMajorMedicalHistory = false;
-  bool _hasTransfusionOrSurgery = false;
-  bool _hasTravelOrNeedleStick = false;
-
-  // Step 5: Final Screening (Sex-Specific) State & Controllers
   DateTime? _lastMensDate;
   int _pregnancyStatusIndex = 0;
   bool _isBreastfeeding = false;
@@ -85,36 +68,36 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
   bool _hasRecentSexualRisk = false;
   bool _hasActiveInfectOrMeds = false;
+  bool _hasAlcoholPast24hr = false;
 
   final List<String> _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
   @override
   void initState() {
     super.initState();
-    if (widget.isRetake && widget.initialScreening != null) {
-      final initial = widget.initialScreening!.screensNPT;
+    if (widget.isRetake) {
       _currentStep = 2;
       _nameController.text = widget.donorName ?? '';
-      _selectedBloodType = widget.bloodType.isNotEmpty ? widget.bloodType : 'O+';
-      _weightController.text = initial.weight > 0 ? initial.weight.toString() : '';
-      _gender = initial.gender;
-      _isFirstTimeDonor = initial.isFirstTimeDonor;
-      _lastDonationDate = initial.lastDonationDate;
-      _totalDonations = initial.totalDonations;
-      _hasTattoosOrPiercings = initial.hasTattsOrPierce;
-      _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
-      _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
-      _feelsWellToday = initial.feelsWellToday;
-      _hasEatenRecently = initial.hasEatenRecently;
-      _recentMedProcedures.addAll(initial.recentMedProcedures);
-      _hasMajorMedicalHistory = initial.hasMajorMedicalHistory;
-      _hasTransfusionOrSurgery = initial.hasTransfusionOrSurgery;
-      _hasTravelOrNeedleStick = initial.hasTravelOrNeedleStick;
-      _lastMensDate = initial.lastMensPeriodDate;
-      _hasHighRiskContact = initial.hasHighRiskExpo ?? false;
-      if (initial.isPregOrNursing == true) {
-        _pregnancyStatusIndex = 1;
-        _isBreastfeeding = true;
+      _selectedBloodType = widget.bloodType ?? 'O+';
+      if (widget.initialScreening != null) {
+        final initial = widget.initialScreening!.screensNPT;
+        _weightController.text = initial.weight > 0 ? initial.weight.toString() : '';
+        _gender = initial.gender;
+        _isFirstTimeDonor = initial.isFirstTimeDonor;
+        _lastDonationDate = initial.lastDonationDate;
+        _totalDonations = initial.totalDonations;
+        _hasTattoosOrPiercings = initial.hasTattsOrPierce;
+        _tattooDate = initial.tattooDate;
+        _prefilledAge = initial.age > 0 ? initial.age : null;
+        _ageController.text = _prefilledAge?.toString() ?? '';
+        _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
+        _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
+        _lastMensDate = initial.lastMensPeriodDate;
+        _hasHighRiskContact = initial.hasHighRiskExpo ?? false;
+        if (initial.isPregOrNursing == true) {
+          _pregnancyStatusIndex = 1;
+          _isBreastfeeding = true;
+        }
       }
     }
   }
@@ -127,6 +110,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _weightController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -151,7 +135,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF7D1B22),
+              primary: Color(0xFF9B1B20),
               onPrimary: Colors.white,
               onSurface: Color(0xFF1E1E1E),
             ),
@@ -178,7 +162,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
             'Lifetime Donation History',
-            style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(color: Color(0xFF9B1B20), fontWeight: FontWeight.bold, fontSize: 16),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -215,7 +199,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
               child: const Text('Save', style: TextStyle(color: Colors.white)),
             ),
           ],
@@ -250,26 +234,22 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     }
   }
 
-  void _prevStep() {
-    final int floor = widget.isRetake ? 2 : 1;
-    if (_currentStep > floor) {
-      setState(() => _currentStep--);
-    }
-  }
-
   Future<void> _finishAssessment() async {
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
     final double weight = double.tryParse(_weightController.text.trim()) ?? 52.0;
-    int calculatedAge = 22;
-    if (_dob != null) {
+    int calculatedAge;
+    if (widget.isRetake) {
+      final editedAge = int.tryParse(_ageController.text.trim());
+      calculatedAge = (editedAge != null && editedAge > 0) ? editedAge : (_prefilledAge ?? 22);
+    } else if (_dob != null) {
       final now = DateTime.now();
       calculatedAge = now.year - _dob!.year;
       if (now.month < _dob!.month || (now.month == _dob!.month && now.day < _dob!.day)) {
         calculatedAge--;
       }
+    } else {
+      calculatedAge = 22;
     }
 
     final bool isPregOrNursing = _gender == BioSex.female && (_pregnancyStatusIndex != 0 || _isBreastfeeding);
@@ -282,15 +262,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       isFirstTimeDonor: _isFirstTimeDonor,
       lastDonationDate: _isFirstTimeDonor ? null : _lastDonationDate,
       totalDonations: _isFirstTimeDonor ? 0 : _totalDonations,
-      feelsWellToday: _feelsWellToday,
-      hasEatenRecently: _hasEatenRecently,
       hasTattsOrPierce: _hasTattoosOrPiercings,
+      tattooDate: _hasTattoosOrPiercings ? _tattooDate : null,
       hasAlcoholPast24hr: _hasAlcoholPast24hr,
       hasActiveInfectOrMeds: _hasActiveInfectOrMeds,
-      recentMedProcedures: _recentMedProcedures,
-      hasMajorMedicalHistory: _hasMajorMedicalHistory,
-      hasTransfusionOrSurgery: _hasTransfusionOrSurgery,
-      hasTravelOrNeedleStick: _hasTravelOrNeedleStick,
       isPregOrNursing: _gender == BioSex.female ? isPregOrNursing : null,
       lastMensPeriodDate: _gender == BioSex.female ? _lastMensDate : null,
       hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,
@@ -308,13 +283,57 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
     final ClassificationResult result = finalModel.evaluateEligibility();
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
     if (widget.isRetake) {
+      try {
+        await ApiService.updateMyProfile(widget.token, {
+          'age': calculatedAge,
+          'weightKg': weight,
+          'gender': _gender.name,
+          'healthScreening': {
+            'isFirstTimeDonor': evaluatedParams.isFirstTimeDonor,
+            'lastDonationDate': evaluatedParams.lastDonationDate?.toIso8601String(),
+            'totalDonations': evaluatedParams.totalDonations,
+            'hasTattsOrPierce': evaluatedParams.hasTattsOrPierce,
+            'tattooDate': evaluatedParams.tattooDate?.toIso8601String(),
+            'hasAlcoholPast24hr': evaluatedParams.hasAlcoholPast24hr,
+            'hasActiveInfectOrMeds': evaluatedParams.hasActiveInfectOrMeds,
+            'isPregOrNursing': evaluatedParams.isPregOrNursing,
+            'lastMensPeriodDate': evaluatedParams.lastMensPeriodDate?.toIso8601String(),
+            'hasHighRiskExpo': evaluatedParams.hasHighRiskExpo,
+            'classificationStatus': result.status.name,
+          },
+        });
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save your updated screening: ${e.message}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not reach the ResQ server. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       widget.onRetakeCompleted?.call(finalModel, result);
       Navigator.pop(context);
     } else {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
       final UserModel newUser = UserModel(
         id: activeUserId,
         email: _emailController.text.trim(),
@@ -355,37 +374,25 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       backgroundColor: const Color(0xFFF3F3F5),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF7D1B22)))
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF9B1B20)))
             : Column(
-                children: [
-                  if (_currentStep > 1) _buildCurvedTopHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: Responsive.horizontalPadding(context),
-                        vertical: 16,
-                      ),
-                      child: ResponsiveContentArea(
-                        child: Column(
-                          children: [
-                            if (_currentStep == 1) _buildStep1AccountUI(),
-                            if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
-                            if (_currentStep == 3) _buildStep3HealthScreeningUI(),
-                            if (_currentStep == 4) _buildStep4MedicalHistoryUI(),
-                            if (_currentStep == 5) _buildStep5FinalScreeningUI(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_currentStep == 3 || _currentStep == 4)
-                    _buildStepNavRow(
-                      onPrev: _prevStep,
-                      onNext: _nextStep,
-                    ),
-                ],
+          children: [
+            if (_currentStep > 1) _buildCurvedTopHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  children: [
+                    if (_currentStep == 1) _buildStep1AccountUI(),
+                    if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
+                    if (_currentStep == 3) _buildStep3FinalScreeningUI(),
+                  ],
+                ),
               ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -395,7 +402,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       width: double.infinity,
       padding: const EdgeInsets.only(top: 14, bottom: 22, left: 18, right: 18),
       decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
+        color: Color(0xFF9B1B20),
         borderRadius: BorderRadius.vertical(bottom: Radius.elliptical(240, 30)),
       ),
       child: Row(
@@ -432,11 +439,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              color: const Color(0xFF7D1B22),
+              color: const Color(0xFF9B1B20),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF7D1B22).withValues(alpha: 0.2),
+                  color: const Color(0xFF9B1B20).withValues(alpha: 0.2),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -493,7 +500,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_rounded, size: 16, color: Color(0xFF7D1B22)),
+              const Icon(Icons.info_rounded, size: 16, color: Color(0xFF9B1B20)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -550,17 +557,17 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7D1B22).withValues(alpha: 0.1),
+                    color: const Color(0xFF9B1B20).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
+                  child: const Icon(Icons.shield_rounded, color: Color(0xFF9B1B20), size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
+                    children: const [
+                      Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF9B1B20))),
                       SizedBox(height: 4),
                       Text(
                         'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
@@ -584,7 +591,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                     MaterialPageRoute(builder: (context) => const LoginView()),
                   );
                 },
-                child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+                child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
               ),
             ],
           ),
@@ -629,7 +636,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
+          borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2),
         ),
       ),
     );
@@ -677,9 +684,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
+                  color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF7D1B22), width: 1.4),
+                  border: Border.all(color: const Color(0xFF9B1B20), width: 1.4),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -687,7 +694,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : const Color(0xFF7D1B22),
+                    color: isSelected ? Colors.white : const Color(0xFF9B1B20),
                   ),
                 ),
               ),
@@ -701,8 +708,8 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           child: OutlinedButton(
             onPressed: () => setState(() => _selectedBloodType = "I'm not sure"),
             style: OutlinedButton.styleFrom(
-              backgroundColor: _selectedBloodType == "I'm not sure" ? const Color(0xFF7D1B22) : Colors.white,
-              side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
+              backgroundColor: _selectedBloodType == "I'm not sure" ? const Color(0xFF9B1B20) : Colors.white,
+              side: const BorderSide(color: Color(0xFF9B1B20), width: 1.4),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
@@ -710,24 +717,35 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: _selectedBloodType == "I'm not sure" ? Colors.white : const Color(0xFF7D1B22),
+                color: _selectedBloodType == "I'm not sure" ? Colors.white : const Color(0xFF9B1B20),
               ),
             ),
           ),
         ),
         const SizedBox(height: 18),
-        const Text('Date of Birth', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        _buildCrimsonDateButton(
-          title: _dob != null ? _formatDate(_dob) : 'Date Picker',
-          onTap: () => _pickDate(
-            context: context,
-            initialDate: DateTime(2002),
-            firstDate: DateTime(1940),
-            lastDate: DateTime.now(),
-            onPicked: (d) => _dob = d,
+        if (!widget.isRetake) ...[
+          const Text('Date of Birth', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _buildCrimsonDateButton(
+            title: _dob != null ? _formatDate(_dob) : 'Date Picker',
+            onTap: () => _pickDate(
+              context: context,
+              initialDate: DateTime(2002),
+              firstDate: DateTime(1940),
+              lastDate: DateTime.now(),
+              onPicked: (d) => _dob = d,
+            ),
           ),
-        ),
+        ] else ...[
+          const Text('Age', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _buildBorderedInput(
+            controller: _ageController,
+            hintText: 'Enter your age',
+            icon: Icons.cake_outlined,
+            keyboardType: TextInputType.number,
+          ),
+        ],
         const SizedBox(height: 16),
         const Text('Biological Sex', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
@@ -827,7 +845,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 width: 20,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: _isFirstTimeDonor ? const Color(0xFF7D1B22) : Colors.white,
+                  color: _isFirstTimeDonor ? const Color(0xFF9B1B20) : Colors.white,
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                 ),
@@ -861,9 +879,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               color: const Color(0xFFE2EDFE),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: const [
                 Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
                 SizedBox(width: 10),
                 Expanded(
@@ -891,7 +909,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ],
         const SizedBox(height: 24),
         _buildPrimaryCTA(
-          title: 'Continue to Health Screening',
+          title: 'Continue to Final Screening',
           onTap: _nextStep,
         ),
         const SizedBox(height: 16),
@@ -899,128 +917,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
-  Widget _buildStep3HealthScreeningUI() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        const Center(
-          child: Text(
-            'Health Screening',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Center(
-          child: Text(
-            'Answer truthfully to ensure donor and recipient safety.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
-          ),
-        ),
-        const SizedBox(height: 18),
-        _buildInfoBanner(
-          'Your data is encrypted and handled according to medical privacy standards (HIPAA compliance). We only use this information to determine eligibility.',
-        ),
-        const SizedBox(height: 20),
-        _buildSectionHeader(Icons.access_time_filled_rounded, 'Immediate Readiness'),
-        const SizedBox(height: 12),
-        _buildYesNoCard(
-          question: 'Are you feeling well and healthy today?',
-          value: _feelsWellToday,
-          onChanged: (val) => setState(() => _feelsWellToday = val),
-        ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Have you had a full meal & fluids in the last 4-6 hrs?',
-          value: _hasEatenRecently,
-          onChanged: (val) => setState(() => _hasEatenRecently = val),
-        ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Have you consumed alcohol in the past 24 hours?',
-          value: _hasAlcoholPast24hr,
-          onChanged: (val) => setState(() => _hasAlcoholPast24hr = val),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildStep4MedicalHistoryUI() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        _buildSectionHeader(Icons.assignment_rounded, 'Medical History'),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Check all that apply in the last 4 weeks:',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _medProcedureOptions.map((option) {
-                  final isSelected = _recentMedProcedures.contains(option);
-                  return _buildChipToggle(
-                    label: option,
-                    isSelected: isSelected,
-                    onTap: () => setState(() {
-                      if (isSelected) {
-                        _recentMedProcedures.remove(option);
-                      } else {
-                        _recentMedProcedures.add(option);
-                      }
-                    }),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Major Medical History',
-          subtitle: 'Heart disease, Asthma, Diabetes, etc.',
-          value: _hasMajorMedicalHistory,
-          onChanged: (val) => setState(() => _hasMajorMedicalHistory = val),
-        ),
-        const SizedBox(height: 22),
-        _buildSectionHeader(Icons.warning_rounded, 'Risk Factors'),
-        const SizedBox(height: 12),
-        _buildYesNoCard(
-          question: 'Transfusions or Surgeries?',
-          subtitle: 'In the last 12 months',
-          value: _hasTransfusionOrSurgery,
-          onChanged: (val) => setState(() => _hasTransfusionOrSurgery = val),
-        ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Travel or Needle Sticks?',
-          subtitle: 'International travel or accidental sticks (12 mos)',
-          value: _hasTravelOrNeedleStick,
-          onChanged: (val) => setState(() => _hasTravelOrNeedleStick = val),
-        ),
-        const SizedBox(height: 20),
-        _buildComfortBanner(),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildStep5FinalScreeningUI() {
+  Widget _buildStep3FinalScreeningUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1047,9 +944,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               color: const Color(0xFFFEF3C7),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: const [
                 Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 20),
                 SizedBox(width: 10),
                 Expanded(
@@ -1117,9 +1014,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children: const [
                     Text('Currently Breastfeeding', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     SizedBox(height: 2),
                     Text('Toggle if nursing a child', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
@@ -1128,7 +1025,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Switch(
                   value: _isBreastfeeding,
                   onChanged: (val) => setState(() => _isBreastfeeding = val),
-                  activeThumbColor: const Color(0xFF7D1B22),
+                  activeThumbColor: const Color(0xFF9B1B20),
                 ),
               ],
             ),
@@ -1219,7 +1116,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 Checkbox(
                   value: _hasRecentSexualRisk,
                   onChanged: (val) => setState(() => _hasRecentSexualRisk = val ?? false),
-                  activeColor: const Color(0xFF7D1B22),
+                  activeColor: const Color(0xFF9B1B20),
                 ),
                 const SizedBox(width: 4),
                 const Expanded(
@@ -1272,30 +1169,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           ),
         ),
         const SizedBox(height: 20),
-        Row(
-          children: [
-            SizedBox(
-              width: 56,
-              height: 50,
-              child: OutlinedButton(
-                onPressed: _prevStep,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  padding: EdgeInsets.zero,
-                ),
-                child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF7D1B22)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildPrimaryCTA(
-                title: 'Review Registration Summary',
-                onTap: _nextStep,
-              ),
-            ),
-          ],
+        _buildPrimaryCTA(
+          title: 'Review Registration Summary',
+          onTap: _nextStep,
         ),
         const SizedBox(height: 20),
       ],
@@ -1325,7 +1201,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         fillColor: Colors.white,
         hintText: hintText,
         hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.normal),
-        prefixIcon: Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        prefixIcon: Icon(icon, color: const Color(0xFF9B1B20), size: 20),
         suffixIcon: suffixIcon,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1333,7 +1209,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
+          borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1354,7 +1230,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFF8A1E26),
+          color: const Color(0xFF9B1B20),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -1386,7 +1262,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
+            color: isSelected ? const Color(0xFF9B1B20) : Colors.transparent,
             width: 1.4,
           ),
         ),
@@ -1394,7 +1270,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           children: [
             Icon(
               isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
-              color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFF64748B),
+              color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFF64748B),
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -1423,7 +1299,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
+            color: isSelected ? const Color(0xFF9B1B20) : Colors.transparent,
             width: 1.4,
           ),
         ),
@@ -1433,7 +1309,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               width: 16,
               height: 16,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF8A1E26) : Colors.white,
+                color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF94A3B8), width: 1.5),
               ),
@@ -1457,10 +1333,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       child: Container(
         height: 44,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : Colors.white,
+          color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFCBD5E1),
+            color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFFCBD5E1),
             width: 1.2,
           ),
         ),
@@ -1487,7 +1363,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF8A1E26),
+          backgroundColor: const Color(0xFF9B1B20),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
@@ -1509,282 +1385,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF8A1E26), size: 14),
+              child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF9B1B20), size: 14),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoBanner(String text) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE2EDFE),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A), height: 1.35),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(IconData icon, String title) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFF7D1B22), size: 20),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildYesNoCard({
-    required String question,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  question,
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E), height: 1.3),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _buildCompactYesNo(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactYesNo({
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildCompactYesNoOption(label: 'Yes', isSelected: value, onTap: () => onChanged(true), isLeft: true),
-          _buildCompactYesNoOption(label: 'No', isSelected: !value, onTap: () => onChanged(false), isLeft: false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactYesNoOption({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isLeft,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.horizontal(
-        left: isLeft ? const Radius.circular(9) : Radius.zero,
-        right: !isLeft ? const Radius.circular(9) : Radius.zero,
-      ),
-      child: Container(
-        width: 52,
-        height: 34,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
-          borderRadius: BorderRadius.horizontal(
-            left: isLeft ? const Radius.circular(9) : Radius.zero,
-            right: !isLeft ? const Radius.circular(9) : Radius.zero,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : const Color(0xFF6B7280),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChipToggle({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFE2E8F0),
-            width: 1.2,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF334155),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildComfortBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF7D1B22), Color(0xFF3A0C10)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your comfort is our priority.',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Medical professionals are on-site for any questions.',
-                    style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepNavRow({
-    required VoidCallback onPrev,
-    required VoidCallback onNext,
-    String nextLabel = 'Next',
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F3F5),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SizedBox(
-              height: 46,
-              child: OutlinedButton(
-                onPressed: onPrev,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.arrow_back_rounded, size: 17, color: Color(0xFF7D1B22)),
-                    SizedBox(width: 6),
-                    Text('Prev', style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: SizedBox(
-              height: 46,
-              child: ElevatedButton(
-                onPressed: onNext,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8A1E26),
-                  shape: const StadiumBorder(),
-                  elevation: 0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(nextLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5)),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.arrow_forward_rounded, size: 17, color: Colors.white),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

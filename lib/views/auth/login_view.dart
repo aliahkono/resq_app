@@ -4,11 +4,13 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/home/home_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
+import 'package:resq/services/eligibility_service.dart';
 
 // =============================================================================
 // AUTH RESULT MODELS — kept local to this file (small, only used here and
@@ -23,6 +25,24 @@ class DonorProfileData {
   final String bloodType;
   final bool isEligible;
   final String? token; // JWT/Session token
+  final String phone;
+  final String email;
+  // Full decision-tree result re-derived from the donor's saved screening
+  // answers (see eligibility_service.dart) — null when there isn't enough
+  // saved screening data to evaluate (e.g. an admin-created walk-in donor).
+  // When present, this is what should actually drive the Eligible/
+  // Ineligible home screen, not the plain `isEligible` bool above, which
+  // only reflects the backend's much cruder "90 days since last donation"
+  // check.
+  final ClassificationResult? classificationResult;
+  // The donor's actual current screening answers (weight, age, gender,
+  // tattoos, alcohol, etc.), reconstructed from the same GET /api/donor/me
+  // response — without this, HomeView.screeningModel stayed null for any
+  // donor who just logged in normally (as opposed to just finishing
+  // registration in the same session), and the retake-screening wizard
+  // would silently fall back to its "create your account" Step 1 instead
+  // of pre-filling and jumping to the actual screening steps.
+  final ScreenNPTModel? screeningModel;
 
   DonorProfileData({
     required this.id,
@@ -30,6 +50,10 @@ class DonorProfileData {
     required this.bloodType,
     required this.isEligible,
     this.token,
+    this.phone = '',
+    this.email = '',
+    this.classificationResult,
+    this.screeningModel,
   });
 }
 
@@ -69,6 +93,10 @@ class AuthService {
           bloodType: profile['bloodType'] as String,
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
+          phone: (profile['phone'] as String?) ?? '',
+          email: (profile['email'] as String?) ?? '',
+          classificationResult: classifyDonorFromProfile(profile),
+          screeningModel: buildScreeningModelFromProfile(profile),
         ),
       );
     } on ApiException catch (e) {
@@ -99,6 +127,10 @@ class AuthService {
           bloodType: profile['bloodType'] as String,
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
+          phone: (profile['phone'] as String?) ?? '',
+          email: (profile['email'] as String?) ?? '',
+          classificationResult: classifyDonorFromProfile(profile),
+          screeningModel: buildScreeningModelFromProfile(profile),
         ),
       );
     } on ApiException catch (e) {
@@ -132,6 +164,19 @@ class _LoginViewState extends State<LoginView> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  // Only show the biometric shortcut when the donor whose session is
+  // currently saved on this device explicitly turned it on from Settings —
+  // see SessionStorage.isBiometricEnabled. Off (and hidden) by default.
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SessionStorage.isBiometricEnabled().then((enabled) {
+      if (!mounted) return;
+      setState(() => _biometricAvailable = enabled);
+    });
+  }
 
   // --- MOCK REGISTERED ACCOUNTS LIST REMOVED ---
 
@@ -210,6 +255,11 @@ class _LoginViewState extends State<LoginView> {
           bloodType: data.bloodType,
           donorId: data.id,
           isEligible: data.isEligible,
+          phoneNum: data.phone,
+          donorEmail: data.email,
+          classificationResult: data.classificationResult,
+          screeningModel: data.screeningModel,
+          token: data.token ?? '',
         );
       } else {
         // Failure path returned by DB (e.g., 401, 404)
@@ -282,6 +332,11 @@ class _LoginViewState extends State<LoginView> {
           bloodType: data.bloodType,
           donorId: data.id,
           isEligible: data.isEligible,
+          phoneNum: data.phone,
+          donorEmail: data.email,
+          classificationResult: data.classificationResult,
+          screeningModel: data.screeningModel,
+          token: data.token ?? '',
         );
       } else {
         // Token was invalid, expired, or biometrics revoked on backend
@@ -316,6 +371,11 @@ class _LoginViewState extends State<LoginView> {
     required String bloodType,
     required String donorId,
     required bool isEligible,
+    required String token,
+    String phoneNum = '',
+    String donorEmail = '',
+    ClassificationResult? classificationResult,
+    ScreenNPTModel? screeningModel,
   }) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
@@ -323,11 +383,26 @@ class _LoginViewState extends State<LoginView> {
           donorName: donorName,
           bloodType: bloodType,
           donorId: donorId,
-          // --- UPDATED: Passing correct structure of ClassificationResult ---
-          classificationResult: ClassificationResult(
-            status: isEligible ? EligibleStats.eligible : EligibleStats.deferredWeight,
-          ),
+          phoneNum: phoneNum,
+          donorEmail: donorEmail,
+          // Prefer the real decision-tree result re-derived from the
+          // donor's saved screening answers (classifyDonorFromProfile) —
+          // falls back to the backend's crude isEligible flag only when
+          // there's no saved screening data to evaluate at all (e.g. an
+          // admin-created walk-in donor). Given how that flag is computed
+          // server-side (donorPortal.controller.js), false can only mean
+          // "donated within the last 90 days" — deferredInterval, not
+          // deferredWeight, is the honest fallback status for that case.
+          classificationResult: classificationResult ??
+              ClassificationResult(
+                status: isEligible ? EligibleStats.eligible : EligibleStats.deferredInterval,
+              ),
+          // Real current screening answers, reconstructed from the same
+          // profile fetch — pre-fills the retake-screening wizard instead
+          // of leaving it null (see DonorProfileData.screeningModel).
+          screeningModel: screeningModel,
           isFirstTimeDonor: false,
+          token: token,
         ),
       ),
           (route) => false,
@@ -344,7 +419,7 @@ class _LoginViewState extends State<LoginView> {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: const Color(0xFF8A1E26),
+        backgroundColor: const Color(0xFF9B1B20),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -370,7 +445,7 @@ class _LoginViewState extends State<LoginView> {
                     width: 110,
                     height: 110,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF7D1B22),
+                      color: Color(0xFF9B1B20),
                       shape: BoxShape.circle,
                     ),
                     padding: const EdgeInsets.all(22),
@@ -521,13 +596,13 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: Color(0xFF8A1E26), size: 18),
+                          const Icon(Icons.error_outline_rounded, color: Color(0xFF9B1B20), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _errorMessage!,
                               style: const TextStyle(
-                                color: Color(0xFF8A1E26),
+                                color: Color(0xFF9B1B20),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -557,15 +632,15 @@ class _LoginViewState extends State<LoginView> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2.0),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2.0),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -599,15 +674,15 @@ class _LoginViewState extends State<LoginView> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 1.5),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 1.5),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2.0),
+                        borderSide: const BorderSide(color: Color(0xFF9B1B20), width: 2.0),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -639,7 +714,7 @@ class _LoginViewState extends State<LoginView> {
                       child: const Text(
                         'Forgot my password?',
                         style: TextStyle(
-                          color: Color(0xFF7D1B22),
+                          color: Color(0xFF9B1B20),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -657,7 +732,7 @@ class _LoginViewState extends State<LoginView> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7D1B22).withValues(alpha: 0.35),
+                          color: const Color(0xFF9B1B20).withValues(alpha: 0.35),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -666,7 +741,7 @@ class _LoginViewState extends State<LoginView> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleLogin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8A1E26),
+                        backgroundColor: const Color(0xFF9B1B20),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -689,18 +764,21 @@ class _LoginViewState extends State<LoginView> {
                     ),
                   ),
 
-                  const SizedBox(height: 18),
-
-                  // Quick Biometric Icon Button (Device Fingerprint / PIN)
-                  IconButton(
-                    icon: const Icon(
-                      Icons.fingerprint_rounded,
-                      size: 34,
-                      color: Color(0xFF7D1B22),
+                  if (_biometricAvailable) ...[
+                    const SizedBox(height: 18),
+                    // Quick Biometric Icon Button (Device Fingerprint / PIN)
+                    // — only shown once a donor has explicitly turned this
+                    // on for their account from Settings.
+                    IconButton(
+                      icon: const Icon(
+                        Icons.fingerprint_rounded,
+                        size: 34,
+                        color: Color(0xFF9B1B20),
+                      ),
+                      onPressed: _handleDeviceBiometricAuth,
+                      tooltip: 'Sign in with Fingerprint / PIN',
                     ),
-                    onPressed: _handleDeviceBiometricAuth,
-                    tooltip: 'Sign in with Fingerprint / PIN',
-                  ),
+                  ],
 
                   const SizedBox(height: 10),
 
@@ -716,7 +794,7 @@ class _LoginViewState extends State<LoginView> {
                         TextSpan(
                           text: 'Sign Up',
                           style: const TextStyle(
-                            color: Color(0xFF7D1B22),
+                            color: Color(0xFF9B1B20),
                             fontWeight: FontWeight.bold,
                           ),
                           recognizer: TapGestureRecognizer()

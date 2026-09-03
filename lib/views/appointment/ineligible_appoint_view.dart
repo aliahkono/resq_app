@@ -69,7 +69,7 @@ class IneligibleAppointView extends StatelessWidget {
                   style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7D1B22),
+                  backgroundColor: const Color(0xFF9B1B20),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

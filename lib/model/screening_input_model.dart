@@ -32,6 +32,9 @@ class ScreenNPTModel {
             ? DateTime.parse(json['last_donation_date'] as String)
             : null,
         hasTattsOrPierce: json['has_tatts_or_pierce'] as bool,
+        tattooDate: json['tattoo_date'] != null
+            ? DateTime.parse(json['tattoo_date'] as String)
+            : null,
         hasAlcoholPast24hr: json['has_alcohol_past_24hr'] as bool,
         hasActiveInfectOrMeds: json['has_active_infect_or_meds'] as bool,
         isPregOrNursing: json['is_preg_or_nursing'] as bool?,
@@ -54,6 +57,7 @@ class ScreenNPTModel {
       'is_first_time_donor': screensNPT.isFirstTimeDonor,
       'last_donation_date': screensNPT.lastDonationDate?.toIso8601String(),
       'has_tatts_or_pierce': screensNPT.hasTattsOrPierce,
+      'tattoo_date': screensNPT.tattooDate?.toIso8601String(),
       'has_alcohol_past_24hr': screensNPT.hasAlcoholPast24hr,
       'has_active_infect_or_meds': screensNPT.hasActiveInfectOrMeds,
       'is_preg_or_nursing': screensNPT.isPregOrNursing,

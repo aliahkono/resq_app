@@ -18,6 +18,7 @@ class DonorScreensNPT {
 
   // General Screening
   final bool hasTattsOrPierce;
+  final DateTime? tattooDate;
   final bool hasAlcoholPast24hr;
   final bool hasActiveInfectOrMeds;
 
@@ -48,6 +49,7 @@ class DonorScreensNPT {
     this.feelsWellToday = true,
     this.hasEatenRecently = true,
     required this.hasTattsOrPierce,
+    this.tattooDate,
     required this.hasAlcoholPast24hr,
     required this.hasActiveInfectOrMeds,
     this.recentMedProcedures = const {},
@@ -98,6 +100,12 @@ class DecisionTreeClassifier {
   /// Minimum mandatory deferral interval between whole blood donations (DOH / NVBSP standard)
   static const int minDonationIntervalDays = 90;
 
+  /// Standard tattoo/piercing deferral window (matches the "Standard 12-month
+  /// deferral window" messaging shown on the donor profile's eligibility
+  /// explanation, and the upper bound of the "6 to 12 months" note shown on
+  /// the screening wizard itself).
+  static const int tattooDeferralWindowDays = 365;
+
   /// Evaluates donor parameters through rule-based decision tree nodes
   ClassificationResult classify(DonorScreensNPT npt) {
     // Node 1: Immediate Wellness Check
@@ -138,23 +146,23 @@ class DecisionTreeClassifier {
       return ClassificationResult(status: EligibleStats.deferredMedical);
     }
 
-    // Node 7: Recent Medications / Minor Procedures Check (last 4 weeks)
-    // NOTE: real-world deferral windows differ per item (e.g. dental work is
-    // typically a much shorter wait than a minor surgery). This flags any
-    // selection uniformly for now — split into per-item windows once you
-    // want finer-grained rules.
-    if (npt.recentMedProcedures.isNotEmpty) {
-      return ClassificationResult(status: EligibleStats.deferredRecentProcedure);
-    }
-
-    // Node 8: Major Medical History Check
-    if (npt.hasMajorMedicalHistory) {
-      return ClassificationResult(status: EligibleStats.deferredMajorMedical);
-    }
-
-    // Node 9: Tattoo / Piercing Window Check
+    // Node 5: Tattoo / Piercing Window Check
     if (npt.hasTattsOrPierce) {
-      return ClassificationResult(status: EligibleStats.deferredTattsPierce);
+      if (npt.tattooDate != null) {
+        final daysSinceProcedure =
+            DateTime.now().difference(npt.tattooDate!).inDays;
+        if (daysSinceProcedure >= tattooDeferralWindowDays) {
+          // Window has passed — fall through, no longer deferred for this.
+        } else {
+          return ClassificationResult(
+            status: EligibleStats.deferredTattsPierce,
+            daysRemaining: tattooDeferralWindowDays - daysSinceProcedure,
+          );
+        }
+      } else {
+        // No date on file to verify the window has elapsed — defer.
+        return ClassificationResult(status: EligibleStats.deferredTattsPierce);
+      }
     }
 
     // Node 10: Transfusion or Surgery Check (last 12 months)

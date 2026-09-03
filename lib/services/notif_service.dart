@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:resq/model/broadcast_notif_model.dart';
+import 'package:resq/services/api_service.dart';
 
 class NotificationService extends ChangeNotifier {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,6 +13,53 @@ class NotificationService extends ChangeNotifier {
   List<BloodBroadcastNotification> get notifications => _notifications;
 
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
+
+  bool _loading = false;
+  bool get isLoading => _loading;
+
+  /// GET /api/donor/notifications — replaces the in-memory list with what's
+  /// actually on the backend. This is the only real data source for the
+  /// bell now; nothing simulates broadcasts locally anymore. Silent on
+  /// failure (keeps whatever was last loaded) since this runs on app open,
+  /// not in direct response to a donor action.
+  Future<void> refresh(String token) async {
+    if (token.isEmpty) return;
+    _loading = true;
+    notifyListeners();
+    try {
+      final response = await ApiService.getMyNotifications(token);
+      final rawList = (response['notifications'] as List<dynamic>?) ?? [];
+      debugPrint('NotificationService.refresh: got ${rawList.length} row(s): $rawList');
+      final parsed = rawList
+          .map((n) => BloodBroadcastNotification.fromJson(n as Map<String, dynamic>))
+          .toList();
+      syncHospitalBroadcasts(parsed);
+    } catch (e, st) {
+      // Keep the last-known list rather than clearing it on a network hiccup
+      // — but log it now instead of failing completely silently.
+      debugPrint('NotificationService.refresh failed: $e\n$st');
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// PATCH /api/donor/notifications/read — marks every row read server-side
+  /// too, not just in this in-memory copy, so the unread badge doesn't come
+  /// back after the next refresh(). Optimistically flips the local state
+  /// first (markAllAsRead already does this instantly); this just makes it
+  /// stick.
+  Future<void> markAllAsReadRemote(String token) async {
+    markAllAsRead();
+    if (token.isEmpty) return;
+    try {
+      await ApiService.markNotificationsRead(token);
+    } catch (_) {
+      // Best-effort — the donor already sees them as read locally; a failed
+      // sync here just means the badge could reappear on next refresh(),
+      // which is a safe failure mode (never worse than "shows unread").
+    }
+  }
 
   /// Filters broadcasts relevant to the donor's eligibility and blood type
   List<BloodBroadcastNotification> getEligibleBroadcasts({

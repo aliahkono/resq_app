@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 
 class QrPassModalView extends StatelessWidget {
@@ -63,25 +64,29 @@ class QrPassModalView extends StatelessWidget {
           const SizedBox(height: 20),
 
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Digital Donor QR Pass',
-                    style: ResQTheme.heading2.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: ResQTheme.textDark,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Digital Donor QR Pass',
+                      overflow: TextOverflow.ellipsis,
+                      style: ResQTheme.heading2.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: ResQTheme.textDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Present at Red Cross or Hospital triage',
-                    style: const TextStyle(fontSize: 12, color: ResQTheme.textMuted),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      'Present at Red Cross or Hospital triage',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
@@ -104,30 +109,36 @@ class QrPassModalView extends StatelessWidget {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          donorName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: ResQTheme.textDark,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            donorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: ResQTheme.textDark,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'ID: $donorId',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: ResQTheme.textMuted,
-                            fontFamily: 'monospace',
+                          const SizedBox(height: 2),
+                          Text(
+                            'ID: $donorId',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: ResQTheme.textMuted,
+                              fontFamily: 'monospace',
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -157,12 +168,35 @@ class QrPassModalView extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 190,
-                        color: isEligible
-                            ? ResQTheme.textDark
-                            : ResQTheme.textMuted.withValues(alpha: 0.6),
+                      // A plain code (e.g. "D-4321") just makes a phone's
+                      // camera offer to *search the web* for it — nothing to
+                      // scan to. Encoding a real link to that donor's record
+                      // in Donor Management's Walk-in lookup (pre-filled and
+                      // auto-searched via the `checkin` query param — see
+                      // DonorManagement.jsx) means scanning it actually opens
+                      // something useful, as long as the staffer scanning is
+                      // already logged into the dashboard on that device.
+                      Opacity(
+                        opacity: isEligible ? 1 : 0.5,
+                        child: donorId.trim().isEmpty
+                            ? const SizedBox(
+                                width: 190,
+                                height: 190,
+                                child: Center(
+                                  child: Icon(Icons.qr_code_2_rounded, size: 96, color: ResQTheme.textMuted),
+                                ),
+                              )
+                            : QrImageView(
+                                data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(donorId)}',
+                                version: QrVersions.auto,
+                                size: 190,
+                                backgroundColor: Colors.white,
+                                eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1E1E1E)),
+                                dataModuleStyle: const QrDataModuleStyle(
+                                  dataModuleShape: QrDataModuleShape.square,
+                                  color: Color(0xFF1E1E1E),
+                                ),
+                              ),
                       ),
                       const SizedBox(height: 8),
                       const Text(
