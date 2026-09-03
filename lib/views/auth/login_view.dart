@@ -25,6 +25,8 @@ class DonorProfileData {
   final String bloodType;
   final bool isEligible;
   final String? token; // JWT/Session token
+  final String phone;
+  final String email;
   // Full decision-tree result re-derived from the donor's saved screening
   // answers (see eligibility_service.dart) — null when there isn't enough
   // saved screening data to evaluate (e.g. an admin-created walk-in donor).
@@ -48,6 +50,8 @@ class DonorProfileData {
     required this.bloodType,
     required this.isEligible,
     this.token,
+    this.phone = '',
+    this.email = '',
     this.classificationResult,
     this.screeningModel,
   });
@@ -89,6 +93,8 @@ class AuthService {
           bloodType: profile['bloodType'] as String,
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
+          phone: (profile['phone'] as String?) ?? '',
+          email: (profile['email'] as String?) ?? '',
           classificationResult: classifyDonorFromProfile(profile),
           screeningModel: buildScreeningModelFromProfile(profile),
         ),
@@ -121,6 +127,8 @@ class AuthService {
           bloodType: profile['bloodType'] as String,
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
+          phone: (profile['phone'] as String?) ?? '',
+          email: (profile['email'] as String?) ?? '',
           classificationResult: classifyDonorFromProfile(profile),
           screeningModel: buildScreeningModelFromProfile(profile),
         ),
@@ -234,6 +242,8 @@ class _LoginViewState extends State<LoginView> {
           bloodType: data.bloodType,
           donorId: data.id,
           isEligible: data.isEligible,
+          phoneNum: data.phone,
+          donorEmail: data.email,
           classificationResult: data.classificationResult,
           screeningModel: data.screeningModel,
           token: data.token ?? '',
@@ -309,6 +319,8 @@ class _LoginViewState extends State<LoginView> {
           bloodType: data.bloodType,
           donorId: data.id,
           isEligible: data.isEligible,
+          phoneNum: data.phone,
+          donorEmail: data.email,
           classificationResult: data.classificationResult,
           screeningModel: data.screeningModel,
           token: data.token ?? '',
@@ -347,6 +359,8 @@ class _LoginViewState extends State<LoginView> {
     required String donorId,
     required bool isEligible,
     required String token,
+    String phoneNum = '',
+    String donorEmail = '',
     ClassificationResult? classificationResult,
     ScreenNPTModel? screeningModel,
   }) {
@@ -356,6 +370,8 @@ class _LoginViewState extends State<LoginView> {
           donorName: donorName,
           bloodType: bloodType,
           donorId: donorId,
+          phoneNum: phoneNum,
+          donorEmail: donorEmail,
           // Prefer the real decision-tree result re-derived from the
           // donor's saved screening answers (classifyDonorFromProfile) —
           // falls back to the backend's crude isEligible flag only when

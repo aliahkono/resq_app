@@ -63,25 +63,29 @@ class QrPassModalView extends StatelessWidget {
           const SizedBox(height: 20),
 
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Digital Donor QR Pass',
-                    style: ResQTheme.heading2.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: ResQTheme.textDark,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Digital Donor QR Pass',
+                      overflow: TextOverflow.ellipsis,
+                      style: ResQTheme.heading2.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: ResQTheme.textDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Present at Red Cross or Hospital triage',
-                    style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      'Present at Red Cross or Hospital triage',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
@@ -104,30 +108,36 @@ class QrPassModalView extends StatelessWidget {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          donorName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: ResQTheme.textDark,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            donorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: ResQTheme.textDark,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'ID: $donorId',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: ResQTheme.textMuted,
-                            fontFamily: 'monospace',
+                          const SizedBox(height: 2),
+                          Text(
+                            'ID: $donorId',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: ResQTheme.textMuted,
+                              fontFamily: 'monospace',
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(

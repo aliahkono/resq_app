@@ -94,28 +94,38 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   @override
   void initState() {
     super.initState();
-    if (widget.isRetake && widget.initialScreening != null) {
-      final initial = widget.initialScreening!.screensNPT;
-      _currentStep = 2; // Skip account creation on retake
+    if (widget.isRetake) {
+      // Always skip Step 1 on a retake, even if there's no prior screening
+      // to pre-fill (e.g. a donor who logged into an existing account via
+      // OTP and never actually went through complete-profile) — otherwise
+      // this fell through to the "Create Account" UI, which is wrong and
+      // confusing for someone whose account already exists.
+      _currentStep = 2;
       _nameController.text = widget.donorName ?? '';
       _selectedBloodType = widget.bloodType ?? 'O+';
-      _weightController.text = initial.weight > 0 ? initial.weight.toString() : '';
-      _gender = initial.gender;
-      _isFirstTimeDonor = initial.isFirstTimeDonor;
-      _lastDonationDate = initial.lastDonationDate;
-      _totalDonations = initial.totalDonations;
-      _hasTattoosOrPiercings = initial.hasTattsOrPierce;
-      _tattooDate = initial.tattooDate;
-      _prefilledAge = initial.age > 0 ? initial.age : null;
-      _ageController.text = _prefilledAge?.toString() ?? '';
-      _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
-      _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
-      _lastMensDate = initial.lastMensPeriodDate;
-      _hasHighRiskContact = initial.hasHighRiskExpo ?? false;
-      if (initial.isPregOrNursing == true) {
-        _pregnancyStatusIndex = 1;
-        _isBreastfeeding = true;
+      if (widget.initialScreening != null) {
+        final initial = widget.initialScreening!.screensNPT;
+        _weightController.text = initial.weight > 0 ? initial.weight.toString() : '';
+        _gender = initial.gender;
+        _isFirstTimeDonor = initial.isFirstTimeDonor;
+        _lastDonationDate = initial.lastDonationDate;
+        _totalDonations = initial.totalDonations;
+        _hasTattoosOrPiercings = initial.hasTattsOrPierce;
+        _tattooDate = initial.tattooDate;
+        _prefilledAge = initial.age > 0 ? initial.age : null;
+        _ageController.text = _prefilledAge?.toString() ?? '';
+        _hasActiveInfectOrMeds = initial.hasActiveInfectOrMeds;
+        _hasAlcoholPast24hr = initial.hasAlcoholPast24hr;
+        _lastMensDate = initial.lastMensPeriodDate;
+        _hasHighRiskContact = initial.hasHighRiskExpo ?? false;
+        if (initial.isPregOrNursing == true) {
+          _pregnancyStatusIndex = 1;
+          _isBreastfeeding = true;
+        }
       }
+      // else: no prior screening data at all — Step 2 onward just starts
+      // blank/default, so the donor fills it in for the first time instead
+      // of being bounced to account creation.
     }
   }
 

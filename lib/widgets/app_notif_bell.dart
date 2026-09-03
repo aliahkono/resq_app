@@ -181,26 +181,32 @@ class _BroadcastModalSheet extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.campaign_rounded, color: Color(0xFF9B1B20), size: 22),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Hospital Broadcasts & SMS',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E1E)),
-                    ),
-                    if (isLoading) ...[
-                      const SizedBox(width: 10),
-                      const SizedBox(
-                        width: 13,
-                        height: 13,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF9B1B20)),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.campaign_rounded, color: Color(0xFF9B1B20), size: 22),
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text(
+                          'Hospital Broadcasts & SMS',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E1E)),
+                        ),
                       ),
+                      if (isLoading) ...[
+                        const SizedBox(width: 10),
+                        const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF9B1B20)),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
                 TextButton(
                   onPressed: onMarkAllRead,
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
                   child: const Text('Mark all read', style: TextStyle(fontSize: 12, color: Color(0xFF9B1B20), fontWeight: FontWeight.bold)),
                 ),
               ],

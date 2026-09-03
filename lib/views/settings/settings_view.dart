@@ -5,6 +5,7 @@ import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
+import 'package:resq/services/local_prefs.dart';
 
 class SettingsView extends StatefulWidget {
   final ScreenNPTModel? screeningModel;
@@ -81,6 +82,24 @@ class _SettingsViewState extends State<SettingsView> {
     _phone = widget.userPhone ?? '';
     _email = widget.userEmail ?? '';
     _loadProfile();
+    _loadLocalPrefs();
+  }
+
+  /// Restores toggles that have no backend field yet (biometric login,
+  /// location services, alert radius) from on-device storage, so they
+  /// reflect what the donor last set instead of always resetting to their
+  /// hardcoded defaults on every re-login.
+  Future<void> _loadLocalPrefs() async {
+    if (widget.donorId.isEmpty) return;
+    final biometric = await LocalPrefs.getBool(widget.donorId, 'biometricLogin');
+    final location = await LocalPrefs.getBool(widget.donorId, 'locationServices');
+    final radius = await LocalPrefs.getString(widget.donorId, 'alertRadius');
+    if (!mounted) return;
+    setState(() {
+      if (biometric != null) _biometricLogin = biometric;
+      if (location != null) _locationServices = location;
+      if (radius != null) _selectedRadius = radius;
+    });
   }
 
   /// GET /api/donor/me — refreshes name/phone/email and the two real
@@ -179,7 +198,10 @@ class _SettingsViewState extends State<SettingsView> {
                       _buildSwitchTile(
                         title: 'Biometric Login (FaceID / Fingerprint)',
                         value: _biometricLogin,
-                        onChanged: (val) => setState(() => _biometricLogin = val),
+                        onChanged: (val) {
+                          setState(() => _biometricLogin = val);
+                          LocalPrefs.setBool(widget.donorId, 'biometricLogin', val);
+                        },
                       ),
                     ]),
 
@@ -221,7 +243,10 @@ class _SettingsViewState extends State<SettingsView> {
                       _buildSwitchTile(
                         title: 'Location Services Access',
                         value: _locationServices,
-                        onChanged: (val) => setState(() => _locationServices = val),
+                        onChanged: (val) {
+                          setState(() => _locationServices = val);
+                          LocalPrefs.setBool(widget.donorId, 'locationServices', val);
+                        },
                       ),
                       const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildRadiusSelectorTile(context),
@@ -552,6 +577,7 @@ class _SettingsViewState extends State<SettingsView> {
                     : null,
                 onTap: () {
                   setState(() => _selectedRadius = option);
+                  LocalPrefs.setString(widget.donorId, 'alertRadius', option);
                   Navigator.pop(ctx);
                 },
               );
@@ -713,6 +739,8 @@ class _SettingsViewState extends State<SettingsView> {
       builder: (ctx) {
         bool saving = false;
         String? error;
+        bool obscureCurrent = true;
+        bool obscureNew = true;
         return StatefulBuilder(
           builder: (ctx, setModalState) => Padding(
             padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
@@ -726,9 +754,31 @@ class _SettingsViewState extends State<SettingsView> {
                 // already has a password set — an OTP-only donor setting
                 // their first one here can leave it blank (see
                 // updateMyProfile, donorPortal.controller.js).
-                TextField(controller: currentPw, obscureText: true, decoration: const InputDecoration(labelText: 'Current Password', border: OutlineInputBorder())),
+                TextField(
+                  controller: currentPw,
+                  obscureText: obscureCurrent,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureCurrent ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                      onPressed: () => setModalState(() => obscureCurrent = !obscureCurrent),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
-                TextField(controller: newPw, obscureText: true, decoration: const InputDecoration(labelText: 'New Password (min. 8 characters)', border: OutlineInputBorder())),
+                TextField(
+                  controller: newPw,
+                  obscureText: obscureNew,
+                  decoration: InputDecoration(
+                    labelText: 'New Password (min. 8 characters)',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                      onPressed: () => setModalState(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                ),
                 if (error != null) ...[
                   const SizedBox(height: 10),
                   Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),

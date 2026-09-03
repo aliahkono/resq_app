@@ -725,7 +725,10 @@ class DonorProfileView extends StatelessWidget {
                         ),
                       );
                     },
-                    child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 12)),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 12), maxLines: 1),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -751,7 +754,15 @@ class DonorProfileView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12.5)),
-          Text(val, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF2C2C2C))),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              val,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF2C2C2C)),
+            ),
+          ),
         ],
       ),
     );

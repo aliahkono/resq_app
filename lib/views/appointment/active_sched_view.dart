@@ -100,13 +100,17 @@ class ActiveSchedView extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          appointment.queueNumber,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14),
+                        Flexible(
+                          child: Text(
+                            appointment.queueNumber,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14),
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         const Text(
                           'Priority Slot',
                           style: TextStyle(
@@ -196,13 +200,15 @@ class ActiveSchedView extends StatelessWidget {
       children: [
         Icon(icon, color: const Color(0xFF9B1B20), size: 20),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
-            const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E))),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E))),
+            ],
+          ),
         ),
       ],
     );

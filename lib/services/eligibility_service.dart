@@ -80,18 +80,32 @@ DonorScreensNPT? screensFromProfile(Map<String, dynamic> profile) {
   // The donor's *actual* completed-donation history (lastDonationAt, kept
   // current by hospital staff recording real donations — see
   // donors.controller.js completeAppointment) is more authoritative than
-  // the self-reported "is this your first donation?" answer frozen at
-  // registration time, which never updates afterward. A non-null
-  // lastDonationAt is itself proof they've donated before, so it's used
-  // directly instead of trusting that frozen flag.
+  // the self-reported "is this your first donation?" answer, since it's
+  // hospital-verified. But it only ever gets set once an admin marks a
+  // real appointment completed — a donor who self-reported as a *returning*
+  // donor at registration (with their own last-donation date) but hasn't
+  // had one recorded by a hospital yet still has a null lastDonationAt here.
+  // Treating null as "definitely first-time" in that case would silently
+  // discard their self-report on every login and could wrongly clear a
+  // real post-donation-interval deferral — so null only means "no
+  // hospital-verified donation on file", and falls back to what the donor
+  // themselves reported (stored in healthScreening) rather than assuming
+  // first-time outright.
   final lastDonationAtStr = profile['lastDonationAt'] as String?;
-  final lastDonationDate = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
+  final backendLastDonation = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
+  final selfReportedLastDonationStr = screening['lastDonationDate'] as String?;
+  final selfReportedLastDonation =
+      selfReportedLastDonationStr != null ? DateTime.tryParse(selfReportedLastDonationStr) : null;
+  final lastDonationDate = backendLastDonation ?? selfReportedLastDonation;
+  final isFirstTimeDonor = backendLastDonation != null
+      ? false
+      : ((screening['isFirstTimeDonor'] as bool?) ?? (selfReportedLastDonation == null));
 
   final npt = DonorScreensNPT(
     gender: genderStr == 'female' ? BioSex.female : BioSex.male,
     weight: weightKg.toDouble(),
     age: age.toInt(),
-    isFirstTimeDonor: lastDonationDate == null,
+    isFirstTimeDonor: isFirstTimeDonor,
     lastDonationDate: lastDonationDate,
     hasTattsOrPierce: hasTatts,
     tattooDate: screening['tattooDate'] != null
