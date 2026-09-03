@@ -167,7 +167,7 @@ class _SettingsViewState extends State<SettingsView> {
         _notifyEmail = prevEmail;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not reach the ResQ server.'), backgroundColor: Colors.red.shade700),
+        SnackBar(content: const Text('Could not reach the ResQ server.'), backgroundColor: Colors.red.shade700),
       );
     }
   }
@@ -436,7 +436,7 @@ class _SettingsViewState extends State<SettingsView> {
           Switch(
             value: value,
             onChanged: enabled ? onChanged : null,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: const Color(0xFF9B1B20),
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFD1D5DB),
@@ -698,6 +698,7 @@ class _SettingsViewState extends State<SettingsView> {
                                       _phone = (updated['phone'] as String?) ?? newPhone;
                                       _email = (updated['email'] as String?) ?? newEmail;
                                     });
+                                    if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Personal profile details saved successfully!'), backgroundColor: Color(0xFF2E7D32)),
@@ -809,6 +810,8 @@ class _SettingsViewState extends State<SettingsView> {
                                 'password': newPw.text,
                                 'currentPassword': currentPw.text,
                               });
+                              if (!mounted) return;
+                              if (!ctx.mounted) return;
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Account security credentials updated!'), backgroundColor: Color(0xFF2E7D32)),

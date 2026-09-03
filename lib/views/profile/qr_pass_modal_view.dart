@@ -80,7 +80,7 @@ class QrPassModalView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    const Text(
                       'Present at Red Cross or Hospital triage',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: ResQTheme.textMuted),
@@ -129,7 +129,7 @@ class QrPassModalView extends StatelessWidget {
                           Text(
                             'ID: $donorId',
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11.5,
                               color: ResQTheme.textMuted,
                               fontFamily: 'monospace',
@@ -201,7 +201,7 @@ class QrPassModalView extends StatelessWidget {
                       const SizedBox(height: 8),
                       const Text(
                         'SCAN FOR PRIORITY TRIAGE',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.1,

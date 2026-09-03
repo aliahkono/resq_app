@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
 
 class ConfirmedAppointmentData {
   // Real appointments.id from the backend — needed so Cancel can call

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/home/eligible_home_view.dart' show EmergencyBloodRequest;
 
 class NoActiveSchedView extends StatelessWidget {
@@ -101,8 +100,8 @@ class NoActiveSchedView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: const [
+                  const Row(
+                    children: [
                       Icon(Icons.info_outline_rounded, color: Color(0xFF9B1B20), size: 18),
                       SizedBox(width: 8),
                       Text(
