@@ -27,7 +27,6 @@
 
 ```text
 lib/
-├── controller/         # Logic & state management controllers
 ├── model/              # Data models (DonorProfileModel, BloodReqModel, AppSessModel, etc.)
 ├── utils/
 │   ├── algo/          # Min-Heap priority queue & decision tree classification algorithms
