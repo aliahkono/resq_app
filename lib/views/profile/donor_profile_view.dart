@@ -29,6 +29,7 @@ class DonorProfileView extends StatelessWidget {
   final String? photoUrl;
   final ValueChanged<String>? onPhotoUpdated;
   final VerificationStatus verificationStatus;
+  final DateTime? lastDonationAt;
 
   const DonorProfileView({
     super.key,
@@ -45,6 +46,7 @@ class DonorProfileView extends StatelessWidget {
     this.photoUrl,
     this.onPhotoUpdated,
     this.verificationStatus = VerificationStatus.notStarted,
+    this.lastDonationAt,
   });
 
   String _formatDate(DateTime date) {
@@ -380,7 +382,13 @@ class DonorProfileView extends StatelessWidget {
   // --- Dynamic Next Eligible & Last Donation Row ---
   Widget _buildDonationScheduleRow(BuildContext context, bool isEligible) {
     final info = _resolveEligibilityInfo(isEligible);
-    final lastDonation = screeningModel?.screensNPT.lastDonationDate ?? clinicalVitals?.recordedDate;
+    // Hospital-verified date (GET /api/donor/me's lastDonationAt, set when
+    // an admin actually records a completed donation) takes priority over
+    // the donor's self-reported lastDonationDate from registration/retake
+    // screening — that self-report never updates from a real donation
+    // event, which is exactly why this used to go stale/inaccurate right
+    // after a donation was recorded.
+    final lastDonation = lastDonationAt ?? screeningModel?.screensNPT.lastDonationDate ?? clinicalVitals?.recordedDate;
 
     return Row(
       children: [

@@ -74,6 +74,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   int _completedDonations = 0;
   String? _photoUrl;
   VerificationStatus _verificationStatus = VerificationStatus.notStarted;
+  DateTime? _lastDonationAt;
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
@@ -120,7 +121,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _loadOpenRequests();
     _loadDonorProfile();
     NotificationService().refresh(widget.token);
-    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refreshBroadcastData());
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _refreshBroadcastData());
   }
 
   @override
@@ -281,11 +282,20 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final completed = raw is num ? raw.toInt() : 0;
       final photoUrl = profile['photoUrl'] as String?;
       final verification = verificationStatusFromString(profile['verificationStatus'] as String?);
+      final lastDonationAtStr = profile['lastDonationAt'] as String?;
+      final lastDonationAt = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
       if (!mounted) return;
       setState(() {
         _completedDonations = completed;
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
         _verificationStatus = verification;
+        _lastDonationAt = lastDonationAt ?? _lastDonationAt;
+        // Hospital-verified donation count is more authoritative than the
+        // self-reported toggle from registration — once a donation is
+        // actually recorded, this flips the dashboard off the first-time
+        // UI even if the donor's original self-report said otherwise, and
+        // keeps it correct on every future login.
+        if (completed > 0) _isFirstTime = false;
       });
     } catch (e) {
       debugPrint('HomeView._loadDonorProfile failed: $e');
@@ -562,6 +572,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           // _loadDonorProfile's comment for why.
           totalDonations: _completedDonations,
           isVerified: _verificationStatus.isVerified,
+          onSwitchToAppointmentTab: () => setState(() => _currentTabIndex = 1),
           onBookingCompleted: _handleBookingCompleted,
           onRefresh: _refreshBroadcastData,
           activeRequests: _activeRequests,
@@ -652,6 +663,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           photoUrl: _photoUrl,
           onPhotoUpdated: (url) => setState(() => _photoUrl = url),
           verificationStatus: _verificationStatus,
+          lastDonationAt: _lastDonationAt,
         );
       default:
         return const SizedBox.shrink();

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:resq/views/appointment/eligible_appoint_view.dart';
 
 class EmergencyBloodRequest {
   final String id;
@@ -53,6 +52,12 @@ class EligibleHomeView extends StatelessWidget {
   // actually donated.
   final int totalDonations;
   final bool isVerified;
+  // Switches HomeView to the Appointment tab instead of pushing a new
+  // screen — see this button's onPressed below for why: the Appointment
+  // tab (NoActiveSchedView) already knows how to show either "book now"
+  // (an active hospital request exists) or the waiting state (none yet),
+  // so this button doesn't need its own separate hospital-picker route.
+  final VoidCallback? onSwitchToAppointmentTab;
 
   const EligibleHomeView({
     super.key,
@@ -66,6 +71,7 @@ class EligibleHomeView extends StatelessWidget {
     this.onRefresh,
     this.totalDonations = 0,
     this.isVerified = false,
+    this.onSwitchToAppointmentTab,
   });
 
   @override
@@ -153,21 +159,7 @@ class EligibleHomeView extends StatelessWidget {
                 width: double.infinity,
                 height: 44,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => EligibleAppointView(
-                          isFirstTimeDonor: true,
-                          token: token,
-                          isVerified: isVerified,
-                          onBookingCompleted: (appointment) {
-                            Navigator.pop(context);
-                            onBookingCompleted(appointment);
-                          },
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () => onSwitchToAppointmentTab?.call(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE9E5E2),
                     foregroundColor: const Color(0xFF9B1B20),

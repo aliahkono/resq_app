@@ -401,7 +401,16 @@ class _LoginViewState extends State<LoginView> {
           // profile fetch — pre-fills the retake-screening wizard instead
           // of leaving it null (see DonorProfileData.screeningModel).
           screeningModel: screeningModel,
-          isFirstTimeDonor: false,
+          // Was hardcoded to false regardless of the actual donor — meant
+          // every donor who logged in normally (as opposed to arriving
+          // here fresh from registration, where the correct value came
+          // through directly) got shown the non-first-time dashboard even
+          // if they'd never actually donated, and vice versa. Derive it
+          // from the same saved screening answers used just above for
+          // classificationResult; default to true (first-time) only when
+          // there's no screening data at all to go on, since a donor with
+          // no saved screening history hasn't demonstrably donated before.
+          isFirstTimeDonor: screeningModel?.screensNPT.isFirstTimeDonor ?? true,
           token: token,
         ),
       ),
