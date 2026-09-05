@@ -13,6 +13,7 @@ class RegistrationSummaryView extends StatelessWidget {
   final ClassificationResult classificationResult;
   final String rawPassword;
   final bool isFirstTimeDonor;
+  final String? photoPath;
 
   const RegistrationSummaryView({
     super.key,
@@ -22,6 +23,7 @@ class RegistrationSummaryView extends StatelessWidget {
     required this.classificationResult,
     required this.rawPassword,
     required this.isFirstTimeDonor,
+    this.photoPath,
   });
 
   String _formatDate(DateTime? date) {
@@ -260,6 +262,7 @@ class RegistrationSummaryView extends StatelessWidget {
                           password: rawPassword,
                           screeningModel: screeningModel,
                           classificationResult: classificationResult,
+                          photoPath: photoPath,
                         ),
                       ),
                     );

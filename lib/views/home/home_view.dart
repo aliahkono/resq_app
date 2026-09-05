@@ -62,6 +62,16 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   late String _donorName;
   late String _donorPhone;
   late String _donorEmail;
+  // Hospital-verified lifetime donation count (GET /api/donor/me's
+  // completedDonations) — the source of truth for the Community Impact
+  // card and Lifetime Impact Record, since it only changes when a hospital
+  // admin actually marks a real appointment completed. The donor's own
+  // self-reported totalDonations from registration/retake never updates
+  // from an actual donation event, so using it there made both cards show
+  // stale or (before this) outright hardcoded numbers regardless of who
+  // was signed in.
+  int _completedDonations = 0;
+  String? _photoUrl;
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
@@ -106,6 +116,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
 
     _loadCurrentAppointment();
     _loadOpenRequests();
+    _loadDonorProfile();
     NotificationService().refresh(widget.token);
     _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refreshBroadcastData());
   }
@@ -251,7 +262,30 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       _loadOpenRequests(),
       NotificationService().refresh(widget.token),
       _loadCurrentAppointment(),
+      _loadDonorProfile(),
     ]);
+  }
+
+  /// GET /api/donor/me — only pulled for completedDonations right now (the
+  /// Community Impact / Lifetime Impact Record source of truth). Silent on
+  /// failure, same reasoning as _loadCurrentAppointment: background
+  /// enrichment, not a donor-triggered action, so a hiccup here shouldn't
+  /// block the rest of the screen.
+  Future<void> _loadDonorProfile() async {
+    if (widget.token.isEmpty) return;
+    try {
+      final profile = await ApiService.getMyProfile(widget.token);
+      final raw = profile['completedDonations'];
+      final completed = raw is num ? raw.toInt() : 0;
+      final photoUrl = profile['photoUrl'] as String?;
+      if (!mounted) return;
+      setState(() {
+        _completedDonations = completed;
+        _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
+      });
+    } catch (e) {
+      debugPrint('HomeView._loadDonorProfile failed: $e');
+    }
   }
 
   String _formatSecondsAgo(int seconds) {
@@ -512,6 +546,16 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           donorName: activeDonorName,
           bloodType: activeBloodType,
           token: widget.token,
+          // 0 for a first-time donor (they haven't actually donated yet,
+          // so the Community Impact card shouldn't show someone else's
+          // stats) — otherwise the same totalDonations the "Lifetime
+          // Impact Record" card on DonorProfileView already uses, so both
+          // screens report the same numbers instead of one being a
+          // hardcoded placeholder.
+          // Hospital-verified count (GET /api/donor/me), not the
+          // self-reported totalDonations from screening — see
+          // _loadDonorProfile's comment for why.
+          totalDonations: _completedDonations,
           onBookingCompleted: _handleBookingCompleted,
           onRefresh: _refreshBroadcastData,
           activeRequests: _activeRequests,
@@ -596,6 +640,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           token: widget.token,
           onProfileUpdated: _handleRetakeCompleted,
           clinicalVitals: _clinicalVitalsRecord,
+          completedDonations: _completedDonations,
+          photoUrl: _photoUrl,
+          onPhotoUpdated: (url) => setState(() => _photoUrl = url),
         );
       default:
         return const SizedBox.shrink();

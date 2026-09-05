@@ -7,6 +7,9 @@
          http.* call fails with a generic connection error, which is exactly
          what the OTP screen was showing. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    
+    <!-- Required for image_picker plugin to access the camera. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:label="resq"

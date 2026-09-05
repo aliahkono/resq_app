@@ -9,6 +9,7 @@ import 'package:resq/views/auth/med_history_details_view.dart';
 import 'package:resq/views/auth/registration_summary_view.dart';
 import 'package:resq/widgets/custom_input_field.dart';
 import 'package:resq/utils/helpers/responsive.dart';
+import 'package:resq/widgets/editable_avatar.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
@@ -45,6 +46,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
   // Step 1: Account Controllers & Toggles
   final _nameController = TextEditingController();
+  // Local file path of a photo picked during registration — no session
+  // token exists yet to upload with (see EditableAvatar's mode split), so
+  // this is only actually uploaded once _finishAssessment's account
+  // creation succeeds and otp_ver_view.dart has a real token to use.
+  String? _photoPath;
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -600,6 +606,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             classificationResult: result,
             rawPassword: _passwordController.text,
             isFirstTimeDonor: _isFirstTimeDonor,
+            photoPath: _photoPath,
           ),
         ),
       );
@@ -720,7 +727,19 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             'Join our community of lifesaving donors.',
             style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+          Center(
+            child: EditableAvatar(
+              localPhotoPath: _photoPath,
+              radius: 42,
+              onLocalFilePicked: (path) => setState(() => _photoPath = path),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Center(
+            child: Text('Add a profile photo (optional)', style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
+          ),
+          const SizedBox(height: 24),
           _buildBorderedInput(
             controller: _nameController,
             hintText: 'Full Name',

@@ -24,6 +24,11 @@ class OtpVerView extends StatefulWidget {
   final String password;
   final ScreenNPTModel? screeningModel;
   final ClassificationResult? classificationResult;
+  // Local path of a photo picked during registration (see EditableAvatar /
+  // registration_wiz_view.dart) — no session token existed at pick time to
+  // upload it with, so it's carried all the way here and uploaded once
+  // complete-profile actually grants one.
+  final String? photoPath;
 
   const OtpVerView({
     super.key,
@@ -35,6 +40,7 @@ class OtpVerView extends StatefulWidget {
     required this.password,
     this.screeningModel,
     this.classificationResult,
+    this.photoPath,
   });
 
   @override
@@ -301,6 +307,17 @@ class _OtpVerViewState extends State<OtpVerView> {
         );
         sessionToken = completeResponse['token'] as String;
         donor = completeResponse['donor'] as Map<String, dynamic>?;
+
+        // Best-effort — a failed photo upload shouldn't block account
+        // creation, which has already succeeded by this point. The donor
+        // can always add/retry a photo later from the Profile screen.
+        if (widget.photoPath != null) {
+          try {
+            await ApiService.uploadProfilePhoto(sessionToken, widget.photoPath!);
+          } catch (e) {
+            debugPrint('OtpVerView: profile photo upload failed: $e');
+          }
+        }
       } else {
         // A donor record already existed for this phone (e.g. an admin
         // walk-in entry, or this donor registering again on a number

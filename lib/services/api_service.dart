@@ -218,6 +218,29 @@ class ApiService {
     return _patch('/donor/me', updates, token: token);
   }
 
+  /// POST /api/donor/me/photo — multipart upload of the donor's profile
+  /// photo, returning the new hosted URL (e.g. { "photoUrl": "https://..." }).
+  /// NOTE: this route does not exist on the backend yet — needs a handler
+  /// added there (accepting a multipart field named "photo", storing it
+  /// wherever donor photos are meant to live, and returning the resulting
+  /// URL) before this call will succeed, same as deleteMyAccount above.
+  static Future<String> uploadProfilePhoto(String token, String filePath) async {
+    final uri = Uri.parse('$kApiBaseUrl/donor/me/photo');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(await http.MultipartFile.fromPath('photo', filePath));
+
+    final streamedResponse = await request.send().timeout(_timeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    final body = _decode(response);
+
+    final url = body['photoUrl'] as String?;
+    if (url == null || url.isEmpty) {
+      throw ApiException(response.statusCode, 'Upload succeeded but no photo URL was returned.');
+    }
+    return url;
+  }
+
   /// POST /api/donor-auth/logout
   static Future<void> logout(String token) {
     return _post('/donor-auth/logout', {}, token: token);

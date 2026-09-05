@@ -6,6 +6,7 @@ import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/helpers/med_keyword_rules.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
+import 'package:resq/widgets/editable_avatar.dart';
 
 class DonorProfileView extends StatelessWidget {
   final ScreenNPTModel? screeningModel;
@@ -17,6 +18,14 @@ class DonorProfileView extends StatelessWidget {
   final String donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onProfileUpdated;
   final String token;
+  // Hospital-verified count (GET /api/donor/me's completedDonations) — not
+  // the donor's self-reported totalDonations from registration/retake
+  // screening, which never changes just because a real donation happened.
+  // Starts at 0 for a first-time donor and only grows when a hospital
+  // admin actually marks an appointment completed.
+  final int completedDonations;
+  final String? photoUrl;
+  final ValueChanged<String>? onPhotoUpdated;
 
   const DonorProfileView({
     super.key,
@@ -29,6 +38,9 @@ class DonorProfileView extends StatelessWidget {
     required this.donorId,
     this.onProfileUpdated,
     this.token = '',
+    this.completedDonations = 0,
+    this.photoUrl,
+    this.onPhotoUpdated,
   });
 
   String _formatDate(DateTime date) {
@@ -192,24 +204,11 @@ class DonorProfileView extends StatelessWidget {
           Stack(
             alignment: Alignment.bottomRight,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF9B1B20), width: 2.2),
-                ),
-                // No real donor photo asset exists in the project (this
-                // referenced "assets/images/donor_sample.jpg", which was
-                // never actually added) — CircleAvatar already renders its
-                // `child` as a perfectly good default appearance without a
-                // backgroundImage, so dropping it just stops the repeated
-                // "Unable to load asset" console error with no visual change.
-                child: const CircleAvatar(
-                  radius: 38,
-                  backgroundColor: Color(0xFFF3E5E6),
-                  child: Icon(Icons.person_rounded, size: 44, color: Color(0xFF9B1B20)),
-                ),
+              EditableAvatar(
+                photoUrl: photoUrl,
+                radius: 38,
+                token: token,
+                onUploaded: (url) => onPhotoUpdated?.call(url),
               ),
               Container(
                 padding: const EdgeInsets.all(3.5),
@@ -480,7 +479,7 @@ class DonorProfileView extends StatelessWidget {
 
   // --- Dynamic Lifetime Impact Card (Without Badges) ---
   Widget _buildLifetimeImpactCard(BuildContext context) {
-    final int donations = (isFirstTimeDonor) ? 0 : (screeningModel?.screensNPT.totalDonations ?? 0);
+    final int donations = completedDonations;
     final double liters = donations * 0.45;
     final int lives = donations * 3;
 
@@ -712,33 +711,57 @@ class DonorProfileView extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20.0),
+      builder: (context) => Container(
+        // Bounded height + the inner content in its own SingleChildScrollView
+        // — without this, a donor with BOTH a Recent Travel Risk reason and
+        // a Medication Disclosures reason (each can wrap several lines once
+        // highlighted keywords are added) could push this sheet's content
+        // taller than the screen, which pushed RETAKE SCREENING/CLOSE off
+        // the bottom entirely with no way to reach them. Title and buttons
+        // stay outside the scrollable area so they're always visible
+        // regardless of how long the reason text gets.
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Medical & Screening Disclosures', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
-            _buildModalRow('Biological Sex', sex),
-            _buildModalRow('Recorded Age', age > 0 ? '$age yrs' : 'N/A'),
-            _buildModalRow('Recorded Weight', weight > 0 ? '$weight kg' : 'N/A'),
-            _buildModalRow(
-              'Recent Travel Risk',
-              !hasTravelFlag
-                  ? 'None reported'
-                  : (travelAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Low Risk'),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildModalRow('Biological Sex', sex),
+                    _buildModalRow('Recorded Age', age > 0 ? '$age yrs' : 'N/A'),
+                    _buildModalRow('Recorded Weight', weight > 0 ? '$weight kg' : 'N/A'),
+                    _buildModalRow(
+                      'Recent Travel Risk',
+                      !hasTravelFlag
+                          ? 'None reported'
+                          : (travelAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Low Risk'),
+                    ),
+                    if (hasTravelFlag) _buildReasonBlock(travelDesc, travelAssessment),
+                    _buildModalRow(
+                      'Medication Disclosures',
+                      !hasMedicalFlag
+                          ? 'None reported'
+                          : (medicalAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Manageable'),
+                    ),
+                    if (hasMedicalFlag) _buildReasonBlock(medicalDesc, medicalAssessment),
+                    _buildModalRow('Assessment Status', 'Evaluated via Real-time Logic'),
+                  ],
+                ),
+              ),
             ),
-            if (hasTravelFlag) _buildReasonBlock(travelDesc, travelAssessment),
-            _buildModalRow(
-              'Medication Disclosures',
-              !hasMedicalFlag
-                  ? 'None reported'
-                  : (medicalAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Manageable'),
-            ),
-            if (hasMedicalFlag) _buildReasonBlock(medicalDesc, medicalAssessment),
-            _buildModalRow('Assessment Status', 'Evaluated via Real-time Logic'),
             const SizedBox(height: 16),
             Row(
               children: [

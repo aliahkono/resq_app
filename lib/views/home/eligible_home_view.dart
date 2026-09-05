@@ -46,6 +46,12 @@ class EligibleHomeView extends StatelessWidget {
   // open would never appear until they fully restarted the app, since the
   // feed only ever fetched once on HomeView's initState.
   final Future<void> Function()? onRefresh;
+  // Hospital-verified lifetime donation count (see DonorProfileView's field
+  // of the same name) — the Community Impact card below derives both
+  // stats from this, instead of the two literal strings '4'/'12' it used
+  // to always show regardless of who was logged in or whether they'd ever
+  // actually donated.
+  final int totalDonations;
 
   const EligibleHomeView({
     super.key,
@@ -57,6 +63,7 @@ class EligibleHomeView extends StatelessWidget {
     required this.token,
     required this.onBookingCompleted,
     this.onRefresh,
+    this.totalDonations = 0,
   });
 
   @override
@@ -437,12 +444,12 @@ class EligibleHomeView extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Units Donated', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
-                          SizedBox(height: 4),
-                          Text('4', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                          const Text('Units Donated', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                          const SizedBox(height: 4),
+                          Text('$totalDonations', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -455,12 +462,12 @@ class EligibleHomeView extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Lives Saved', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
-                          SizedBox(height: 4),
-                          Text('12', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                          const Text('Lives Saved', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                          const SizedBox(height: 4),
+                          Text('${totalDonations * 3}', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
