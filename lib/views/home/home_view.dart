@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/appointment/active_sched_view.dart';
@@ -72,6 +73,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   // was signed in.
   int _completedDonations = 0;
   String? _photoUrl;
+  VerificationStatus _verificationStatus = VerificationStatus.notStarted;
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
@@ -278,10 +280,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final raw = profile['completedDonations'];
       final completed = raw is num ? raw.toInt() : 0;
       final photoUrl = profile['photoUrl'] as String?;
+      final verification = verificationStatusFromString(profile['verificationStatus'] as String?);
       if (!mounted) return;
       setState(() {
         _completedDonations = completed;
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
+        _verificationStatus = verification;
       });
     } catch (e) {
       debugPrint('HomeView._loadDonorProfile failed: $e');
@@ -491,6 +495,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                     isEligible: _effectiveResult.isEligible,
                     donorBloodType: widget.bloodType,
                     token: widget.token,
+                    isVerified: _verificationStatus.isVerified,
                     onBookingCompleted: _handleBookingCompleted,
                   ),
                 ],
@@ -556,6 +561,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           // self-reported totalDonations from screening — see
           // _loadDonorProfile's comment for why.
           totalDonations: _completedDonations,
+          isVerified: _verificationStatus.isVerified,
           onBookingCompleted: _handleBookingCompleted,
           onRefresh: _refreshBroadcastData,
           activeRequests: _activeRequests,
@@ -570,6 +576,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 builder: (context) => EligibleAppointView(
                   isFirstTimeDonor: _isFirstTime,
                   token: widget.token,
+                  isVerified: _verificationStatus.isVerified,
                   preselectedHospitalId: request.hospitalId.isNotEmpty ? request.hospitalId : null,
                   onBookingCompleted: (appointment) {
                     Navigator.pop(context);
@@ -611,6 +618,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                     builder: (context) => EligibleAppointView(
                       isFirstTimeDonor: _isFirstTime,
                       token: widget.token,
+                      isVerified: _verificationStatus.isVerified,
                       preselectedHospitalId: hospitalId,
                       onBookingCompleted: (appointment) {
                         Navigator.pop(context);
@@ -643,6 +651,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           completedDonations: _completedDonations,
           photoUrl: _photoUrl,
           onPhotoUpdated: (url) => setState(() => _photoUrl = url),
+          verificationStatus: _verificationStatus,
         );
       default:
         return const SizedBox.shrink();

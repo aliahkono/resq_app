@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
+import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/helpers/med_keyword_rules.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
+import 'package:resq/views/profile/get_ver_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
 import 'package:resq/widgets/editable_avatar.dart';
 
@@ -26,6 +28,7 @@ class DonorProfileView extends StatelessWidget {
   final int completedDonations;
   final String? photoUrl;
   final ValueChanged<String>? onPhotoUpdated;
+  final VerificationStatus verificationStatus;
 
   const DonorProfileView({
     super.key,
@@ -41,6 +44,7 @@ class DonorProfileView extends StatelessWidget {
     this.completedDonations = 0,
     this.photoUrl,
     this.onPhotoUpdated,
+    this.verificationStatus = VerificationStatus.notStarted,
   });
 
   String _formatDate(DateTime date) {
@@ -260,6 +264,8 @@ class DonorProfileView extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          _buildVerificationBadge(context),
           const SizedBox(height: 16),
           const Divider(height: 1, color: Color(0xFFEFE8E8)),
           const SizedBox(height: 14),
@@ -802,6 +808,67 @@ class DonorProfileView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildVerificationBadge(BuildContext context) {
+    late final Color bg;
+    late final Color fg;
+    late final IconData icon;
+    switch (verificationStatus) {
+      case VerificationStatus.verified:
+        bg = const Color(0xFFE8F5E9);
+        fg = const Color(0xFF2E7D32);
+        icon = Icons.verified_rounded;
+        break;
+      case VerificationStatus.pending:
+        bg = const Color(0xFFFFF3E0);
+        fg = const Color(0xFFE65100);
+        icon = Icons.hourglass_top_rounded;
+        break;
+      case VerificationStatus.rejected:
+        bg = const Color(0xFFFEF2F2);
+        fg = const Color(0xFFB91C1C);
+        icon = Icons.error_outline_rounded;
+        break;
+      case VerificationStatus.notStarted:
+        bg = const Color(0xFFF3F3F5);
+        fg = const Color(0xFF6B7280);
+        icon = Icons.shield_outlined;
+        break;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                verificationStatus.label.toUpperCase(),
+                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.4, color: fg),
+              ),
+            ],
+          ),
+        ),
+        if (verificationStatus != VerificationStatus.verified && verificationStatus != VerificationStatus.pending) ...[
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => GetVerifiedView(token: token)),
+            ),
+            child: const Text(
+              'Get Verified',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20), decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
+      ],
     );
   }
 

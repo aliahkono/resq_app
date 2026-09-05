@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/views/profile/get_ver_view.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 
 /// Parsed from GET /api/donor/hospitals — real hospitals from the admin
@@ -41,6 +42,11 @@ class EligibleAppointView extends StatefulWidget {
   // partner hospital, so letting them tap a different card here would let
   // them silently book against a hospital with no open request at all.
   final String? preselectedHospitalId;
+  // Gate added so every entry point that can reach this screen (Home tab's
+  // Priority Request Feed, Appointment tab's own CTA, the notification
+  // bell's "accept slot") is protected in one place, instead of needing
+  // the same check duplicated at each call site.
+  final bool isVerified;
 
   const EligibleAppointView({
     super.key,
@@ -48,6 +54,7 @@ class EligibleAppointView extends StatefulWidget {
     required this.token,
     required this.onBookingCompleted,
     this.preselectedHospitalId,
+    this.isVerified = false,
   });
 
   @override
@@ -191,6 +198,64 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.isVerified) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEBEBEB),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: const BoxDecoration(color: Color(0xFFFDEBEC), shape: BoxShape.circle),
+                  child: const Icon(Icons.verified_user_outlined, size: 44, color: Color(0xFF9B1B20)),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Verification Required',
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'To keep both donors and recipients safe, you need to complete ID and photo verification before booking a donation appointment.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => GetVerifiedView(token: widget.token)),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF9B1B20),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      elevation: 0,
+                    ),
+                    child: const Text('GET VERIFIED', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Not Now', style: TextStyle(color: Color(0xFF6B7280))),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFEBEBEB),
       body: SafeArea(
@@ -349,7 +414,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
               ),
             ],
           ),
-          AppNotificationBell(isEligible: true, donorBloodType: '', token: widget.token),
+          AppNotificationBell(isEligible: true, donorBloodType: '', token: widget.token, isVerified: widget.isVerified),
         ],
       ),
     );

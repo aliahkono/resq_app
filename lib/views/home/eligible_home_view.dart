@@ -52,6 +52,7 @@ class EligibleHomeView extends StatelessWidget {
   // to always show regardless of who was logged in or whether they'd ever
   // actually donated.
   final int totalDonations;
+  final bool isVerified;
 
   const EligibleHomeView({
     super.key,
@@ -64,6 +65,7 @@ class EligibleHomeView extends StatelessWidget {
     required this.onBookingCompleted,
     this.onRefresh,
     this.totalDonations = 0,
+    this.isVerified = false,
   });
 
   @override
@@ -157,6 +159,7 @@ class EligibleHomeView extends StatelessWidget {
                         builder: (context) => EligibleAppointView(
                           isFirstTimeDonor: true,
                           token: token,
+                          isVerified: isVerified,
                           onBookingCompleted: (appointment) {
                             Navigator.pop(context);
                             onBookingCompleted(appointment);

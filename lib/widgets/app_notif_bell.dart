@@ -16,6 +16,7 @@ class AppNotificationBell extends StatelessWidget {
   // broadcast notification also shows up on the Appointment tab, instead of
   // being the one entry point that silently forgets about it.
   final void Function(Map<String, dynamic> appointment)? onBookingCompleted;
+  final bool isVerified;
 
   const AppNotificationBell({
     super.key,
@@ -23,6 +24,7 @@ class AppNotificationBell extends StatelessWidget {
     required this.donorBloodType,
     required this.token,
     this.onBookingCompleted,
+    this.isVerified = false,
   });
 
   @override
@@ -116,6 +118,7 @@ class AppNotificationBell extends StatelessWidget {
               builder: (context) => EligibleAppointView(
                 isFirstTimeDonor: false,
                 token: token,
+                isVerified: isVerified,
                 preselectedHospitalId: item.hospitalId,
                 onBookingCompleted: (appointment) {
                   Navigator.pop(context);
