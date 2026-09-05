@@ -44,14 +44,14 @@ class MedicalAssessment {
   const MedicalAssessment({required this.verdict, this.note, this.matches = const []});
 }
 
-class _ConditionRule {
+class ConditionRule {
   final String label;
   final List<String> triggerKeywords;
   final List<String> deferralKeywords;
   final List<String> eligibleKeywords;
   final bool alwaysDeferred;
 
-  const _ConditionRule({
+  const ConditionRule({
     required this.label,
     required this.triggerKeywords,
     this.deferralKeywords = const [],
@@ -63,8 +63,8 @@ class _ConditionRule {
 class MedicalKeywordRules {
   MedicalKeywordRules._();
 
-  static const List<_ConditionRule> majorMedicalConditions = [
-    _ConditionRule(
+  static const List<ConditionRule> majorMedicalConditions = [
+    ConditionRule(
       label: 'Asthma',
       triggerKeywords: ['asthma'],
       deferralKeywords: [
@@ -80,46 +80,46 @@ class MedicalKeywordRules {
       ],
       eligibleKeywords: ['controlled', 'mild', 'no symptoms', 'manageable'],
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Heart Disease',
       triggerKeywords: ['heart disease', 'cardiac', 'heart attack', 'coronary'],
       alwaysDeferred: true,
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Diabetes',
       triggerKeywords: ['diabetes', 'diabetic'],
       deferralKeywords: ['insulin', 'uncontrolled', 'high blood sugar', 'beef insulin'],
       eligibleKeywords: ['metformin', 'oral medication', 'diet controlled', 'diet-controlled', 'controlled'],
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Neurological Disorder',
       triggerKeywords: ['epilepsy', 'seizure', 'seizures', 'neurological disorder'],
       alwaysDeferred: true,
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Blood/Bleeding/Clotting Disorder',
       triggerKeywords: ['bleeding disorder', 'clotting disorder', 'hemophilia', 'blood disorder', 'thrombophilia'],
       alwaysDeferred: true,
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Severe Skin Condition',
       triggerKeywords: ['severe skin condition', 'severe psoriasis', 'severe eczema', 'skin infection'],
       alwaysDeferred: true,
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Autoimmune/Immunosuppressive Disorder',
       triggerKeywords: ['autoimmune', 'lupus', 'immunosuppressive', 'rheumatoid arthritis', 'immunocompromised'],
       alwaysDeferred: true,
     ),
   ];
 
-  static const List<_ConditionRule> travelConditions = [
-    _ConditionRule(
+  static const List<ConditionRule> travelConditions = [
+    ConditionRule(
       label: 'Malaria-Endemic Travel',
       triggerKeywords: ['malaria', 'palawan', 'mindoro', 'romblon', 'endemic area', 'rural area'],
       alwaysDeferred: true,
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Needle Stick / Sharps Exposure',
       triggerKeywords: [
         'needle stick',
@@ -132,7 +132,7 @@ class MedicalKeywordRules {
       ],
       alwaysDeferred: true,
     ),
-    _ConditionRule(
+    ConditionRule(
       label: 'Tattoo / Piercing (Commercial Shop)',
       triggerKeywords: ['tattoo', 'piercing', 'ear piercing', 'body piercing'],
       alwaysDeferred: true,
@@ -168,7 +168,7 @@ class MedicalKeywordRules {
 
   static MedicalAssessment _assess(
     String? description,
-    List<_ConditionRule> rules, {
+    List<ConditionRule> rules, {
     required KeywordVerdict noMentionVerdict,
     required String noMentionNote,
     KeywordVerdict defaultWhenNoTriggerMatches = KeywordVerdict.deferred,
