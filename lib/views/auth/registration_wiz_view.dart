@@ -5,6 +5,7 @@ import 'package:resq/model/user_model.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/login_view.dart';
+import 'package:resq/views/auth/med_history_details_view.dart';
 import 'package:resq/views/auth/registration_summary_view.dart';
 import 'package:resq/widgets/custom_input_field.dart';
 import 'package:resq/utils/helpers/responsive.dart';
@@ -79,12 +80,23 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     'Aspirin',
     'Vaccines',
     'Dental Work',
-    'Minor Surgery',
   ];
   final Set<String> _recentMedProcedures = {};
+  // Date + dosage/reason collected per chip the instant it's checked (see
+  // _promptMedProcedureDetail) — keyed by the same option name.
+  final Map<String, MedProcedureDetail> _medProcedureDetails = {};
   bool _hasMajorMedicalHistory = false;
+  // Collected on the follow-up question screen (see _openMedicalHistoryDetails)
+  // when Major Medical History, Transfusion/Surgery, or Travel/Needle Stick
+  // is toggled "yes" — no date for major medical history since no deferral
+  // window applies to it (see decision_tree_class.dart).
+  String? _majorMedicalHistoryDesc;
   bool _hasTransfusionOrSurgery = false;
+  DateTime? _transfusionOrSurgeryDate;
+  String? _transfusionOrSurgeryDesc;
   bool _hasTravelOrNeedleStick = false;
+  DateTime? _travelOrNeedleDate;
+  String? _travelOrNeedleDesc;
 
   // Step 5: Final Screening (Sex-Specific) State & Controllers
   DateTime? _lastMensDate;
@@ -126,9 +138,15 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         _feelsWellToday = initial.feelsWellToday;
         _hasEatenRecently = initial.hasEatenRecently;
         _recentMedProcedures.addAll(initial.recentMedProcedures);
+        _medProcedureDetails.addAll(initial.medProcedureDetails);
         _hasMajorMedicalHistory = initial.hasMajorMedicalHistory;
+        _majorMedicalHistoryDesc = initial.majorMedicalHistoryDesc;
         _hasTransfusionOrSurgery = initial.hasTransfusionOrSurgery;
+        _transfusionOrSurgeryDate = initial.transfusionOrSurgeryDate;
+        _transfusionOrSurgeryDesc = initial.transfusionOrSurgeryDesc;
         _hasTravelOrNeedleStick = initial.hasTravelOrNeedleStick;
+        _travelOrNeedleDate = initial.travelOrNeedleDate;
+        _travelOrNeedleDesc = initial.travelOrNeedleDesc;
         _lastMensDate = initial.lastMensPeriodDate;
         _hasHighRiskContact = initial.hasHighRiskExpo ?? false;
         if (initial.isPregOrNursing == true) {
@@ -259,6 +277,90 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     );
   }
 
+  /// Instant follow-up popup shown the moment a donor checks one of the
+  /// "recent meds/procedures" chips (Antibiotics, Aspirin, Vaccines, Dental
+  /// Work) — collects when it happened and the dosage/reason so the
+  /// decision tree can judge the 4-week window against a real date instead
+  /// of deferring forever. Confirming closes the popup and checks the
+  /// chip; cancelling leaves the chip unselected.
+  Future<void> _promptMedProcedureDetail(String option) async {
+    DateTime? pickedDate = _medProcedureDetails[option]?.date;
+    final reasonController = TextEditingController(text: _medProcedureDetails[option]?.dosageOrReason ?? '');
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                option,
+                style: const TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('When did you take/undergo this?', style: TextStyle(fontSize: 13, height: 1.4)),
+                  const SizedBox(height: 10),
+                  _buildCrimsonDateButton(
+                    title: pickedDate != null ? _formatDate(pickedDate) : 'Select Date',
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: dialogContext,
+                        initialDate: pickedDate ?? DateTime.now(),
+                        firstDate: DateTime.now().subtract(const Duration(days: 90)),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => pickedDate = picked);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  CustomInputField(
+                    controller: reasonController,
+                    hintText: 'e.g., 500mg twice daily / Wisdom tooth removal',
+                    labelText: 'Dosage or Reason',
+                    icon: Icons.medical_information_outlined,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (pickedDate == null) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Please select a date.')),
+                      );
+                      return;
+                    }
+                    setState(() {
+                      _recentMedProcedures.add(option);
+                      _medProcedureDetails[option] = MedProcedureDetail(
+                        date: pickedDate,
+                        dosageOrReason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+                      );
+                    });
+                    Navigator.pop(dialogContext);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
+                  child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   bool _validateStep() {
     if (_currentStep == 1 && !widget.isRetake) {
       if (!(_formKey.currentState?.validate() ?? false)) {
@@ -278,11 +380,46 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
 
   void _nextStep() {
     if (!_validateStep()) return;
+    if (_currentStep == 4 &&
+        (_hasMajorMedicalHistory || _hasTransfusionOrSurgery || _hasTravelOrNeedleStick)) {
+      // Toggled "yes" on at least one Medical History / Risk Factor
+      // question — collect the follow-up details on a dedicated screen
+      // before moving on, instead of proceeding straight to Final
+      // Screening with no way to judge deferral windows against a date.
+      _openMedicalHistoryDetails();
+      return;
+    }
     if (_currentStep < _totalSteps) {
       setState(() => _currentStep++);
     } else {
       _finishAssessment();
     }
+  }
+
+  Future<void> _openMedicalHistoryDetails() async {
+    final result = await Navigator.of(context).push<MedicalHistoryFollowUpResult>(
+      MaterialPageRoute(
+        builder: (context) => MedicalHistoryDetailsView(
+          needsMajorMedical: _hasMajorMedicalHistory,
+          needsTransfusion: _hasTransfusionOrSurgery,
+          needsTravel: _hasTravelOrNeedleStick,
+          initialMajorMedicalDesc: _majorMedicalHistoryDesc,
+          initialTransfusionDate: _transfusionOrSurgeryDate,
+          initialTransfusionDesc: _transfusionOrSurgeryDesc,
+          initialTravelDate: _travelOrNeedleDate,
+          initialTravelDesc: _travelOrNeedleDesc,
+        ),
+      ),
+    );
+    if (result == null) return; // donor backed out — stay on Step 4
+    setState(() {
+      _majorMedicalHistoryDesc = result.majorMedicalHistoryDesc;
+      _transfusionOrSurgeryDate = result.transfusionOrSurgeryDate;
+      _transfusionOrSurgeryDesc = result.transfusionOrSurgeryDesc;
+      _travelOrNeedleDate = result.travelOrNeedleDate;
+      _travelOrNeedleDesc = result.travelOrNeedleDesc;
+      _currentStep++;
+    });
   }
 
   void _prevStep() {
@@ -326,12 +463,19 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       feelsWellToday: _feelsWellToday,
       hasEatenRecently: _hasEatenRecently,
       hasTattsOrPierce: _hasTattoosOrPiercings,
+      tattooDate: _hasTattoosOrPiercings ? _tattooDate : null,
       hasAlcoholPast24hr: _hasAlcoholPast24hr,
       hasActiveInfectOrMeds: _hasActiveInfectOrMeds,
       recentMedProcedures: _recentMedProcedures,
+      medProcedureDetails: _medProcedureDetails,
       hasMajorMedicalHistory: _hasMajorMedicalHistory,
+      majorMedicalHistoryDesc: _hasMajorMedicalHistory ? _majorMedicalHistoryDesc : null,
       hasTransfusionOrSurgery: _hasTransfusionOrSurgery,
+      transfusionOrSurgeryDate: _hasTransfusionOrSurgery ? _transfusionOrSurgeryDate : null,
+      transfusionOrSurgeryDesc: _hasTransfusionOrSurgery ? _transfusionOrSurgeryDesc : null,
       hasTravelOrNeedleStick: _hasTravelOrNeedleStick,
+      travelOrNeedleDate: _hasTravelOrNeedleStick ? _travelOrNeedleDate : null,
+      travelOrNeedleDesc: _hasTravelOrNeedleStick ? _travelOrNeedleDesc : null,
       isPregOrNursing: _gender == BioSex.female ? isPregOrNursing : null,
       lastMensPeriodDate: _gender == BioSex.female ? _lastMensDate : null,
       hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,
@@ -366,10 +510,27 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             'isFirstTimeDonor': evaluatedParams.isFirstTimeDonor,
             'lastDonationDate': evaluatedParams.lastDonationDate?.toIso8601String(),
             'totalDonations': evaluatedParams.totalDonations,
+            'feelsWellToday': evaluatedParams.feelsWellToday,
+            'hasEatenRecently': evaluatedParams.hasEatenRecently,
             'hasTattsOrPierce': evaluatedParams.hasTattsOrPierce,
             'tattooDate': evaluatedParams.tattooDate?.toIso8601String(),
             'hasAlcoholPast24hr': evaluatedParams.hasAlcoholPast24hr,
             'hasActiveInfectOrMeds': evaluatedParams.hasActiveInfectOrMeds,
+            'recentMedProcedures': evaluatedParams.recentMedProcedures.toList(),
+            'medProcedureDetails': evaluatedParams.medProcedureDetails.map(
+              (key, detail) => MapEntry(key, {
+                'date': detail.date?.toIso8601String(),
+                'dosageOrReason': detail.dosageOrReason,
+              }),
+            ),
+            'hasMajorMedicalHistory': evaluatedParams.hasMajorMedicalHistory,
+            'majorMedicalHistoryDesc': evaluatedParams.majorMedicalHistoryDesc,
+            'hasTransfusionOrSurgery': evaluatedParams.hasTransfusionOrSurgery,
+            'transfusionOrSurgeryDate': evaluatedParams.transfusionOrSurgeryDate?.toIso8601String(),
+            'transfusionOrSurgeryDesc': evaluatedParams.transfusionOrSurgeryDesc,
+            'hasTravelOrNeedleStick': evaluatedParams.hasTravelOrNeedleStick,
+            'travelOrNeedleDate': evaluatedParams.travelOrNeedleDate?.toIso8601String(),
+            'travelOrNeedleDesc': evaluatedParams.travelOrNeedleDesc,
             'isPregOrNursing': evaluatedParams.isPregOrNursing,
             'lastMensPeriodDate': evaluatedParams.lastMensPeriodDate?.toIso8601String(),
             'hasHighRiskExpo': evaluatedParams.hasHighRiskExpo,
@@ -1089,13 +1250,16 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   return _buildChipToggle(
                     label: option,
                     isSelected: isSelected,
-                    onTap: () => setState(() {
+                    onTap: () {
                       if (isSelected) {
-                        _recentMedProcedures.remove(option);
+                        setState(() {
+                          _recentMedProcedures.remove(option);
+                          _medProcedureDetails.remove(option);
+                        });
                       } else {
-                        _recentMedProcedures.add(option);
+                        _promptMedProcedureDetail(option);
                       }
-                    }),
+                    },
                   );
                 }).toList(),
               ),

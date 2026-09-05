@@ -239,7 +239,19 @@ class ApiService {
       '/donor/appointments',
       {
         'hospitalId': hospitalId,
-        'scheduledAt': scheduledAt.toIso8601String(),
+        // .toUtc() is required here: scheduledAt is built from the picked
+        // date/time-slot as a naive LOCAL DateTime (see _confirmBooking,
+        // eligible_appoint_view.dart). A naive DateTime's toIso8601String()
+        // has no timezone marker at all ("2026-09-10T08:00:00.000", no "Z"
+        // or offset) — the backend (running in UTC on Render) then parses
+        // that ambiguous string as if it already were UTC. Reading it back
+        // and calling .toLocal() (see _toConfirmedAppointment,
+        // home_view.dart) then applies the device's UTC+8 offset on top of
+        // a value that was never actually UTC, shifting the reflected time
+        // slot 8 hours from what the donor actually picked. Converting to
+        // UTC before sending makes the string unambiguous end to end, so
+        // .toLocal() on the way back correctly reverses it.
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
       },
       token: token,
     );

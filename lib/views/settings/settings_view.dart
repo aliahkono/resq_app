@@ -950,34 +950,52 @@ class _SettingsViewState extends State<SettingsView> {
           'Are you sure you want to sign out of your ResQ donor account?',
           style: TextStyle(fontSize: 13, color: Colors.black87),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF9B1B20),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              Navigator.pop(context);
-              // Best-effort: invalidate the session server-side (POST
-              // /donor-auth/logout deletes the Redis session row). If this
-              // fails — no connection, token already expired — sign the
-              // donor out locally anyway; there's nothing else useful to do
-              // with a stale/unreachable token.
-              try {
-                await ApiService.logout(widget.token);
-              } catch (_) {}
-              await SessionStorage.clearToken();
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const AuthLandingView()),
-                    (route) => false,
-              );
-            },
-            child: const Text('SIGN OUT'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF9B1B20),
+                    side: const BorderSide(color: Color(0xFF9B1B20), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9B1B20),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    Navigator.pop(context);
+                    // Best-effort: invalidate the session server-side (POST
+                    // /donor-auth/logout deletes the Redis session row). If this
+                    // fails — no connection, token already expired — sign the
+                    // donor out locally anyway; there's nothing else useful to do
+                    // with a stale/unreachable token.
+                    try {
+                      await ApiService.logout(widget.token);
+                    } catch (_) {}
+                    await SessionStorage.clearToken();
+                    navigator.pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const AuthLandingView()),
+                          (route) => false,
+                    );
+                  },
+                  child: const Text('SIGN OUT', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
         ],
       ),

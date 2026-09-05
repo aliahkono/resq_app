@@ -3,6 +3,7 @@ import 'package:resq/model/donor_profile_model.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/user_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
+import 'package:resq/utils/helpers/eligibility_rules.dart';
 import 'package:resq/views/auth/otp_ver_view.dart';
 
 class RegistrationSummaryView extends StatelessWidget {
@@ -144,11 +145,28 @@ class RegistrationSummaryView extends StatelessWidget {
                   screens.recentMedProcedures.isEmpty ? 'None' : screens.recentMedProcedures.join(', '),
                 ),
                 const Divider(height: 1),
-                _buildDataRow('Major Medical History', screens.hasMajorMedicalHistory ? 'Reported' : 'None'),
+                _buildDataRow(
+                  'Major Medical History',
+                  screens.hasMajorMedicalHistory
+                      ? (screens.majorMedicalHistoryDesc?.isNotEmpty == true
+                          ? 'Reported • ${screens.majorMedicalHistoryDesc}'
+                          : 'Reported')
+                      : 'None',
+                ),
                 const Divider(height: 1),
-                _buildDataRow('Transfusion or Surgery (12 mos)', screens.hasTransfusionOrSurgery ? 'Yes' : 'No'),
+                _buildDataRow(
+                  'Transfusion or Surgery (12 mos)',
+                  screens.hasTransfusionOrSurgery
+                      ? 'Yes • ${_formatDate(screens.transfusionOrSurgeryDate)}'
+                      : 'No',
+                ),
                 const Divider(height: 1),
-                _buildDataRow('Travel or Needle Stick (12 mos)', screens.hasTravelOrNeedleStick ? 'Yes' : 'No'),
+                _buildDataRow(
+                  'Travel or Needle Stick (12 mos)',
+                  screens.hasTravelOrNeedleStick
+                      ? 'Yes • ${_formatDate(screens.travelOrNeedleDate)}'
+                      : 'No',
+                ),
               ]),
 
               const SizedBox(height: 18),
@@ -170,6 +188,8 @@ class RegistrationSummaryView extends StatelessWidget {
                 _buildDataRow('Alcohol Intake (Past 24h)', screens.hasAlcoholPast24hr ? 'Yes' : 'None'),
                 const Divider(height: 1),
                 _buildDataRow('Active Infection / Meds', screens.hasActiveInfectOrMeds ? 'Reported' : 'Clear'),
+                const Divider(height: 1),
+                _buildReasonRow(EligibilityRules.getStatsDesc(classificationResult)),
               ]),
 
               const SizedBox(height: 18),
@@ -330,6 +350,26 @@ class RegistrationSummaryView extends StatelessWidget {
               textAlign: TextAlign.right,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReasonRow(String reason) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'REASON',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280), letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            reason,
+            style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E1E1E), height: 1.4),
           ),
         ],
       ),

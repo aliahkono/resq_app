@@ -1,5 +1,17 @@
 enum BioSex { male, female }
 
+/// Details captured for one recent medication/minor procedure chip, or for
+/// a "yes" answer on Major Medical History / Transfusion-Surgery / Travel-
+/// Needle Stick — when it happened and why, collected right after the
+/// donor flags it so the decision tree has enough to judge whether the
+/// deferral window has actually elapsed instead of deferring forever.
+class MedProcedureDetail {
+  final DateTime? date;
+  final String? dosageOrReason;
+
+  const MedProcedureDetail({this.date, this.dosageOrReason});
+}
+
 /// Represents the raw donor screening inputs passed into the Decision Tree
 class DonorScreensNPT {
   // Baseline Parameters
@@ -24,13 +36,26 @@ class DonorScreensNPT {
 
   // Medical History Parameters (NEW)
   // Recent meds/minor procedures in the last 4 weeks, e.g. "Antibiotics",
-  // "Aspirin", "Vaccines", "Dental Work", "Minor Surgery"
+  // "Aspirin", "Vaccines", "Dental Work"
   final Set<String> recentMedProcedures;
+  // Date + dosage/reason collected per chip in recentMedProcedures, keyed
+  // by the same option name — used to judge whether the 4-week window has
+  // actually elapsed instead of deferring forever just because a chip was
+  // ever checked.
+  final Map<String, MedProcedureDetail> medProcedureDetails;
   final bool hasMajorMedicalHistory; // heart disease, asthma, diabetes, etc.
+  // Free-text description collected when hasMajorMedicalHistory is true —
+  // no deferral window applies (clinical review required regardless of
+  // when it happened), so only the description is kept, no date.
+  final String? majorMedicalHistoryDesc;
 
   // Risk Factor Parameters (NEW)
   final bool hasTransfusionOrSurgery; // last 12 months
+  final DateTime? transfusionOrSurgeryDate;
+  final String? transfusionOrSurgeryDesc;
   final bool hasTravelOrNeedleStick; // international travel or accidental stick, last 12 months
+  final DateTime? travelOrNeedleDate;
+  final String? travelOrNeedleDesc;
 
   // Female-Specific Screening Parameters
   final bool? isPregOrNursing;
@@ -53,9 +78,15 @@ class DonorScreensNPT {
     required this.hasAlcoholPast24hr,
     required this.hasActiveInfectOrMeds,
     this.recentMedProcedures = const {},
+    this.medProcedureDetails = const {},
     this.hasMajorMedicalHistory = false,
+    this.majorMedicalHistoryDesc,
     this.hasTransfusionOrSurgery = false,
+    this.transfusionOrSurgeryDate,
+    this.transfusionOrSurgeryDesc,
     this.hasTravelOrNeedleStick = false,
+    this.travelOrNeedleDate,
+    this.travelOrNeedleDesc,
     this.isPregOrNursing,
     this.lastMensPeriodDate,
     this.hasHighRiskExpo,
@@ -106,6 +137,18 @@ class DecisionTreeClassifier {
   /// the screening wizard itself).
   static const int tattooDeferralWindowDays = 365;
 
+  /// 4-week window for recent minor medications/procedures (antibiotics,
+  /// aspirin, vaccines, dental work) — matches EligibilityRules.recentProcedureDefDays.
+  static const int recentProcedureDefDays = 28;
+
+  /// 12-month window for a reported transfusion or surgery — matches
+  /// EligibilityRules.transfusionSurgeryDefDays.
+  static const int transfusionSurgeryDefDays = 365;
+
+  /// 12-month window for reported travel or an accidental needle stick —
+  /// matches EligibilityRules.travelNeedleDefDays.
+  static const int travelNeedleDefDays = 365;
+
   /// Evaluates donor parameters through rule-based decision tree nodes
   ClassificationResult classify(DonorScreensNPT npt) {
     // Node 1: Immediate Wellness Check
@@ -146,6 +189,45 @@ class DecisionTreeClassifier {
       return ClassificationResult(status: EligibleStats.deferredMedical);
     }
 
+    // Node 6b: Recent Minor Medications/Procedures Check (4-week window per
+    // chip — uses whichever selected procedure's date is most recent so a
+    // donor who, say, took antibiotics 3 weeks ago and had dental work 2
+    // months ago is judged against the antibiotics date, not cleared early).
+    if (npt.recentMedProcedures.isNotEmpty) {
+      DateTime? mostRecentDate;
+      bool anyMissingDate = false;
+      for (final option in npt.recentMedProcedures) {
+        final date = npt.medProcedureDetails[option]?.date;
+        if (date == null) {
+          anyMissingDate = true;
+          continue;
+        }
+        if (mostRecentDate == null || date.isAfter(mostRecentDate)) {
+          mostRecentDate = date;
+        }
+      }
+      if (anyMissingDate || mostRecentDate == null) {
+        // No date on file for at least one selected procedure — can't verify
+        // the window has elapsed, so defer.
+        return ClassificationResult(status: EligibleStats.deferredRecentProcedure);
+      }
+      final daysSinceProcedure = DateTime.now().difference(mostRecentDate).inDays;
+      if (daysSinceProcedure < recentProcedureDefDays) {
+        return ClassificationResult(
+          status: EligibleStats.deferredRecentProcedure,
+          daysRemaining: recentProcedureDefDays - daysSinceProcedure,
+        );
+      }
+      // Window has passed for every selected procedure — fall through.
+    }
+
+    // Node 6c: Major Medical History Check — no deferral window; a reported
+    // major condition (heart disease, asthma, diabetes, etc.) always
+    // requires clinical review regardless of when it was disclosed.
+    if (npt.hasMajorMedicalHistory) {
+      return ClassificationResult(status: EligibleStats.deferredMajorMedical);
+    }
+
     // Node 5: Tattoo / Piercing Window Check
     if (npt.hasTattsOrPierce) {
       if (npt.tattooDate != null) {
@@ -165,14 +247,41 @@ class DecisionTreeClassifier {
       }
     }
 
-    // Node 10: Transfusion or Surgery Check (last 12 months)
+    // Node 10: Transfusion or Surgery Check (12-month window, using the
+    // actual event date collected in the follow-up screen — same pattern
+    // as the tattoo check above, rather than deferring forever just
+    // because the toggle was once set to "yes").
     if (npt.hasTransfusionOrSurgery) {
-      return ClassificationResult(status: EligibleStats.deferredTransfusionSurgery);
+      if (npt.transfusionOrSurgeryDate != null) {
+        final daysSince = DateTime.now().difference(npt.transfusionOrSurgeryDate!).inDays;
+        if (daysSince >= transfusionSurgeryDefDays) {
+          // Window has passed — fall through, no longer deferred for this.
+        } else {
+          return ClassificationResult(
+            status: EligibleStats.deferredTransfusionSurgery,
+            daysRemaining: transfusionSurgeryDefDays - daysSince,
+          );
+        }
+      } else {
+        return ClassificationResult(status: EligibleStats.deferredTransfusionSurgery);
+      }
     }
 
-    // Node 11: Travel or Needle Stick Check (last 12 months)
+    // Node 11: Travel or Needle Stick Check (12-month window, same pattern).
     if (npt.hasTravelOrNeedleStick) {
-      return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
+      if (npt.travelOrNeedleDate != null) {
+        final daysSince = DateTime.now().difference(npt.travelOrNeedleDate!).inDays;
+        if (daysSince >= travelNeedleDefDays) {
+          // Window has passed — fall through, no longer deferred for this.
+        } else {
+          return ClassificationResult(
+            status: EligibleStats.deferredTravelNeedle,
+            daysRemaining: travelNeedleDefDays - daysSince,
+          );
+        }
+      } else {
+        return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
+      }
     }
 
     // Node 12: Alcohol Intake Check (< 24 hrs)

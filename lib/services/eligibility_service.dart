@@ -101,18 +101,52 @@ DonorScreensNPT? screensFromProfile(Map<String, dynamic> profile) {
       ? false
       : ((screening['isFirstTimeDonor'] as bool?) ?? (selfReportedLastDonation == null));
 
+  Map<String, MedProcedureDetail> parseMedProcedureDetails(dynamic raw) {
+    if (raw is! Map) return const {};
+    final result = <String, MedProcedureDetail>{};
+    raw.forEach((key, value) {
+      if (value is Map) {
+        result[key.toString()] = MedProcedureDetail(
+          date: value['date'] != null ? DateTime.tryParse(value['date'] as String) : null,
+          dosageOrReason: value['dosageOrReason'] as String?,
+        );
+      }
+    });
+    return result;
+  }
+
   final npt = DonorScreensNPT(
     gender: genderStr == 'female' ? BioSex.female : BioSex.male,
     weight: weightKg.toDouble(),
     age: age.toInt(),
     isFirstTimeDonor: isFirstTimeDonor,
     lastDonationDate: lastDonationDate,
+    totalDonations: (screening['totalDonations'] as num?)?.toInt() ?? 0,
+    feelsWellToday: (screening['feelsWellToday'] as bool?) ?? true,
+    hasEatenRecently: (screening['hasEatenRecently'] as bool?) ?? true,
     hasTattsOrPierce: hasTatts,
     tattooDate: screening['tattooDate'] != null
         ? DateTime.tryParse(screening['tattooDate'] as String)
         : null,
     hasAlcoholPast24hr: hasAlcohol,
     hasActiveInfectOrMeds: hasActiveInfect,
+    recentMedProcedures: (screening['recentMedProcedures'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toSet() ??
+        const {},
+    medProcedureDetails: parseMedProcedureDetails(screening['medProcedureDetails']),
+    hasMajorMedicalHistory: (screening['hasMajorMedicalHistory'] as bool?) ?? false,
+    majorMedicalHistoryDesc: screening['majorMedicalHistoryDesc'] as String?,
+    hasTransfusionOrSurgery: (screening['hasTransfusionOrSurgery'] as bool?) ?? false,
+    transfusionOrSurgeryDate: screening['transfusionOrSurgeryDate'] != null
+        ? DateTime.tryParse(screening['transfusionOrSurgeryDate'] as String)
+        : null,
+    transfusionOrSurgeryDesc: screening['transfusionOrSurgeryDesc'] as String?,
+    hasTravelOrNeedleStick: (screening['hasTravelOrNeedleStick'] as bool?) ?? false,
+    travelOrNeedleDate: screening['travelOrNeedleDate'] != null
+        ? DateTime.tryParse(screening['travelOrNeedleDate'] as String)
+        : null,
+    travelOrNeedleDesc: screening['travelOrNeedleDesc'] as String?,
     isPregOrNursing: screening['isPregOrNursing'] as bool?,
     lastMensPeriodDate: screening['lastMensPeriodDate'] != null
         ? DateTime.tryParse(screening['lastMensPeriodDate'] as String)

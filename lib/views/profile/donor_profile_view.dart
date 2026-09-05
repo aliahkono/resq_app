@@ -488,7 +488,6 @@ class DonorProfileView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF9B1B20), width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,7 +550,6 @@ class DonorProfileView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF9B1B20), width: 1.2),
       ),
       child: Column(
         children: [
@@ -578,14 +576,14 @@ class DonorProfileView extends StatelessWidget {
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
           _buildRecordTile(
-            icon: Icons.description_outlined,
-            title: 'Donation Receipts & Certs',
+            icon: Icons.badge_outlined,
+            title: 'Digitalized Health Card',
             subtitle: 'Download verified records',
             isDownload: true,
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Downloading verified official donation certificate (PDF)...'),
+                  content: Text('Downloading your Digitalized Health Card (PDF)...'),
                   backgroundColor: Color(0xFF2E7D32),
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -719,8 +717,18 @@ class DonorProfileView extends StatelessWidget {
             _buildModalRow('Biological Sex', sex),
             _buildModalRow('Recorded Age', age > 0 ? '$age yrs' : 'N/A'),
             _buildModalRow('Recorded Weight', weight > 0 ? '$weight kg' : 'N/A'),
-            _buildModalRow('Recent Travel Risk', 'Disclosed • None in 30 days'),
-            _buildModalRow('Medication Disclosures', 'Disclosed • Clear'),
+            _buildModalRow(
+              'Recent Travel Risk',
+              (screeningModel?.screensNPT.hasTravelOrNeedleStick ?? false)
+                  ? 'Disclosed • Reported within 12 months'
+                  : 'Disclosed • None reported',
+            ),
+            _buildModalRow(
+              'Medication Disclosures',
+              (screeningModel?.screensNPT.hasActiveInfectOrMeds ?? false)
+                  ? 'Disclosed • Active infection/meds reported'
+                  : 'Disclosed • Clear',
+            ),
             _buildModalRow('Assessment Status', 'Evaluated via Real-time Logic'),
             const SizedBox(height: 16),
             Row(
