@@ -6,6 +6,7 @@ import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
 import 'package:resq/services/local_prefs.dart';
+import 'package:resq/views/settings/delete_acc_otp_view.dart';
 
 class SettingsView extends StatefulWidget {
   final ScreenNPTModel? screeningModel;
@@ -13,6 +14,8 @@ class SettingsView extends StatefulWidget {
   final String bloodType;
   final String donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
+  final void Function({required String name, required String phone, required String email})?
+      onProfileDetailsUpdated;
   final String? userName;
   final String? userPhone;
   final String? userEmail;
@@ -27,6 +30,7 @@ class SettingsView extends StatefulWidget {
     this.bloodType = '',
     this.donorId = '',
     this.onRetakeCompleted,
+    this.onProfileDetailsUpdated,
     this.userName,
     this.userPhone,
     this.userEmail,
@@ -209,6 +213,12 @@ class _SettingsViewState extends State<SettingsView> {
                           SessionStorage.setBiometricEnabled(val);
                         },
                       ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildNavigationTile(
+                        title: 'Delete Account',
+                        titleColor: const Color(0xFFB91C1C),
+                        onTap: () => _startDeleteAccountFlow(context),
+                      ),
                     ]),
 
                     const SizedBox(height: 20),
@@ -373,6 +383,7 @@ class _SettingsViewState extends State<SettingsView> {
   Widget _buildNavigationTile({
     required String title,
     required VoidCallback onTap,
+    Color? titleColor,
   }) {
     return InkWell(
       onTap: onTap,
@@ -384,14 +395,14 @@ class _SettingsViewState extends State<SettingsView> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF1E2432),
+                  color: titleColor ?? const Color(0xFF1E2432),
                 ),
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF4B5563)),
+            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: titleColor ?? const Color(0xFF4B5563)),
           ],
         ),
       ),
@@ -698,6 +709,7 @@ class _SettingsViewState extends State<SettingsView> {
                                       _phone = (updated['phone'] as String?) ?? newPhone;
                                       _email = (updated['email'] as String?) ?? newEmail;
                                     });
+                                    widget.onProfileDetailsUpdated?.call(name: _name, phone: _phone, email: _email);
                                     if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -935,6 +947,43 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // --- Delete Account Flow: confirm -> send OTP -> DeleteAccountOtpView ---
+  // (see delete_account_otp_view.dart for the OTP verification + the
+  // separate "are you sure" confirmation that happens after it).
+  Future<void> _startDeleteAccountFlow(BuildContext context) async {
+    if (_phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No registered mobile number on file. Please add one under Edit Personal Details first.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ApiService.requestOtp(_phone);
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not send verification code: ${e.message}')),
+      );
+      return;
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reach the ResQ server. Please try again.')),
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => DeleteAccountOtpView(phone: _phone, token: widget.token),
       ),
     );
   }

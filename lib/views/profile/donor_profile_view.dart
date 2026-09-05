@@ -3,6 +3,7 @@ import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
+import 'package:resq/utils/helpers/med_keyword_rules.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
 
@@ -702,6 +703,12 @@ class DonorProfileView extends StatelessWidget {
     final double weight = screeningModel?.screensNPT.weight ?? 0.0;
     final int age = screeningModel?.screensNPT.age ?? 0;
     final String sex = (screeningModel?.screensNPT.gender == BioSex.female) ? 'Female' : 'Male';
+    final bool hasTravelFlag = screeningModel?.screensNPT.hasTravelOrNeedleStick ?? false;
+    final bool hasMedicalFlag = screeningModel?.screensNPT.hasMajorMedicalHistory ?? false;
+    final String? travelDesc = screeningModel?.screensNPT.travelOrNeedleDesc;
+    final String? medicalDesc = screeningModel?.screensNPT.majorMedicalHistoryDesc;
+    final travelAssessment = MedicalKeywordRules.assessTravelOrNeedleStick(travelDesc);
+    final medicalAssessment = MedicalKeywordRules.assessMajorMedicalHistory(medicalDesc);
 
     showModalBottomSheet(
       context: context,
@@ -719,16 +726,18 @@ class DonorProfileView extends StatelessWidget {
             _buildModalRow('Recorded Weight', weight > 0 ? '$weight kg' : 'N/A'),
             _buildModalRow(
               'Recent Travel Risk',
-              (screeningModel?.screensNPT.hasTravelOrNeedleStick ?? false)
-                  ? 'Disclosed • Reported within 12 months'
-                  : 'Disclosed • None reported',
+              !hasTravelFlag
+                  ? 'None reported'
+                  : (travelAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Low Risk'),
             ),
+            if (hasTravelFlag) _buildReasonBlock(travelDesc, travelAssessment),
             _buildModalRow(
               'Medication Disclosures',
-              (screeningModel?.screensNPT.hasActiveInfectOrMeds ?? false)
-                  ? 'Disclosed • Active infection/meds reported'
-                  : 'Disclosed • Clear',
+              !hasMedicalFlag
+                  ? 'None reported'
+                  : (medicalAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Manageable'),
             ),
+            if (hasMedicalFlag) _buildReasonBlock(medicalDesc, medicalAssessment),
             _buildModalRow('Assessment Status', 'Evaluated via Real-time Logic'),
             const SizedBox(height: 16),
             Row(
@@ -792,6 +801,80 @@ class DonorProfileView extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// "Reason" block shown under Recent Travel Risk / Medication
+  /// Disclosures in the screening history modal — the free-text
+  /// description the donor gave, with the specific words that drove the
+  /// eligible/deferred call highlighted (see medical_keyword_rules.dart),
+  /// so a donor or admin can see *why* without needing to look anything up.
+  Widget _buildReasonBlock(String? description, MedicalAssessment assessment) {
+    final bool hasDesc = description != null && description.trim().isNotEmpty;
+    final bool isDeferred = assessment.verdict == KeywordVerdict.deferred;
+    final Color accent = isDeferred ? const Color(0xFFB91C1C) : const Color(0xFF15803D);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4.0, bottom: 10.0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isDeferred ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'REASON',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: accent),
+            ),
+            const SizedBox(height: 4),
+            if (hasDesc)
+              RichText(text: TextSpan(children: _buildHighlightedSpans(description, assessment)))
+            else
+              Text(
+                assessment.note ?? 'No additional details provided.',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF4B5563)),
+              ),
+            if (hasDesc && assessment.note != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                assessment.note!,
+                style: const TextStyle(fontSize: 10.5, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Turns a free-text reason into spans with each matched keyword
+  /// bolded/colored — red for a word that drove a deferral, green for one
+  /// that supported eligibility (e.g. "controlled" for a diabetes note).
+  List<InlineSpan> _buildHighlightedSpans(String description, MedicalAssessment assessment) {
+    const baseStyle = TextStyle(fontSize: 11.5, color: Color(0xFF1E1E1E), height: 1.35);
+    if (assessment.matches.isEmpty) {
+      return [TextSpan(text: description, style: baseStyle)];
+    }
+    final spans = <InlineSpan>[];
+    int cursor = 0;
+    for (final m in assessment.matches) {
+      if (m.start > cursor) {
+        spans.add(TextSpan(text: description.substring(cursor, m.start), style: baseStyle));
+      }
+      final color = m.verdict == KeywordVerdict.deferred ? const Color(0xFFB91C1C) : const Color(0xFF15803D);
+      spans.add(TextSpan(
+        text: description.substring(m.start, m.end),
+        style: baseStyle.copyWith(color: color, fontWeight: FontWeight.bold, backgroundColor: color.withValues(alpha: 0.12)),
+      ));
+      cursor = m.end;
+    }
+    if (cursor < description.length) {
+      spans.add(TextSpan(text: description.substring(cursor), style: baseStyle));
+    }
+    return spans;
   }
 }
 

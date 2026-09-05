@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
@@ -53,16 +54,37 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   ClassificationResult _effectiveResult = ClassificationResult(status: EligibleStats.deferredWeight);
   ScreenNPTModel? _currentScreeningModel;
   bool _isFirstTime = true;
+  // Mutable copies of the identity fields Settings' "Edit Personal Details"
+  // can change — kept in this State (not just read from widget.donorName/
+  // phoneNum/donorEmail directly) so a successful save reflects here and on
+  // DonorProfileView immediately, instead of only updating SettingsView's
+  // own local state and requiring a full logout/login to show anywhere else.
+  late String _donorName;
+  late String _donorPhone;
+  late String _donorEmail;
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
   List<EmergencyBloodRequest> _activeRequests = [];
+  // The app has no push/WebSocket channel of its own (see
+  // didChangeAppLifecycleState's comment below), so a hospital broadcast or
+  // appointment update made on the admin dashboard while a donor is
+  // actively looking at this screen — not backgrounding/foregrounding the
+  // app, not pulling to refresh — would otherwise never show up until they
+  // did one of those. This timer polls the same data
+  // _refreshBroadcastData already re-fetches on those triggers, just on a
+  // fixed interval too, so the dashboard and Appointment tab stay
+  // reasonably current on their own while open.
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _currentScreeningModel = widget.screeningModel;
+    _donorName = widget.donorName;
+    _donorPhone = widget.phoneNum;
+    _donorEmail = widget.donorEmail;
 
     try {
       if (widget.classificationResult != null) {
@@ -85,10 +107,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _loadCurrentAppointment();
     _loadOpenRequests();
     NotificationService().refresh(widget.token);
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refreshBroadcastData());
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -313,7 +337,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         builder: (context) => RegistrationWizView(
           isRetake: true,
           initialScreening: _currentScreeningModel,
-          donorName: widget.donorName,
+          donorName: _donorName,
           bloodType: widget.bloodType,
           donorId: widget.donorId,
           token: widget.token,
@@ -347,6 +371,21 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  /// Called by SettingsView right after Edit Personal Details successfully
+  /// saves (PATCH /api/donor/me) — updates this screen's own copy of the
+  /// donor's name/phone/email immediately so DonorProfileView and the
+  /// dashboard header reflect the change right away, instead of only
+  /// updating SettingsView's own local state (which used to mean nothing
+  /// else in the app noticed until a full logout/login rebuilt everything
+  /// from a fresh GET /api/donor/me).
+  void _handleProfileDetailsUpdated({required String name, required String phone, required String email}) {
+    setState(() {
+      _donorName = name;
+      _donorPhone = phone;
+      _donorEmail = email;
+    });
   }
 
   Widget _buildTopHeader() {
@@ -393,9 +432,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => SettingsView(
-                              userName: widget.donorName,
-                              userPhone: widget.phoneNum,
-                              userEmail: widget.donorEmail,
+                              userName: _donorName,
+                              userPhone: _donorPhone,
+                              userEmail: _donorEmail,
                               token: widget.token,
                               // Needed for the retake-screening button
                               // inside Edit Personal Details — without
@@ -404,10 +443,11 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                               // nowhere (onRetakeCompleted was never
                               // supplied here before).
                               screeningModel: _currentScreeningModel,
-                              donorName: widget.donorName,
+                              donorName: _donorName,
                               bloodType: widget.bloodType,
                               donorId: widget.donorId,
                               onRetakeCompleted: _handleRetakeCompleted,
+                              onProfileDetailsUpdated: _handleProfileDetailsUpdated,
                             ),
                           ),
                         );
@@ -430,7 +470,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final String activeDonorName = widget.donorName.isNotEmpty ? widget.donorName : 'John Doe';
+    final String activeDonorName = _donorName.isNotEmpty ? _donorName : 'John Doe';
     final String activeBloodType = widget.bloodType.isNotEmpty ? widget.bloodType : 'A+';
     final String activeDonorId = widget.donorId.isNotEmpty ? widget.donorId : 'BD-10942';
 

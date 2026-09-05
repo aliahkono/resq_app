@@ -126,6 +126,17 @@ class ApiService {
     return _decode(response);
   }
 
+  static Future<Map<String, dynamic>> _delete(String path, {Map<String, dynamic>? body, String? token}) async {
+    final response = await http
+        .delete(
+          Uri.parse('$kApiBaseUrl$path'),
+          headers: _headers(token),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(_timeout);
+    return _decode(response);
+  }
+
   // --- Donor auth (public — no token yet) --------------------------------
 
   /// POST /api/donor-auth/login — { identifier, password } -> { token, expiresIn, donor }
@@ -210,6 +221,21 @@ class ApiService {
   /// POST /api/donor-auth/logout
   static Future<void> logout(String token) {
     return _post('/donor-auth/logout', {}, token: token);
+  }
+
+  /// DELETE /api/donor/me — permanently deletes the signed-in donor's
+  /// account and profile. `otpCode` is the 6-digit code sent via
+  /// requestOtp to the donor's own registered phone right before this is
+  /// called (see DeleteAccountOtpView) — a second factor confirming the
+  /// person doing this actually holds the account's phone, not just
+  /// whoever is holding an unlocked device with a live session. Expects
+  /// the backend to verify the code server-side as part of this single
+  /// call (not a separate verify-then-delete round trip), and — per the
+  /// donor management requirement — to remove the donor from the Donor
+  /// Management list on the Web Admin dashboard as part of the same
+  /// deletion, not just deactivate the mobile-side session.
+  static Future<void> deleteMyAccount(String token, {required String otpCode}) {
+    return _delete('/donor/me', body: {'otpCode': otpCode}, token: token);
   }
 
   /// GET /api/donor/hospitals — public hospital list for the appointment

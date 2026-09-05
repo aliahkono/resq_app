@@ -1,3 +1,5 @@
+import 'package:resq/utils/helpers/med_keyword_rules.dart';
+
 enum BioSex { male, female }
 
 /// Details captured for one recent medication/minor procedure chip, or for
@@ -149,6 +151,12 @@ class DecisionTreeClassifier {
   /// matches EligibilityRules.travelNeedleDefDays.
   static const int travelNeedleDefDays = 365;
 
+  /// 6-month window specifically for travel to a local malaria-endemic
+  /// area (e.g. rural Palawan, Mindoro, Romblon) — shorter than the
+  /// general 12-month travel/needle-stick window per the Philippine
+  /// eligibility guidance table.
+  static const int malariaEndemicTravelDefDays = 180;
+
   /// Evaluates donor parameters through rule-based decision tree nodes
   ClassificationResult classify(DonorScreensNPT npt) {
     // Node 1: Immediate Wellness Check
@@ -221,11 +229,20 @@ class DecisionTreeClassifier {
       // Window has passed for every selected procedure — fall through.
     }
 
-    // Node 6c: Major Medical History Check — no deferral window; a reported
-    // major condition (heart disease, asthma, diabetes, etc.) always
-    // requires clinical review regardless of when it was disclosed.
+    // Node 6c: Major Medical History Check — assessed against the free-text
+    // description (see medical_keyword_rules.dart) rather than a blanket
+    // defer: asthma/diabetes can be eligible when the description indicates
+    // the condition is controlled (oral meds/diet), while heart disease,
+    // epilepsy/seizures, blood/bleeding disorders, severe skin conditions,
+    // and autoimmune disorders always defer regardless of detail.
     if (npt.hasMajorMedicalHistory) {
-      return ClassificationResult(status: EligibleStats.deferredMajorMedical);
+      final assessment = MedicalKeywordRules.assessMajorMedicalHistory(npt.majorMedicalHistoryDesc);
+      if (assessment.verdict == KeywordVerdict.deferred) {
+        return ClassificationResult(status: EligibleStats.deferredMajorMedical);
+      }
+      // Otherwise the description indicates a controlled/manageable
+      // condition (e.g. "asthma, well controlled, no recent attacks") —
+      // fall through instead of deferring just because the toggle was set.
     }
 
     // Node 5: Tattoo / Piercing Window Check
@@ -267,21 +284,34 @@ class DecisionTreeClassifier {
       }
     }
 
-    // Node 11: Travel or Needle Stick Check (12-month window, same pattern).
+    // Node 11: Travel or Needle Stick Check — assessed against the free-text
+    // description (see medical_keyword_rules.dart) rather than a flat
+    // toggle: travel to a non-endemic city is eligible per the guidance
+    // table, while malaria-endemic travel (6-month window), needle-stick
+    // exposure, or a commercial tattoo/piercing disclosed here (12-month
+    // window) are not.
     if (npt.hasTravelOrNeedleStick) {
-      if (npt.travelOrNeedleDate != null) {
-        final daysSince = DateTime.now().difference(npt.travelOrNeedleDate!).inDays;
-        if (daysSince >= travelNeedleDefDays) {
-          // Window has passed — fall through, no longer deferred for this.
+      final assessment = MedicalKeywordRules.assessTravelOrNeedleStick(npt.travelOrNeedleDesc);
+      if (assessment.verdict == KeywordVerdict.deferred) {
+        final isMalariaEndemic = assessment.matches.any((m) => m.conditionLabel == 'Malaria-Endemic Travel');
+        final windowDays = isMalariaEndemic ? malariaEndemicTravelDefDays : travelNeedleDefDays;
+        if (npt.travelOrNeedleDate != null) {
+          final daysSince = DateTime.now().difference(npt.travelOrNeedleDate!).inDays;
+          if (daysSince >= windowDays) {
+            // Window has passed — fall through, no longer deferred for this.
+          } else {
+            return ClassificationResult(
+              status: EligibleStats.deferredTravelNeedle,
+              daysRemaining: windowDays - daysSince,
+            );
+          }
         } else {
-          return ClassificationResult(
-            status: EligibleStats.deferredTravelNeedle,
-            daysRemaining: travelNeedleDefDays - daysSince,
-          );
+          return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
         }
-      } else {
-        return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
       }
+      // Otherwise the description indicates non-endemic travel with no
+      // needle-stick/tattoo exposure mentioned — fall through instead of
+      // deferring just because the toggle was set.
     }
 
     // Node 12: Alcohol Intake Check (< 24 hrs)
