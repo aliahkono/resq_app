@@ -189,7 +189,11 @@ class DonorProfileView extends StatelessWidget {
       String bType,
       bool isEligible,
       ) {
-    final int donations = (isFirstTimeDonor) ? 0 : (screeningModel?.screensNPT.totalDonations ?? 0);
+    // Hospital-verified count, same source as the Lifetime Impact card below
+    // — not isFirstTimeDonor/screensNPT.totalDonations, which are just the
+    // donor's own self-report from registration/retake screening and never
+    // change just because a real donation got recorded at a hospital.
+    final int donations = completedDonations;
 
     return Container(
       width: double.infinity,
@@ -323,7 +327,7 @@ class DonorProfileView extends StatelessWidget {
               const Icon(Icons.psychology_outlined, color: Color(0xFF6B7280), size: 20),
               const SizedBox(width: 8),
               Text(
-                isFirstTimeDonor || donations == 0
+                donations == 0
                     ? 'First-Time Hero (0 Donations Completed)'
                     : 'Lifesaving Hero ($donations Donation${donations == 1 ? '' : 's'} Completed)',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
