@@ -16,9 +16,13 @@ import 'package:http/http.dart' as http;
 ///   - iOS simulator: 127.0.0.1 directly (shares the Mac's network stack)
 ///   - A real phone: your computer's LAN IP (e.g. 192.168.1.23), phone and
 ///     computer on the same Wi-Fi, or an ngrok tunnel URL if it's remote
-/// Change this before testing against a real backend — it will not work
-/// as-is on a physical device.
-const String kApiBaseUrl = "http://10.0.2.2:4000/api";
+/// Whichever backend you point at is also whichever *database* the data
+/// lands in — local dev server and the deployed one are two entirely
+/// separate databases that never sync with each other.
+const String kApiBaseUrl = String.fromEnvironment(
+  "API_BASE_URL",
+  defaultValue: "https://hospital-web-dashboard.onrender.com/api",
+);
 
 /// Thrown for any non-2xx response. `message` is the backend's own `error`
 /// field when it sent one (see server/src/utils/asyncHandler.js and every
