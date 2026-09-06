@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:resq/services/api_service.dart';
 
@@ -62,51 +63,73 @@ const List<String> kSecondaryIdTypes = [
   "PSA Birth Certificate or Marriage Contract",
 ];
 
+// These document types either have nothing printed on the back (a
+// passport's data is all on the photo page) or are effectively single-
+// sided documents (a clearance/certificate is one printed page, not a
+// two-sided card) — asking for a "back" photo for these would just get a
+// blank/irrelevant capture, so the Scan ID — Back step is skipped entirely
+// for them (see the _steps getter below).
+const Set<String> kNoIdBackTypes = {
+  "Philippine Passport issued by the Department of Foreign Affairs (DFA)",
+  "NBI Clearance or Police Clearance",
+  "Barangay Clearance or Barangay ID",
+  "PSA Birth Certificate or Marriage Contract",
+};
+
 class _GetVerifiedViewState extends State<GetVerifiedView> {
-  static const List<_CaptureStep> _steps = [
-    _CaptureStep(
-      kind: _CaptureKind.idFront,
-      title: 'Scan ID — Front',
-      instruction: 'Place the front of your valid government ID inside the frame. Make sure all text is readable.',
-      icon: Icons.badge_outlined,
-    ),
-    _CaptureStep(
-      kind: _CaptureKind.idBack,
-      title: 'Scan ID — Back',
-      instruction: 'Now flip it over and capture the back of the same ID.',
-      icon: Icons.badge_outlined,
-    ),
-    _CaptureStep(
-      kind: _CaptureKind.faceFront,
-      title: 'Face — Straight Ahead',
-      instruction: 'Look directly at the camera with a neutral expression.',
-      icon: Icons.face_retouching_natural_rounded,
-    ),
-    _CaptureStep(
-      kind: _CaptureKind.faceLeft,
-      title: 'Face — Turn Left',
-      instruction: 'Slowly turn your head to your left, about 45°.',
-      icon: Icons.face_retouching_natural_rounded,
-    ),
-    _CaptureStep(
-      kind: _CaptureKind.faceRight,
-      title: 'Face — Turn Right',
-      instruction: 'Now turn your head to your right, about 45°.',
-      icon: Icons.face_retouching_natural_rounded,
-    ),
-    _CaptureStep(
-      kind: _CaptureKind.faceUp,
-      title: 'Face — Tilt Up',
-      instruction: 'Tilt your chin up slightly, keeping your face in frame.',
-      icon: Icons.face_retouching_natural_rounded,
-    ),
-    _CaptureStep(
-      kind: _CaptureKind.faceDown,
-      title: 'Face — Tilt Down',
-      instruction: 'Tilt your chin down slightly, keeping your face in frame.',
-      icon: Icons.face_retouching_natural_rounded,
-    ),
-  ];
+  // Depends on _selectedIdType (Scan ID — Back is omitted for the document
+  // types in kNoIdBackTypes) — a getter rather than a fixed const list, so
+  // it always reflects whichever ID was actually chosen on the selection
+  // screen. Recomputed on every access, which is fine at 6-7 tiny value
+  // objects.
+  List<_CaptureStep> get _steps {
+    final skipBack = _selectedIdType != null && kNoIdBackTypes.contains(_selectedIdType);
+    return [
+      const _CaptureStep(
+        kind: _CaptureKind.idFront,
+        title: 'Scan ID — Front',
+        instruction: 'Place the front of your valid government ID inside the frame. Make sure all text is readable.',
+        icon: Icons.badge_outlined,
+      ),
+      if (!skipBack)
+        const _CaptureStep(
+          kind: _CaptureKind.idBack,
+          title: 'Scan ID — Back',
+          instruction: 'Now flip it over and capture the back of the same ID.',
+          icon: Icons.badge_outlined,
+        ),
+      const _CaptureStep(
+        kind: _CaptureKind.faceFront,
+        title: 'Face — Straight Ahead',
+        instruction: 'Look directly at the camera with a neutral expression.',
+        icon: Icons.face_retouching_natural_rounded,
+      ),
+      const _CaptureStep(
+        kind: _CaptureKind.faceLeft,
+        title: 'Face — Turn Left',
+        instruction: 'Slowly turn your head to your left, about 45°.',
+        icon: Icons.face_retouching_natural_rounded,
+      ),
+      const _CaptureStep(
+        kind: _CaptureKind.faceRight,
+        title: 'Face — Turn Right',
+        instruction: 'Now turn your head to your right, about 45°.',
+        icon: Icons.face_retouching_natural_rounded,
+      ),
+      const _CaptureStep(
+        kind: _CaptureKind.faceUp,
+        title: 'Face — Tilt Up',
+        instruction: 'Tilt your chin up slightly, keeping your face in frame.',
+        icon: Icons.face_retouching_natural_rounded,
+      ),
+      const _CaptureStep(
+        kind: _CaptureKind.faceDown,
+        title: 'Face — Tilt Down',
+        instruction: 'Tilt your chin down slightly, keeping your face in frame.',
+        icon: Icons.face_retouching_natural_rounded,
+      ),
+    ];
+  }
 
   // Which ID the donor said they'll present, chosen on a selection screen
   // shown before any capture starts. _selectedIdType null means that screen
@@ -125,7 +148,23 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
   String? _error;
   bool _submitting = false;
 
+  // Ground truth for the ID Front OCR cross-check below — fetched once on
+  // open so it's ready by the time the donor actually gets to that step.
+  // Null just means "couldn't fetch" (or a field genuinely isn't on file);
+  // every place that reads these treats null as "skip this specific check"
+  // rather than blocking the whole flow over an unrelated network hiccup.
+  String? _donorName;
+  int? _donorAge;
+
+  // Best-effort OCR results from the ID Front capture, carried through to
+  // submission as extra context for whoever/whatever reviews it later —
+  // not re-validated here, since the blocking checks already ran at
+  // capture time (see _capture's idFront branch).
+  DateTime? _extractedBirthdate;
+  String? _extractedAddress;
+
   late final FaceDetector _faceDetector;
+  late final TextRecognizer _textRecognizer;
 
   @override
   void initState() {
@@ -133,12 +172,137 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
     _faceDetector = FaceDetector(
       options: FaceDetectorOptions(enableTracking: false, performanceMode: FaceDetectorMode.accurate),
     );
+    _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    _loadDonorProfile();
   }
 
   @override
   void dispose() {
     _faceDetector.close();
+    _textRecognizer.close();
     super.dispose();
+  }
+
+  Future<void> _loadDonorProfile() async {
+    try {
+      final profile = await ApiService.getMyProfile(widget.token);
+      if (!mounted) return;
+      setState(() {
+        _donorName = profile['name'] as String?;
+        _donorAge = (profile['age'] as num?)?.toInt();
+      });
+    } catch (_) {
+      // Best-effort only — see the field comments above.
+    }
+  }
+
+  // Requires most (rounded up) of the donor's own name tokens to appear
+  // somewhere in the ID's recognized text. Not exact-match: OCR noise and
+  // name-order differences (Last/First/Middle vs First Last on different ID
+  // layouts) make a strict match too easy to false-positive-reject on a
+  // real, correct ID.
+  bool _nameLooksConsistent(String ocrText, String donorName) {
+    final normalizedOcr = ocrText.toUpperCase().replaceAll(RegExp(r'[^A-Z\s]'), ' ');
+    final tokens = donorName
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z\s]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length >= 2)
+        .toList();
+    if (tokens.isEmpty) return true; // nothing usable to compare — don't block on it
+    final matched = tokens.where(normalizedOcr.contains).length;
+    return matched >= (tokens.length / 2).ceil();
+  }
+
+  static const List<String> _monthAbbrevs = [
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+  ];
+
+  // Best-effort date-of-birth parse across a few common PH-ID date formats.
+  // Genuinely heuristic: picks the first date it finds whose year falls in
+  // a plausible birth-year range (16-100 years old), not the specific
+  // field actually labeled "Date of Birth" — this app has no per-ID-type
+  // template to know where that label even is.
+  DateTime? _extractBirthdate(String ocrText) {
+    final now = DateTime.now();
+    bool plausibleBirthYear(int year) => year > now.year - 100 && year <= now.year - 16;
+
+    final monthName = RegExp(
+      r'(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)\.?\s+(\d{1,2}),?\s+(\d{4})',
+      caseSensitive: false,
+    );
+    for (final m in monthName.allMatches(ocrText)) {
+      final monthIdx = _monthAbbrevs.indexWhere((abbr) => m.group(1)!.toUpperCase().startsWith(abbr));
+      final day = int.tryParse(m.group(2)!);
+      final year = int.tryParse(m.group(3)!);
+      if (monthIdx >= 0 && day != null && year != null && plausibleBirthYear(year)) {
+        try {
+          return DateTime(year, monthIdx + 1, day);
+        } catch (_) {}
+      }
+    }
+
+    final numeric = RegExp(r'(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})');
+    for (final m in numeric.allMatches(ocrText)) {
+      final a = int.tryParse(m.group(1)!);
+      final b = int.tryParse(m.group(2)!);
+      final year = int.tryParse(m.group(3)!);
+      if (a == null || b == null || year == null || !plausibleBirthYear(year)) continue;
+      int? month, day;
+      if (a >= 1 && a <= 12) {
+        month = a;
+        day = b;
+      } else if (b >= 1 && b <= 12) {
+        month = b;
+        day = a;
+      }
+      if (month == null || day == null) continue;
+      try {
+        return DateTime(year, month, day);
+      } catch (_) {}
+    }
+
+    final isoLike = RegExp(r'(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})');
+    for (final m in isoLike.allMatches(ocrText)) {
+      final year = int.tryParse(m.group(1)!);
+      final month = int.tryParse(m.group(2)!);
+      final day = int.tryParse(m.group(3)!);
+      if (year == null || month == null || day == null || !plausibleBirthYear(year)) continue;
+      if (month < 1 || month > 12) continue;
+      try {
+        return DateTime(year, month, day);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  // null = couldn't check either value, not a pass/fail. A ±2 year window
+  // accommodates the donor's registered age being self-reported once at
+  // registration rather than recalculated as time passes, not just OCR
+  // error.
+  bool? _ageConsistent(DateTime? birthdate, int? registeredAge) {
+    if (birthdate == null || registeredAge == null) return null;
+    final now = DateTime.now();
+    int computedAge = now.year - birthdate.year;
+    if (now.month < birthdate.month || (now.month == birthdate.month && now.day < birthdate.day)) {
+      computedAge -= 1;
+    }
+    return (computedAge - registeredAge).abs() <= 2;
+  }
+
+  // Purely informational — there's nothing on the donor's record to check
+  // an address against (donors aren't asked for one anywhere else in this
+  // app), so this is captured for context only, never blocking.
+  String? _extractAddress(String ocrText) {
+    const keywords = [
+      'BRGY', 'BARANGAY', 'STREET', 'ST.', 'AVE', 'AVENUE', 'CITY', 'PROVINCE', 'ROAD', 'RD.', 'PUROK', 'ZONE', 'MUNICIPALITY',
+    ];
+    for (final rawLine in ocrText.split('\n')) {
+      final line = rawLine.trim();
+      final upper = line.toUpperCase();
+      if (line.length > 8 && keywords.any(upper.contains)) return line;
+    }
+    return null;
   }
 
   _CaptureStep get _current => _steps[_currentIndex];
@@ -193,6 +357,40 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
         });
         return;
       }
+
+      // Automated check #2: read the ID's printed text (on-device OCR) and
+      // sanity-check it against the donor's own registered profile — still
+      // not a database-verified identity check (see class doc comment),
+      // just catching an ID that's clearly not this donor's (wrong name
+      // entirely, wildly inconsistent birth year) before auto-approval.
+      // OCR itself failing outright (blur, glare, an ID format it can't
+      // read) doesn't block the donor — only an actual detected mismatch
+      // below does; a tech hiccup shouldn't be treated the same as fraud.
+      try {
+        final recognized = await _textRecognizer.processImage(InputImage.fromFilePath(picked.path));
+        final ocrText = recognized.text;
+        if (_donorName != null && ocrText.trim().length > 15 && !_nameLooksConsistent(ocrText, _donorName!)) {
+          setState(() {
+            _error =
+                "The name on this ID doesn't seem to match your registered profile ($_donorName). Make sure you're scanning your own ID, or update your profile name in Settings first.";
+            _processing = false;
+          });
+          return;
+        }
+        final birthdate = _extractBirthdate(ocrText);
+        if (_ageConsistent(birthdate, _donorAge) == false) {
+          setState(() {
+            _error = "The birthdate on this ID doesn't look consistent with your registered age. Please double check, or update your profile first.";
+            _processing = false;
+          });
+          return;
+        }
+        _extractedBirthdate = birthdate;
+        _extractedAddress = _extractAddress(ocrText);
+      } catch (_) {
+        // See comment above — OCR failing is not itself a rejection.
+      }
+
       setState(() {
         _capturedPaths[_current.kind] = picked.path;
         _processing = false;
@@ -279,7 +477,11 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
         widget.token,
         idType: _selectedIdType!,
         idFrontPath: _capturedPaths[_CaptureKind.idFront]!,
-        idBackPath: _capturedPaths[_CaptureKind.idBack]!,
+        // Absent (null) for ID types in kNoIdBackTypes — this step never
+        // ran for those, so there's nothing captured under this key.
+        idBackPath: _capturedPaths[_CaptureKind.idBack],
+        extractedBirthdate: _extractedBirthdate?.toIso8601String(),
+        extractedAddress: _extractedAddress,
         facePosePaths: {
           'front': _capturedPaths[_CaptureKind.faceFront]!,
           'left': _capturedPaths[_CaptureKind.faceLeft]!,
@@ -396,7 +598,7 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
                   ),
                   SizedBox(height: 6),
                   Text(
-                    "Choose one government-issued ID — you'll scan its front and back in the next step.",
+                    "Choose one government-issued ID — you'll scan it (and your face) in the next step.",
                     style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.4),
                   ),
                 ],
