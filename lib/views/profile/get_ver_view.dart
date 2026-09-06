@@ -36,6 +36,32 @@ class GetVerifiedView extends StatefulWidget {
   State<GetVerifiedView> createState() => _GetVerifiedViewState();
 }
 
+// Philippine government/KYC ID categories a donor can present — mirrors the
+// same primary/secondary split banks and other KYC flows in the Philippines
+// use, so staff reviewing a submission on the Web Dashboard know exactly
+// what kind of document they're looking at instead of guessing from the
+// photo alone.
+const List<String> kPrimaryIdTypes = [
+  "Philippine Identification (PhilID / National ID) or ePhilID",
+  "Philippine Passport issued by the Department of Foreign Affairs (DFA)",
+  "Land Transportation Office (LTO) Driver's License",
+  "Unified Multi-Purpose ID (UMID) from SSS or GSIS",
+  "Professional Regulation Commission (PRC) ID",
+  "Postal ID (PVC card)",
+  "Voter's ID or Voter's Certification from COMELEC",
+  "Senior Citizen ID, PWD ID, or Solo Parent ID",
+];
+
+const List<String> kSecondaryIdTypes = [
+  "Taxpayer Identification Number (TIN) ID",
+  "PhilHealth Insurance Card",
+  "Pag-IBIG Loyalty Card / Loyalty Card Plus",
+  "Company ID or School ID",
+  "NBI Clearance or Police Clearance",
+  "Barangay Clearance or Barangay ID",
+  "PSA Birth Certificate or Marriage Contract",
+];
+
 class _GetVerifiedViewState extends State<GetVerifiedView> {
   static const List<_CaptureStep> _steps = [
     _CaptureStep(
@@ -81,6 +107,17 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
       icon: Icons.face_retouching_natural_rounded,
     ),
   ];
+
+  // Which ID the donor said they'll present, chosen on a selection screen
+  // shown before any capture starts. _selectedIdType null means that screen
+  // hasn't been confirmed yet — it gates entry into the rest of the flow the
+  // same way _isLastStep gates submission below. _pendingIdType is just the
+  // radio selection in progress on that screen, kept separate so tapping an
+  // option doesn't immediately jump into capturing before the donor taps
+  // Continue (these are long labels on a scrollable list — an accidental
+  // tap shouldn't fast-forward the whole flow).
+  String? _selectedIdType;
+  String? _pendingIdType;
 
   int _currentIndex = 0;
   final Map<_CaptureKind, String> _capturedPaths = {};
@@ -208,6 +245,7 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
     try {
       await ApiService.submitVerification(
         widget.token,
+        idType: _selectedIdType!,
         idFrontPath: _capturedPaths[_CaptureKind.idFront]!,
         idBackPath: _capturedPaths[_CaptureKind.idBack]!,
         facePosePaths: {
@@ -270,6 +308,19 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_selectedIdType == null) {
+      return _buildIdTypeSelection(context);
+    }
+    return _buildCaptureFlow(context);
+  }
+
+  // First screen of the flow: pick which government ID will be presented,
+  // grouped the way DFA/bank KYC forms usually do — one Primary ID is
+  // normally enough on its own, while a Secondary one is meant to be
+  // paired with either a Primary ID or another Secondary ID. Reviewers on
+  // the Web Dashboard see whichever label is picked here alongside the
+  // scanned photos.
+  Widget _buildIdTypeSelection(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F5),
       appBar: AppBar(
@@ -277,7 +328,156 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: (_processing || _submitting) ? null : () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Get Verified',
+          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Which ID will you present?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    "Choose one government-issued ID — you'll scan its front and back in the next step.",
+                    style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                children: [
+                  _buildIdSectionHeader('PRIMARY ID'),
+                  const SizedBox(height: 8),
+                  ...kPrimaryIdTypes.map(_buildIdOption),
+                  const SizedBox(height: 20),
+                  _buildIdSectionHeader('SECONDARY ID'),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Only if you don\'t have a Primary ID — present two Secondary IDs together.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF9CA3AF), height: 1.3),
+                  ),
+                  const SizedBox(height: 8),
+                  ...kSecondaryIdTypes.map(_buildIdOption),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _pendingIdType == null
+                      ? null
+                      : () => setState(() => _selectedIdType = _pendingIdType),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9B1B20),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFE5E7EB),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'CONTINUE',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIdSectionHeader(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF9B1B20),
+        letterSpacing: 0.6,
+      ),
+    );
+  }
+
+  Widget _buildIdOption(String label) {
+    final selected = _pendingIdType == label;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => setState(() => _pendingIdType = label),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? const Color(0xFF9B1B20) : const Color(0xFFE5E7EB), width: selected ? 1.5 : 1),
+          ),
+          child: Row(
+            children: [
+              Radio<String>(
+                value: label,
+                groupValue: _pendingIdType,
+                activeColor: const Color(0xFF9B1B20),
+                onChanged: (value) => setState(() => _pendingIdType = value),
+              ),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: const Color(0xFF1E1E1E),
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCaptureFlow(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F3F5),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF9B1B20),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+          onPressed: (_processing || _submitting)
+              ? null
+              : () {
+                  // Stepping back from the very first capture returns to ID
+                  // selection (still part of this same flow) instead of
+                  // popping out of Get Verified entirely.
+                  if (_currentIndex == 0) {
+                    setState(() {
+                      _selectedIdType = null;
+                      _pendingIdType = null;
+                    });
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
         ),
         title: Text(
           'Get Verified (${_currentIndex + 1}/${_steps.length})',

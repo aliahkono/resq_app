@@ -251,13 +251,15 @@ class ApiService {
   /// later) to actually verify. Returns the resulting status, expected to
   /// be "pending" immediately after a successful submission.
   /// NOTE: this route does not exist on the backend yet — needs a handler
-  /// added there (accepting multipart fields "idFront", "idBack", and
-  /// "face_front"/"face_left"/"face_right"/"face_up"/"face_down", storing
-  /// them wherever verification documents are meant to live, and setting
-  /// the donor's verificationStatus to "pending") before this call will
-  /// succeed, same as deleteMyAccount and uploadProfilePhoto above.
+  /// added there (accepting a text field "idType" plus multipart fields
+  /// "idFront", "idBack", and "face_front"/"face_left"/"face_right"/
+  /// "face_up"/"face_down", storing them wherever verification documents
+  /// are meant to live, and setting the donor's verificationStatus to
+  /// "pending") before this call will succeed, same as deleteMyAccount and
+  /// uploadProfilePhoto above.
   static Future<Map<String, dynamic>> submitVerification(
     String token, {
+    required String idType,
     required String idFrontPath,
     required String idBackPath,
     required Map<String, String> facePosePaths,
@@ -265,6 +267,7 @@ class ApiService {
     final uri = Uri.parse('$kApiBaseUrl/donor/me/verification');
     final request = http.MultipartRequest('POST', uri);
     request.headers['Authorization'] = 'Bearer $token';
+    request.fields['idType'] = idType;
     request.files.add(await http.MultipartFile.fromPath('idFront', idFrontPath));
     request.files.add(await http.MultipartFile.fromPath('idBack', idBackPath));
     for (final entry in facePosePaths.entries) {
