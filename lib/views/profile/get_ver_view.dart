@@ -158,9 +158,41 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
       return;
     }
 
-    if (_isIdStep) {
-      // No face-pose check for the ID photos themselves — just accept the
-      // capture and move on.
+    if (_current.kind == _CaptureKind.idBack) {
+      // Most PH IDs' backs have no photo on them at all (National ID,
+      // driver's license, etc.) — nothing to detect a face against, so
+      // just accept the capture and move on.
+      setState(() {
+        _capturedPaths[_current.kind] = picked.path;
+        _processing = false;
+      });
+      _advanceOrFinish();
+      return;
+    }
+
+    if (_current.kind == _CaptureKind.idFront) {
+      // Automated check #1: the front of a valid ID should show a face —
+      // catches an obviously wrong capture (a blank surface, a random
+      // object, the wrong side of the ID) before it's ever uploaded. This
+      // only confirms *a* face is present, not that it's this donor's
+      // face — that would need real face-matching against the selfie
+      // captures below, which this app doesn't do.
+      try {
+        final faces = await _faceDetector.processImage(InputImage.fromFilePath(picked.path));
+        if (faces.isEmpty) {
+          setState(() {
+            _error = "We couldn't find a photo on that ID — please make sure the front (with your photo) is in frame and try again.";
+            _processing = false;
+          });
+          return;
+        }
+      } catch (e) {
+        setState(() {
+          _error = 'Could not analyze that photo — please try again.';
+          _processing = false;
+        });
+        return;
+      }
       setState(() {
         _capturedPaths[_current.kind] = picked.path;
         _processing = false;
@@ -243,7 +275,7 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
       _error = null;
     });
     try {
-      await ApiService.submitVerification(
+      final result = await ApiService.submitVerification(
         widget.token,
         idType: _selectedIdType!,
         idFrontPath: _capturedPaths[_CaptureKind.idFront]!,
@@ -257,21 +289,35 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
         },
       );
       if (!mounted) return;
+      // Submission is checked automatically and (currently) approved right
+      // away rather than queued for a human reviewer — reflect whatever the
+      // backend actually reports instead of assuming, in case that changes
+      // later without this screen being updated to match.
+      final approved = result['verificationStatus'] == 'verified';
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.hourglass_top_rounded, color: Color(0xFF9B1B20), size: 22),
-              SizedBox(width: 10),
-              Text('Submitted for Review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Icon(
+                approved ? Icons.verified_rounded : Icons.hourglass_top_rounded,
+                color: const Color(0xFF9B1B20),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                approved ? 'You\'re Verified!' : 'Submitted for Review',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
-          content: const Text(
-            'Your ID and photos have been submitted. This usually takes 1-2 business days to review — you\'ll be notified once your account is verified.',
-            style: TextStyle(fontSize: 13, height: 1.4),
+          content: Text(
+            approved
+                ? 'Your ID and photos passed our automated checks — your account is verified.'
+                : 'Your ID and photos have been submitted. This usually takes 1-2 business days to review — you\'ll be notified once your account is verified.',
+            style: const TextStyle(fontSize: 13, height: 1.4),
           ),
           actions: [
             SizedBox(
