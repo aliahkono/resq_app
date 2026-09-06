@@ -838,6 +838,11 @@ class DonorProfileView extends StatelessWidget {
         fg = const Color(0xFFE65100);
         icon = Icons.hourglass_top_rounded;
         break;
+      case VerificationStatus.inReview:
+        bg = const Color(0xFFFFF3E0);
+        fg = const Color(0xFFE65100);
+        icon = Icons.visibility_outlined;
+        break;
       case VerificationStatus.rejected:
         bg = const Color(0xFFFEF2F2);
         fg = const Color(0xFFB91C1C);
@@ -868,7 +873,9 @@ class DonorProfileView extends StatelessWidget {
             ],
           ),
         ),
-        if (verificationStatus != VerificationStatus.verified && verificationStatus != VerificationStatus.pending) ...[
+        if (verificationStatus != VerificationStatus.verified &&
+            verificationStatus != VerificationStatus.pending &&
+            verificationStatus != VerificationStatus.inReview) ...[
           const SizedBox(width: 8),
           GestureDetector(
             onTap: () => Navigator.of(context).push(

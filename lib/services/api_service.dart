@@ -280,6 +280,18 @@ class ApiService {
     return _decode(response);
   }
 
+  /// POST /api/donor/me/verification/didit-session — starts a real
+  /// third-party KYC session (Didit: ID authenticity + liveness + face
+  /// match) for the signed-in donor. Returns { url, sessionId } — `url` is
+  /// what get_ver_view.dart opens in the device browser; the actual
+  /// approve/decline decision comes back to the backend asynchronously via
+  /// Didit's webhook, not in this response, so the app has to check
+  /// getMyProfile's verificationStatus afterward rather than trusting
+  /// anything about "the flow closed" as proof of a result.
+  static Future<Map<String, dynamic>> startDiditVerification(String token) {
+    return _post('/donor/me/verification/didit-session', {}, token: token);
+  }
+
   /// POST /api/donor-auth/logout
   static Future<void> logout(String token) {
     return _post('/donor-auth/logout', {}, token: token);
