@@ -22,7 +22,16 @@ import 'package:resq/model/ver_stats_model.dart';
 class GetVerifiedView extends StatefulWidget {
   final String token;
 
-  const GetVerifiedView({super.key, required this.token});
+  // Set when this screen is shown as the last step of registration (right
+  // after OTP/complete-profile, see otp_ver_view.dart) rather than opened
+  // later from the Profile screen. Changes two things: a "Skip for now"
+  // option appears (verification is still optional, just surfaced earlier),
+  // and finishing — whether by skipping or by completing/checking status —
+  // calls this instead of popping, since there's no previous screen in this
+  // flow worth returning to.
+  final VoidCallback? onFinished;
+
+  const GetVerifiedView({super.key, required this.token, this.onFinished});
 
   @override
   State<GetVerifiedView> createState() => _GetVerifiedViewState();
@@ -89,7 +98,11 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
       });
       if (status == VerificationStatus.verified || status == VerificationStatus.rejected) {
         if (!mounted) return;
-        Navigator.pop(context, true); // true = status changed, caller should refresh
+        if (widget.onFinished != null) {
+          widget.onFinished!();
+        } else {
+          Navigator.pop(context, true); // true = status changed, caller should refresh
+        }
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -113,15 +126,33 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF9B1B20),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: widget.onFinished == null,
+        leading: widget.onFinished == null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
         title: const Text(
           'Get Verified',
           style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        // Registration-time flow only: there's nothing to go "back" to here
+        // (the account is already created), and verification stays
+        // optional at this stage — so Skip replaces the back arrow instead
+        // of leaving the donor stuck with no way off this screen.
+        actions: widget.onFinished == null
+            ? null
+            : [
+                TextButton(
+                  onPressed: widget.onFinished,
+                  child: const Text(
+                    'SKIP',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                  ),
+                ),
+              ],
       ),
       body: SafeArea(
         child: Padding(
@@ -237,6 +268,18 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF9B1B20)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    ),
+                  ),
+                ),
+              ],
+              if (widget.onFinished != null) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: widget.onFinished,
+                    child: const Text(
+                      'Skip for now — verify later from your profile',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),

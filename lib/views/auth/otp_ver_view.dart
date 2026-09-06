@@ -7,6 +7,7 @@ import 'package:resq/services/session_storage.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/home/home_view.dart';
+import 'package:resq/views/profile/get_ver_view.dart';
 
 enum OtpVerificationMode { phone, email }
 
@@ -477,6 +478,29 @@ class _OtpVerViewState extends State<OtpVerView> {
     );
   }
 
+  // Pushed once (from _showSuccessDialog below) and replaces the entire
+  // stack — nothing before this point (registration form, OTP screen, the
+  // optional Get Verified interstitial) is worth navigating back to once
+  // the donor is on the dashboard.
+  void _goToDashboard(Map<String, dynamic>? donor) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => HomeView(
+          donorName: (donor?['name'] as String?) ?? widget.donorName,
+          bloodType: (donor?['bloodType'] as String?) ?? widget.bloodType,
+          donorId: (donor?['id'] as String?) ?? widget.donorId,
+          phoneNum: _phoneNumber,
+          donorEmail: (donor?['email'] as String?) ?? _email,
+          screeningModel: widget.screeningModel,
+          classificationResult: widget.classificationResult,
+          isFirstTimeDonor: widget.screeningModel?.screensNPT.isFirstTimeDonor ?? true,
+          token: _sessionToken ?? '',
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   // `donor` is the real record the backend just returned (from
   // complete-profile or, for the already-existed branch, verify-otp
   // itself) — used in place of the locally-generated placeholder id so
@@ -537,29 +561,24 @@ class _OtpVerViewState extends State<OtpVerView> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => HomeView(
-                          donorName: (donor?['name'] as String?) ?? widget.donorName,
-                          bloodType: (donor?['bloodType'] as String?) ?? widget.bloodType,
-                          donorId: (donor?['id'] as String?) ?? widget.donorId,
-                          phoneNum: _phoneNumber,
-                          // Was `_email` (whatever was typed into this
-                          // registration attempt's form) — wrong for the
-                          // existing-account branch, where that value was
-                          // never saved. The donor object straight from the
-                          // backend is the actual source of truth here.
-                          donorEmail: (donor?['email'] as String?) ?? _email,
-                          screeningModel: widget.screeningModel,
-                          classificationResult: widget.classificationResult,
-                          isFirstTimeDonor:
-                          widget.screeningModel?.screensNPT.isFirstTimeDonor ?? true,
-                          token: _sessionToken ?? '',
+                    Navigator.of(context).pop(); // close this dialog
+                    // Brand-new accounts see the (still-optional) Get
+                    // Verified step right here, before the dashboard — an
+                    // account that already existed (_isExistingAccount)
+                    // skips straight there, since this wasn't really "just
+                    // registered" and may already be verified.
+                    if (_isExistingAccount) {
+                      _goToDashboard(donor);
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => GetVerifiedView(
+                            token: _sessionToken ?? '',
+                            onFinished: () => _goToDashboard(donor),
+                          ),
                         ),
-                      ),
-                          (route) => false,
-                    );
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ResQTheme.primaryCrimson,
@@ -569,9 +588,9 @@ class _OtpVerViewState extends State<OtpVerView> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'PROCEED TO DASHBOARD',
-                    style: TextStyle(
+                  child: Text(
+                    _isExistingAccount ? 'PROCEED TO DASHBOARD' : 'CONTINUE',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13.5,
                     ),
