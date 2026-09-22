@@ -11,6 +11,12 @@
     <!-- Required for image_picker plugin to access the camera. -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Android 13+ (API 33) requires this to be granted explicitly at
+         runtime before any notification — including FCM push — can show.
+         Requested from Dart via firebase_messaging's requestPermission()
+         (see notif_service.dart). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="resq"
         android:name="${applicationName}"
@@ -42,6 +48,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Channel a background/terminated-state FCM notification posts to
+             by default — must match the channel created in push_service.dart
+             so Android doesn't fall back to its own generic "Miscellaneous"
+             channel (which the donor could mute without realizing it also
+             mutes blood-request alerts). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="resq_alerts_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/launcher_icon" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -292,6 +292,20 @@ class ApiService {
     return _post('/donor/me/verification/didit-session', {}, token: token);
   }
 
+  /// POST /api/donor/devices — registers this device's FCM token so the
+  /// backend can push to it (see push_service.dart). Safe to call again
+  /// with the same token (the backend upserts on fcm_token) — used both on
+  /// first grant and whenever Firebase rotates the token.
+  static Future<void> registerDeviceToken(String token, String fcmToken, {String platform = 'android'}) {
+    return _post('/donor/devices', {'fcmToken': fcmToken, 'platform': platform}, token: token);
+  }
+
+  /// DELETE /api/donor/devices — called on sign-out so a device that's no
+  /// longer signed in to this donor stops receiving their pushes.
+  static Future<void> unregisterDeviceToken(String token, String fcmToken) {
+    return _delete('/donor/devices', body: {'fcmToken': fcmToken}, token: token);
+  }
+
   /// POST /api/donor-auth/logout
   static Future<void> logout(String token) {
     return _post('/donor-auth/logout', {}, token: token);

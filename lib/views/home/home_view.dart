@@ -17,6 +17,7 @@ import 'package:resq/widgets/custom_bot_nav_bar.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/notif_service.dart';
+import 'package:resq/services/push_service.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
@@ -121,6 +122,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _loadOpenRequests();
     _loadDonorProfile();
     NotificationService().refresh(widget.token);
+    PushService.instance.registerDevice(widget.token);
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _refreshBroadcastData());
   }
 
@@ -131,14 +133,14 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // The app has no push/WebSocket channel of its own (see
-  // COORDINATING_HOSPITAL_NAME's donor-side counterpart, the realtime hub,
-  // which only pushes to the *admin* dashboard) — so a check-in a hospital
-  // staffer records by scanning this donor's QR pass (donors.controller.js's
-  // completeAppointment) has no way to reach this screen instantly. Instead,
-  // re-checking whenever the app comes back to the foreground means the
-  // donor's own screen "closes" that appointment on its own the next time
-  // they glance at their phone, without needing a manual pull-to-refresh.
+  // A hospital staffer completing this donor's appointment by scanning
+  // their QR pass (donors.controller.js's completeAppointment) isn't one of
+  // the four push trigger types (see push_service.dart) and has no
+  // real-time channel of its own on the donor side (the realtime hub only
+  // pushes to the *admin* dashboard). Re-checking whenever the app comes
+  // back to the foreground means the donor's own screen "closes" that
+  // appointment on its own the next time they glance at their phone,
+  // without needing a manual pull-to-refresh.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {

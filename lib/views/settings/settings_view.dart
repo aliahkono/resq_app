@@ -6,6 +6,7 @@ import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
 import 'package:resq/services/local_prefs.dart';
+import 'package:resq/services/push_service.dart';
 import 'package:resq/views/settings/delete_acc_otp_view.dart';
 
 class SettingsView extends StatefulWidget {
@@ -1034,6 +1035,13 @@ class _SettingsViewState extends State<SettingsView> {
                     // with a stale/unreachable token.
                     try {
                       await ApiService.logout(widget.token);
+                    } catch (_) {}
+                    // Best-effort too — a device that fails to unregister
+                    // just means it keeps getting pushes for the account it
+                    // already signed out of locally, not a blocker to
+                    // finishing sign-out.
+                    try {
+                      await PushService.instance.unregisterDevice(widget.token);
                     } catch (_) {}
                     await SessionStorage.clearToken();
                     navigator.pushAndRemoveUntil(
