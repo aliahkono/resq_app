@@ -841,11 +841,11 @@ class DonorProfileView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.badge_outlined, color: Color(0xFF9B1B20), size: 20),
-                const SizedBox(width: 8),
-                const Text('Digitalized Health Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Icon(Icons.badge_outlined, color: Color(0xFF9B1B20), size: 20),
+                SizedBox(width: 8),
+                Text('Digitalized Health Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
             ),
             const SizedBox(height: 14),
