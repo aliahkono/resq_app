@@ -596,17 +596,8 @@ class DonorProfileView extends StatelessWidget {
           _buildRecordTile(
             icon: Icons.badge_outlined,
             title: 'Digitalized Health Card',
-            subtitle: 'Download verified records',
-            isDownload: true,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Downloading your Digitalized Health Card (PDF)...'),
-                  backgroundColor: Color(0xFF2E7D32),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
+            subtitle: 'View your donor records',
+            onTap: () => _showHealthCardModal(context, isEligible),
           ),
         ],
       ),
@@ -816,6 +807,79 @@ class DonorProfileView extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// "Digitalized Health Card" tile — used to fire off a fake PDF download
+  /// snackbar that didn't actually produce anything. Now a real popup
+  /// showing the donor's own records (identity, blood type, verification
+  /// status, donation history) instead — the button's function changed
+  /// from "download" to "view", per the checklist item, not just a label
+  /// swap.
+  void _showHealthCardModal(BuildContext context, bool isEligible) {
+    final int donations = completedDonations;
+    final lastDonation = lastDonationAt ?? screeningModel?.screensNPT.lastDonationDate ?? clinicalVitals?.recordedDate;
+    final String displayId = donorId.isNotEmpty ? (donorId.startsWith('#') ? donorId : '#$donorId') : '#BD-10942';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.badge_outlined, color: Color(0xFF9B1B20), size: 20),
+                const SizedBox(width: 8),
+                const Text('Digitalized Health Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildModalRow('Donor Name', donorName.isNotEmpty ? donorName : 'John Doe'),
+                    _buildModalRow('Donor ID', displayId),
+                    _buildModalRow('Blood Type', bloodType.isNotEmpty ? bloodType : 'A+'),
+                    _buildModalRow('Eligibility Status', isEligible ? 'Eligible to Donate' : 'Temporarily Deferred'),
+                    _buildModalRow('Verification Status', verificationStatus.label),
+                    _buildModalRow('Completed Donations', '$donations'),
+                    _buildModalRow('Last Donation Date', lastDonation != null ? _formatDate(lastDonation) : 'N/A'),
+                    if (clinicalVitals != null) ...[
+                      _buildModalRow(
+                        'Hemoglobin',
+                        '${clinicalVitals!.hemoglobin.toStringAsFixed(1)} g/dL (${clinicalVitals!.hemoglobinStatus})',
+                      ),
+                      _buildModalRow('Recorded By', clinicalVitals!.medTechName),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
+                child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
+              ),
             ),
           ],
         ),
