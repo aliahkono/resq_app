@@ -3,9 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-    <string>ResQ uses your camera to take a profile photo.</string>
+    <string>ResQ uses your camera to take a profile photo and to capture ID photos during donor verification.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>ResQ uses your photo library to set a profile photo.</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>ResQ uses Face ID to let you sign in quickly and securely.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -48,6 +50,12 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
 	<true/>
 </dict>
 </plist>
