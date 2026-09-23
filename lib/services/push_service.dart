@@ -119,43 +119,54 @@ class PushService {
 
   /// Requests OS notification permission — only a real prompt on Android 13+
   /// (API 33), where POST_NOTIFICATIONS is required; granted automatically
-  /// on older Android. Returns whether pushes are actually allowed.
+  /// on older Android. Returns whether pushes are actually allowed, or
+  /// false if Firebase itself isn't usable (no GoogleService-Info.plist /
+  /// google-services.json for this build) rather than letting that throw.
   Future<bool> _requestPermission() async {
-    final settings = await _messaging.requestPermission(alert: true, badge: true, sound: true);
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    try {
+      final settings = await _messaging.requestPermission(alert: true, badge: true, sound: true);
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (e) {
+      debugPrint('PushService: notification permission request failed: $e');
+      return false;
+    }
   }
 
   /// Requests permission, fetches this device's FCM token, and registers it
   /// with the backend under the signed-in donor. Call once after login
   /// (see home_view.dart's initState) — a no-op if permission is denied or
   /// Firebase couldn't hand back a token (e.g. no Firebase project
-  /// configured yet, see setup instructions).
+  /// configured yet, see setup instructions). The whole body is one big
+  /// try/catch, not just the token-fetch part — _requestPermission already
+  /// guards itself, but Firebase being unconfigured can surface at any of
+  /// these calls depending on platform, and push registration should never
+  /// be able to break sign-in.
   Future<void> registerDevice(String donorAuthToken) async {
     if (donorAuthToken.isEmpty) return;
 
-    final granted = await _requestPermission();
-    if (!granted) return;
-
     try {
+      final granted = await _requestPermission();
+      if (!granted) return;
+
       final fcmToken = await _messaging.getToken();
       if (fcmToken != null) {
         await ApiService.registerDeviceToken(donorAuthToken, fcmToken);
       }
+
+      // Firebase can rotate a device's token (token expiry, app data
+      // restored to a new device) — without this, a donor who's been
+      // signed in for a while would silently stop receiving pushes once
+      // that happens.
+      _tokenRefreshSub?.cancel();
+      _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
+        ApiService.registerDeviceToken(donorAuthToken, newToken).catchError((_) {});
+      });
     } catch (e) {
       // Firebase not configured for this build, or a network hiccup — push
       // is additive, so a failure here should never block sign-in.
       debugPrint('PushService: device registration failed: $e');
     }
-
-    // Firebase can rotate a device's token (token expiry, app data
-    // restored to a new device) — without this, a donor who's been signed
-    // in for a while would silently stop receiving pushes once that
-    // happens.
-    _tokenRefreshSub?.cancel();
-    _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
-      ApiService.registerDeviceToken(donorAuthToken, newToken).catchError((_) {});
-    });
   }
 
   /// Call on sign-out so this device stops receiving pushes meant for the
