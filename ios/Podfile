@@ -1,8 +1,9 @@
-# Firebase (firebase_core/firebase_messaging) and flutter_local_notifications
-# both require iOS 13+ — the Flutter-generated default of no minimum (which
-# falls back to the Xcode project's own, older IPHONEOS_DEPLOYMENT_TARGET)
-# isn't high enough for those plugins to build.
-platform :ios, '13.0'
+# 13.0 (Firebase/flutter_local_notifications' own floor) wasn't enough —
+# CocoaPods reported the installed Flutter engine itself needs a higher
+# minimum than that to resolve. 15.0 matches the commented-out default this
+# Flutter version's own template ships with, so it's the floor this
+# toolchain actually expects rather than a guess.
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
