@@ -168,15 +168,63 @@ class _LoginViewState extends State<LoginView> {
   // currently saved on this device explicitly turned it on from Settings —
   // see SessionStorage.isBiometricEnabled. Off (and hidden) by default.
   bool _biometricAvailable = false;
+  // Which biometric this specific device actually has enrolled — used to
+  // show the correct icon/label (Face ID vs. fingerprint) instead of always
+  // assuming fingerprint, which is wrong on any Face-ID iPhone or
+  // face-unlock Android device.
+  BiometricType? _deviceBiometricType;
+  // Ensures the automatic prompt (below) only ever fires once per visit to
+  // this screen, not on every rebuild.
+  bool _autoPromptShown = false;
 
   @override
   void initState() {
     super.initState();
-    SessionStorage.isBiometricEnabled().then((enabled) {
+    SessionStorage.isBiometricEnabled().then((enabled) async {
       if (!mounted) return;
       setState(() => _biometricAvailable = enabled);
+      if (!enabled) return;
+
+      await _detectDeviceBiometricType();
+      if (!mounted || _autoPromptShown) return;
+
+      // Prompt the moment this screen appears instead of waiting for the
+      // donor to notice and tap a small icon — a donor who never taps it
+      // would otherwise never actually get to use the feature they turned
+      // on in Settings. The manual icon below stays as a retry affordance
+      // if this first attempt is cancelled or fails.
+      _autoPromptShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handleDeviceBiometricAuth();
+      });
     });
   }
+
+  /// Reads which biometric method is actually enrolled on this device (Face
+  /// ID vs. fingerprint) so the UI can show the right icon/label. Leaves
+  /// _deviceBiometricType null on any failure — the UI falls back to a
+  /// generic fingerprint icon rather than blocking the biometric shortcut
+  /// over a detection error.
+  Future<void> _detectDeviceBiometricType() async {
+    try {
+      final List<BiometricType> available = await _localAuth.getAvailableBiometrics();
+      if (!mounted) return;
+      setState(() {
+        _deviceBiometricType = available.contains(BiometricType.face)
+            ? BiometricType.face
+            : (available.contains(BiometricType.fingerprint) ? BiometricType.fingerprint : null);
+      });
+    } catch (_) {
+      // Detection isn't critical — _handleDeviceBiometricAuth still works
+      // via the OS's own biometricOnly:false prompt either way.
+    }
+  }
+
+  IconData get _biometricIcon =>
+      _deviceBiometricType == BiometricType.face ? Icons.face_retouching_natural_rounded : Icons.fingerprint_rounded;
+
+  String get _biometricLabel =>
+      _deviceBiometricType == BiometricType.face ? 'Sign in with Face ID' : 'Sign in with Fingerprint / PIN';
 
   // --- MOCK REGISTERED ACCOUNTS LIST REMOVED ---
 
@@ -774,18 +822,31 @@ class _LoginViewState extends State<LoginView> {
                   ),
 
                   if (_biometricAvailable) ...[
-                    const SizedBox(height: 18),
-                    // Quick Biometric Icon Button (Device Fingerprint / PIN)
-                    // — only shown once a donor has explicitly turned this
-                    // on for their account from Settings.
-                    IconButton(
-                      icon: const Icon(
-                        Icons.fingerprint_rounded,
-                        size: 34,
-                        color: Color(0xFF9B1B20),
-                      ),
-                      onPressed: _handleDeviceBiometricAuth,
-                      tooltip: 'Sign in with Fingerprint / PIN',
+                    const SizedBox(height: 14),
+                    // Biometric login is already offered automatically as
+                    // soon as this screen loads (see initState) — this icon
+                    // is just the retry affordance for when that first
+                    // system prompt gets cancelled or fails, so a donor
+                    // isn't stuck re-typing their password over one missed
+                    // tap. Icon/label reflect what's actually enrolled on
+                    // this device (Face ID vs. fingerprint) instead of
+                    // always assuming fingerprint.
+                    Column(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _biometricIcon,
+                            size: 34,
+                            color: const Color(0xFF9B1B20),
+                          ),
+                          onPressed: _handleDeviceBiometricAuth,
+                          tooltip: _biometricLabel,
+                        ),
+                        Text(
+                          _biometricLabel,
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                        ),
+                      ],
                     ),
                   ],
 
