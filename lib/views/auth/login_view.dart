@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -220,11 +221,27 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
-  IconData get _biometricIcon =>
-      _deviceBiometricType == BiometricType.face ? Icons.face_retouching_natural_rounded : Icons.fingerprint_rounded;
+  String get _biometricLabel {
+    if (_deviceBiometricType == BiometricType.face) {
+      return Platform.isIOS ? 'Sign in with Face ID' : 'Sign in with Face Unlock';
+    }
+    return 'Sign in with Fingerprint / PIN';
+  }
 
-  String get _biometricLabel =>
-      _deviceBiometricType == BiometricType.face ? 'Sign in with Face ID' : 'Sign in with Fingerprint / PIN';
+  /// The platform's own biometric glyph, not a single generic icon reused
+  /// everywhere — iOS's Face ID prompt is the corner-bracket scan frame,
+  /// Android's face unlock is a plain rounded face, and fingerprint already
+  /// looks the same (a ridge swirl) on both, so only the face case actually
+  /// needs to branch by platform.
+  Widget _biometricGlyph({required double size, required Color color}) {
+    if (_deviceBiometricType == BiometricType.face) {
+      if (Platform.isIOS) {
+        return CustomPaint(size: Size(size, size), painter: _FaceIdIconPainter(color: color));
+      }
+      return Icon(Icons.sentiment_satisfied_alt_rounded, size: size, color: color);
+    }
+    return Icon(Icons.fingerprint_rounded, size: size, color: color);
+  }
 
   // --- MOCK REGISTERED ACCOUNTS LIST REMOVED ---
 
@@ -834,11 +851,7 @@ class _LoginViewState extends State<LoginView> {
                     Column(
                       children: [
                         IconButton(
-                          icon: Icon(
-                            _biometricIcon,
-                            size: 34,
-                            color: const Color(0xFF9B1B20),
-                          ),
+                          icon: _biometricGlyph(size: 34, color: const Color(0xFF9B1B20)),
                           onPressed: _handleDeviceBiometricAuth,
                           tooltip: _biometricLabel,
                         ),
@@ -889,4 +902,60 @@ class _LoginViewState extends State<LoginView> {
       ),
     );
   }
+}
+
+/// Draws the iOS Face ID glyph — a corner-bracket scan frame with a simple
+/// face inside — as original line art (not Apple's SF Symbol asset) since
+/// this project doesn't otherwise depend on cupertino_icons and Apple's
+/// exact glyph isn't ours to redistribute. Purely decorative/stroke-based,
+/// so it scales cleanly to any icon size passed in.
+class _FaceIdIconPainter extends CustomPainter {
+  final Color color;
+  const _FaceIdIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.075
+      ..strokeCap = StrokeCap.round;
+
+    final w = size.width;
+    final h = size.height;
+    const pad = 0.10; // inset from the icon's edge, as a fraction of w/h
+    const arm = 0.22; // length of each corner bracket arm
+    const radius = 0.10; // corner rounding
+
+    void bracket(double cx, double cy, double dx, double dy) {
+      // cx/cy: the bracket's corner point. dx/dy: +1/-1 indicating which
+      // quadrant the two arms extend into from that corner.
+      canvas.drawPath(
+        Path()
+          ..moveTo(cx, cy + dy * arm * h)
+          ..lineTo(cx, cy + dy * radius * h)
+          ..quadraticBezierTo(cx, cy, cx + dx * radius * w, cy)
+          ..lineTo(cx + dx * arm * w, cy),
+        paint,
+      );
+    }
+
+    bracket(pad * w, pad * h, 1, 1); // top-left
+    bracket(w - pad * w, pad * h, -1, 1); // top-right
+    bracket(pad * w, h - pad * h, 1, -1); // bottom-left
+    bracket(w - pad * w, h - pad * h, -1, -1); // bottom-right
+
+    // Minimal face: two short vertical eyes + a shallow smile arc.
+    final eyeY = h * 0.42;
+    final eyeDx = w * 0.15;
+    final eyeLen = h * 0.09;
+    canvas.drawLine(Offset(w / 2 - eyeDx, eyeY - eyeLen / 2), Offset(w / 2 - eyeDx, eyeY + eyeLen / 2), paint);
+    canvas.drawLine(Offset(w / 2 + eyeDx, eyeY - eyeLen / 2), Offset(w / 2 + eyeDx, eyeY + eyeLen / 2), paint);
+
+    final mouthRect = Rect.fromCenter(center: Offset(w / 2, h * 0.54), width: w * 0.30, height: h * 0.22);
+    canvas.drawArc(mouthRect, 0.35, math.pi - 0.7, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FaceIdIconPainter oldDelegate) => oldDelegate.color != color;
 }
