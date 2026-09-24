@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -148,6 +149,34 @@ class PushService {
     try {
       final granted = await _requestPermission();
       if (!granted) return;
+
+      // On iOS, FCM's getToken() requires an APNs token to already be
+      // registered with the OS, but that arrives asynchronously right after
+      // permission is granted — calling getToken() immediately can race
+      // ahead of it and throw apns-token-not-set. Give it a few short
+      // retries before giving up, since on a fresh permission grant it's
+      // often just not there *yet* rather than never coming.
+      if (Platform.isIOS) {
+        String? apnsToken = await _messaging.getAPNSToken();
+        var attempts = 0;
+        while (apnsToken == null && attempts < 5) {
+          await Future.delayed(const Duration(seconds: 1));
+          apnsToken = await _messaging.getAPNSToken();
+          attempts++;
+        }
+        if (apnsToken == null) {
+          // Still not set after retrying — this almost always means the
+          // Push Notifications capability isn't enabled for this build
+          // (that capability requires a paid Apple Developer Program
+          // account; a free/Personal Team signing can't add it), not a
+          // transient timing issue. Calling getToken() now would just
+          // throw the same error again, so stop here rather than spamming
+          // it — push stays silently unavailable on this build until a
+          // paid-account build re-signs with that capability turned on.
+          debugPrint('PushService: no APNs token after retrying — Push Notifications capability is likely not enabled for this build.');
+          return;
+        }
+      }
 
       final fcmToken = await _messaging.getToken();
       if (fcmToken != null) {
