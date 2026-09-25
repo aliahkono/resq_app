@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:resq/model/broadcast_notif_model.dart';
 import 'package:resq/services/notif_service.dart';
 import 'package:resq/views/appointment/eligible_appoint_view.dart';
@@ -90,6 +91,10 @@ class AppNotificationBell extends StatelessWidget {
         isLoading: service.isLoading,
         isEligible: isEligible,
         onMarkAllRead: () => service.markAllAsReadRemote(token),
+        // Referral cards need "mark read" without the rest of
+        // onSelectBroadcast's booking/eligibility navigation below — they
+        // have nothing to accept or book.
+        onMarkRead: (item) => service.markAsRead(item.id),
         onSelectBroadcast: (item) {
           service.markAsRead(item.id);
           Navigator.pop(ctx);
@@ -147,6 +152,7 @@ class _BroadcastModalSheet extends StatelessWidget {
   final bool isEligible;
   final VoidCallback onMarkAllRead;
   final Function(BloodBroadcastNotification) onSelectBroadcast;
+  final Function(BloodBroadcastNotification) onMarkRead;
 
   const _BroadcastModalSheet({
     required this.notifications,
@@ -154,6 +160,7 @@ class _BroadcastModalSheet extends StatelessWidget {
     required this.isEligible,
     required this.onMarkAllRead,
     required this.onSelectBroadcast,
+    required this.onMarkRead,
   });
 
   @override
@@ -239,6 +246,8 @@ class _BroadcastModalSheet extends StatelessWidget {
   }
 
   Widget _buildNotificationCard(BuildContext context, BloodBroadcastNotification item) {
+    if (item.isReferral) return _buildReferralCard(context, item);
+
     Color badgeBg;
     Color badgeColor;
     IconData badgeIcon;
@@ -344,6 +353,97 @@ class _BroadcastModalSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Shown instead of _buildNotificationCard's normal card for a donor who
+  // was currently deferred when this broadcast went out — they can't
+  // donate right now, so this doesn't offer "accept slot" at all. Its own
+  // self-contained card (no onSelectBroadcast tap-through, no booking
+  // flow) — just a different ask: pass the word to someone who can help.
+  Widget _buildReferralCard(BuildContext context, BloodBroadcastNotification item) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: item.isRead ? Colors.white : const Color(0xFFF3F8FB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF0E6E8C),
+          width: item.isRead ? 1.0 : 1.4,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2F7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.diversity_3_rounded, size: 12, color: Color(0xFF0E6E8C)),
+                    SizedBox(width: 4),
+                    Text('REFERRAL OPPORTUNITY', style: TextStyle(color: Color(0xFF0E6E8C), fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              if (!item.isRead)
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(color: Color(0xFF0E6E8C), shape: BoxShape.circle),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            item.hospitalName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF1E1E1E)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "You're on a short recovery hold, so this one isn't for you to fulfill — but if you "
+            "know someone who's ${item.bloodType} and eligible, ${item.hospitalName} could really use their help "
+            "(${item.location}).",
+            style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563), height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 36,
+            child: OutlinedButton.icon(
+              onPressed: () => _copyReferralDetails(context, item),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0E6E8C),
+                side: const BorderSide(color: Color(0xFF0E6E8C)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.copy_rounded, size: 15),
+              label: const Text('COPY DETAILS TO SHARE', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyReferralDetails(BuildContext context, BloodBroadcastNotification item) {
+    onMarkRead(item); // no booking navigation for a referral card — nothing to accept
+    final text = 'ResQ Alert: ${item.hospitalName} needs ${item.bloodType} blood donors '
+        '(${item.location}). If you know someone who\'s ${item.bloodType} and eligible to donate, '
+        'please share this with them — every donor helps.';
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied! Paste it in a message to share.'),
+        backgroundColor: Color(0xFF0E6E8C),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

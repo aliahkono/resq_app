@@ -21,6 +21,11 @@ class BloodBroadcastNotification {
   final DateTime timestamp;
   bool isRead;
   final bool smsDispatched;
+  // true for a donor who was currently deferred when this broadcast went
+  // out — they weren't asked to come donate (they can't), they were asked
+  // to refer someone else who might be able to. Changes how the bell card
+  // reads and what its action button does (see app_notif_bell.dart).
+  final bool isReferral;
 
   BloodBroadcastNotification({
     required this.id,
@@ -35,6 +40,7 @@ class BloodBroadcastNotification {
     required this.timestamp,
     this.isRead = false,
     this.smsDispatched = true,
+    this.isReferral = false,
   });
 
   bool get isStillOpen => requestStatus == 'OPEN' || requestStatus == 'PARTIALLY_FULFILLED';
@@ -76,6 +82,7 @@ class BloodBroadcastNotification {
       // notifyDonorsForRequest actually attempting SMS/email dispatch — if
       // this row exists at all, dispatch was attempted for real.
       smsDispatched: true,
+      isReferral: json['isReferral'] as bool? ?? false,
     );
   }
 
