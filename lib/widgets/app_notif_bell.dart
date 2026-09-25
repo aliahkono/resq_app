@@ -442,9 +442,13 @@ class _BroadcastModalSheet extends StatelessWidget {
     final text = 'ResQ Alert: ${item.hospitalName} needs ${item.bloodType} blood donors '
         '(${item.location}). If you know someone who\'s ${item.bloodType} and eligible to donate, '
         'please share this with them — every donor helps.';
-    // sharePositionOrigin isn't set here — required on iPad (for the share
-    // sheet's popover anchor) but not on iPhone/Android, and this app
-    // doesn't target iPad.
-    SharePlus.instance.share(ShareParams(text: text));
+    // sharePositionOrigin anchors the share sheet's popover on iPad, and on
+    // recent iOS versions its absence can also make the sheet silently fail
+    // to appear at all on iPhone too, not just crash on iPad as older
+    // share_plus versions documented — so this is passed unconditionally
+    // rather than only for iPad.
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null ? (box.localToGlobal(Offset.zero) & box.size) : null;
+    SharePlus.instance.share(ShareParams(text: text, sharePositionOrigin: origin));
   }
 }
