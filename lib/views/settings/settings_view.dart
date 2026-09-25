@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
@@ -8,6 +10,7 @@ import 'package:resq/services/session_storage.dart';
 import 'package:resq/services/local_prefs.dart';
 import 'package:resq/services/push_service.dart';
 import 'package:resq/views/settings/delete_acc_otp_view.dart';
+import 'package:resq/widgets/resq_ui.dart';
 
 class SettingsView extends StatefulWidget {
   final ScreenNPTModel? screeningModel;
@@ -571,291 +574,598 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  int _radiusKm(String option) => int.tryParse(option.split(' ').first) ?? 15;
+
   void _showRadiusPicker(BuildContext context) {
-    showModalBottomSheet(
+    String pending = _selectedRadius;
+
+    showResQSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Urgent Alert Radius',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final int index = _radiusOptions.indexOf(pending).clamp(0, _radiusOptions.length - 1);
+          final int km = _radiusKm(pending);
+          final int maxKm = _radiusKm(_radiusOptions.last);
+
+          return ResQSheet(
+            icon: Icons.radar_rounded,
+            title: 'Urgent Alert Radius',
+            subtitle: 'How far away can hospitals alert you?',
+            footer: RQButton(
+              label: 'Save radius',
+              onPressed: () {
+                setState(() => _selectedRadius = pending);
+                LocalPrefs.setString(widget.donorId, 'alertRadius', pending);
+                Navigator.pop(ctx);
+              },
             ),
-            const SizedBox(height: 12),
-            ...List.generate(_radiusOptions.length, (index) {
-              final option = _radiusOptions[index];
-              return ListTile(
-                title: Text(option, style: const TextStyle(fontWeight: FontWeight.w600)),
-                trailing: _selectedRadius == option
-                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF9B1B20))
-                    : null,
-                onTap: () {
-                  setState(() => _selectedRadius = option);
-                  LocalPrefs.setString(widget.donorId, 'alertRadius', option);
-                  Navigator.pop(ctx);
-                },
-              );
-            }),
-          ],
-        ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Radius preview: rings for each option, the chosen one filled.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    height: 190,
+                    width: double.infinity,
+                    color: const Color(0xFFECEAE4),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: km.toDouble()),
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      builder: (context, value, _) => CustomPaint(
+                        painter: _RadiusPainter(
+                          selectedKm: value,
+                          maxKm: maxKm.toDouble(),
+                          ringsKm: _radiusOptions.map(_radiusKm).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$km',
+                        style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: RQColors.ink),
+                      ),
+                      const TextSpan(
+                        text: ' km radius',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: RQColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Text('You\'ll get urgent alerts from hospitals within $km km of you.',
+                    style: const TextStyle(fontSize: 12.5, color: RQColors.muted)),
+                const SizedBox(height: 8),
+                SliderTheme(
+                  data: SliderTheme.of(ctx).copyWith(
+                    activeTrackColor: RQColors.blood,
+                    inactiveTrackColor: RQColors.hairline,
+                    thumbColor: RQColors.blood,
+                    overlayColor: RQColors.blood.withValues(alpha: 0.12),
+                    trackHeight: 6,
+                    showValueIndicator: ShowValueIndicator.never,
+                  ),
+                  child: Slider(
+                    value: index.toDouble(),
+                    min: 0,
+                    max: (_radiusOptions.length - 1).toDouble(),
+                    divisions: _radiusOptions.length - 1,
+                    semanticFormatterCallback: (v) => _radiusOptions[v.round()],
+                    onChanged: (v) => setModalState(() => pending = _radiusOptions[v.round()]),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    for (int i = 0; i < _radiusOptions.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: _radiusOptions[i] == pending
+                              ? ElevatedButton(
+                                  onPressed: () {},
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: RQColors.blood,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    minimumSize: Size.zero,
+                                    padding: EdgeInsets.zero,
+                                    shape: const StadiumBorder(),
+                                  ),
+                                  child: Text(_radiusOptions[i],
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                )
+                              : OutlinedButton(
+                                  onPressed: () => setModalState(() => pending = _radiusOptions[i]),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: RQColors.ink,
+                                    side: const BorderSide(color: RQColors.hairline, width: 1.5),
+                                    minimumSize: Size.zero,
+                                    padding: EdgeInsets.zero,
+                                    shape: const StadiumBorder(),
+                                  ),
+                                  child: Text(_radiusOptions[i],
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500)),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: RQColors.hairline),
+                  ),
+                  child: Column(
+                    children: [
+                      RQToggleRow(
+                        title: 'Use my location',
+                        subtitle: 'Needed to measure distance to hospitals',
+                        value: _locationServices,
+                        onChanged: (val) {
+                          setState(() => _locationServices = val);
+                          setModalState(() {});
+                          LocalPrefs.setBool(widget.donorId, 'locationServices', val);
+                        },
+                      ),
+                      RQToggleRow(
+                        title: 'Also send by SMS',
+                        subtitle: "When you're offline or have no data",
+                        value: _notifySms,
+                        showDivider: false,
+                        onChanged: _loadingPrefs
+                            ? null
+                            : (val) async {
+                                setModalState(() {});
+                                await _updateNotifyPref(sms: val);
+                                if (ctx.mounted) setModalState(() {});
+                              },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
+  }
+
+  String get _initials {
+    final parts = _name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   void _showEditPersonalDetailsModal(BuildContext context) {
     final nameCtrl = TextEditingController(text: _name);
     final phoneCtrl = TextEditingController(text: _phone);
     final emailCtrl = TextEditingController(text: _email);
+    bool saving = false;
+    String? error;
 
-    showModalBottomSheet(
+    Future<void> save(BuildContext ctx, StateSetter setModalState) async {
+      final newName = nameCtrl.text.trim();
+      final newPhone = phoneCtrl.text.trim();
+      final newEmail = emailCtrl.text.trim();
+      final updates = <String, dynamic>{};
+      if (newName != _name) updates['name'] = newName;
+      if (newPhone != _phone) updates['phone'] = newPhone;
+      if (newEmail != _email) updates['email'] = newEmail;
+
+      if (updates.isEmpty) {
+        Navigator.pop(ctx);
+        return;
+      }
+      if (newName.isEmpty) {
+        setModalState(() => error = 'Please enter your full name.');
+        return;
+      }
+
+      setModalState(() {
+        saving = true;
+        error = null;
+      });
+
+      try {
+        final updated = await ApiService.updateMyProfile(widget.token, updates);
+        if (!mounted) return;
+        setState(() {
+          _name = (updated['name'] as String?) ?? newName;
+          _phone = (updated['phone'] as String?) ?? newPhone;
+          _email = (updated['email'] as String?) ?? newEmail;
+        });
+        widget.onProfileDetailsUpdated?.call(name: _name, phone: _phone, email: _email);
+        if (!ctx.mounted) return;
+        Navigator.pop(ctx);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Personal details saved.'), backgroundColor: RQColors.success),
+        );
+      } on ApiException catch (e) {
+        if (!ctx.mounted) return;
+        setModalState(() {
+          saving = false;
+          error = e.message;
+        });
+      } catch (_) {
+        if (!ctx.mounted) return;
+        setModalState(() {
+          saving = false;
+          error = 'Could not reach the ResQ server.';
+        });
+      }
+    }
+
+    showResQSheet(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        bool saving = false;
-        String? error;
-        return StatefulBuilder(
-          builder: (ctx, setModalState) => Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => ResQSheet(
+          title: 'Edit personal details',
+          subtitle: 'So hospitals can reach you quickly',
+          footer: Row(
+            children: [
+              Expanded(
+                child: RQButton.secondary(label: 'Cancel', onPressed: saving ? null : () => Navigator.pop(ctx)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: RQButton(
+                  label: 'Save changes',
+                  loading: saving,
+                  onPressed: () => save(ctx, setModalState),
+                ),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  const Text('Personal Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(color: RQColors.bloodTint, shape: BoxShape.circle),
+                    alignment: Alignment.center,
+                    child: Text(_initials,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: RQColors.bloodText)),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: phoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 10),
-                    Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: saving
-                              ? null
-                              : () {
-                                  Navigator.pop(ctx);
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => RegistrationWizView(
-                                        isRetake: true,
-                                        initialScreening: widget.screeningModel,
-                                        donorName: widget.donorName,
-                                        bloodType: widget.bloodType,
-                                        donorId: widget.donorId,
-                                        token: widget.token,
-                                        onRetakeCompleted: widget.onRetakeCompleted,
-                                      ),
-                                    ),
-                                  );
-                                },
-                          child: const Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 11.5)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: saving
-                              ? null
-                              : () async {
-                                  final newName = nameCtrl.text.trim();
-                                  final newPhone = phoneCtrl.text.trim();
-                                  final newEmail = emailCtrl.text.trim();
-                                  final updates = <String, dynamic>{};
-                                  if (newName != _name) updates['name'] = newName;
-                                  if (newPhone != _phone) updates['phone'] = newPhone;
-                                  if (newEmail != _email) updates['email'] = newEmail;
-
-                                  if (updates.isEmpty) {
-                                    Navigator.pop(ctx);
-                                    return;
-                                  }
-
-                                  setModalState(() {
-                                    saving = true;
-                                    error = null;
-                                  });
-
-                                  try {
-                                    final updated = await ApiService.updateMyProfile(widget.token, updates);
-                                    if (!mounted) return;
-                                    setState(() {
-                                      _name = (updated['name'] as String?) ?? newName;
-                                      _phone = (updated['phone'] as String?) ?? newPhone;
-                                      _email = (updated['email'] as String?) ?? newEmail;
-                                    });
-                                    widget.onProfileDetailsUpdated?.call(name: _name, phone: _phone, email: _email);
-                                    if (!ctx.mounted) return;
-                                    Navigator.pop(ctx);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Personal profile details saved successfully!'), backgroundColor: Color(0xFF2E7D32)),
-                                    );
-                                  } on ApiException catch (e) {
-                                    setModalState(() {
-                                      saving = false;
-                                      error = e.message;
-                                    });
-                                  } catch (_) {
-                                    setModalState(() {
-                                      saving = false;
-                                      error = 'Could not reach the ResQ server.';
-                                    });
-                                  }
-                                },
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
-                          child: saving
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontSize: 11.5)),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_name.isNotEmpty ? _name : 'Your name',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: RQColors.ink)),
+                        if (widget.donorId.isNotEmpty)
+                          Text('Donor ID ${widget.donorId}',
+                              style: const TextStyle(fontSize: 12, color: RQColors.muted)),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          );
-        },
-      );
+              const SizedBox(height: 20),
+              const RQSectionLabel('Basic info'),
+              const SizedBox(height: 10),
+              RQTextField(controller: nameCtrl, label: 'Full name', enabled: !saving),
+              const SizedBox(height: 18),
+              const RQSectionLabel('Contact'),
+              const SizedBox(height: 10),
+              RQTextField(
+                controller: phoneCtrl,
+                label: 'Mobile number',
+                keyboardType: TextInputType.phone,
+                enabled: !saving,
+              ),
+              const SizedBox(height: 12),
+              RQTextField(
+                controller: emailCtrl,
+                label: 'Email',
+                keyboardType: TextInputType.emailAddress,
+                enabled: !saving,
+              ),
+              if (widget.bloodType.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: RQColors.surface, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(color: RQColors.blood, borderRadius: BorderRadius.circular(12)),
+                        alignment: Alignment.center,
+                        child: Text(widget.bloodType,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Blood type',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: RQColors.ink)),
+                            Text("Can't be changed here",
+                                style: TextStyle(fontSize: 12, color: RQColors.muted)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.lock_outline_rounded, size: 18, color: RQColors.muted),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: saving
+                    ? null
+                    : () {
+                        Navigator.pop(ctx);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => RegistrationWizView(
+                              isRetake: true,
+                              initialScreening: widget.screeningModel,
+                              donorName: widget.donorName,
+                              bloodType: widget.bloodType,
+                              donorId: widget.donorId,
+                              token: widget.token,
+                              onRetakeCompleted: widget.onRetakeCompleted,
+                            ),
+                          ),
+                        );
+                      },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text('Update health screening answers',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: RQColors.navy)),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: RQColors.navy),
+                    ],
+                  ),
+                ),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                _sheetError(error!),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sheetError(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 18, color: Color(0xFFB91C1C)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFFB91C1C)))),
+        ],
+      ),
+    );
   }
 
   void _showChangePasswordModal(BuildContext context) {
     final currentPw = TextEditingController();
     final newPw = TextEditingController();
+    final confirmPw = TextEditingController();
+    bool saving = false;
+    String? error;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
 
-    showModalBottomSheet(
+    Widget eye(bool obscured, VoidCallback onTap) => IconButton(
+          tooltip: obscured ? 'Show password' : 'Hide password',
+          icon: Icon(obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: RQColors.muted),
+          onPressed: onTap,
+        );
+
+    Widget rule(bool ok, String text) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(ok ? Icons.check_rounded : Icons.circle_outlined,
+                size: 15, color: ok ? RQColors.success : const Color(0xFF9CA3AF)),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(text, style: TextStyle(fontSize: 12, color: ok ? RQColors.ink : RQColors.muted)),
+            ),
+          ],
+        );
+
+    showResQSheet(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        bool saving = false;
-        String? error;
-        bool obscureCurrent = true;
-        bool obscureNew = true;
-        return StatefulBuilder(
-          builder: (ctx, setModalState) => Padding(
-            padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final pw = newPw.text;
+          final bool hasLen = pw.length >= 8;
+          final bool hasUpper = pw.contains(RegExp(r'[A-Z]'));
+          final bool hasNum = pw.contains(RegExp(r'[0-9]'));
+          final bool hasSym = pw.contains(RegExp(r'[^A-Za-z0-9]'));
+          final int score = [hasLen, hasUpper, hasNum, hasSym].where((b) => b).length;
+          final bool matches = confirmPw.text.isNotEmpty && confirmPw.text == pw;
+          final bool canSave = hasLen && matches && !saving;
+
+          const labels = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
+          final Color strengthColor = score >= 3
+              ? RQColors.success
+              : score == 2
+                  ? RQColors.warning
+                  : const Color(0xFFB91C1C);
+
+          Future<void> submit() async {
+            setModalState(() {
+              saving = true;
+              error = null;
+            });
+            try {
+              await ApiService.updateMyProfile(widget.token, {
+                'password': newPw.text,
+                'currentPassword': currentPw.text,
+              });
+              if (!mounted || !ctx.mounted) return;
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Password updated.'), backgroundColor: RQColors.success),
+              );
+            } on ApiException catch (e) {
+              if (!ctx.mounted) return;
+              setModalState(() {
+                saving = false;
+                error = e.message;
+              });
+            } catch (_) {
+              if (!ctx.mounted) return;
+              setModalState(() {
+                saving = false;
+                error = 'Could not reach the ResQ server.';
+              });
+            }
+          }
+
+          return ResQSheet(
+            icon: Icons.shield_outlined,
+            title: 'Password & Security',
+            subtitle: 'Keep your ResQ account safe',
+            footer: RQButton(
+              label: 'Update password',
+              loading: saving,
+              onPressed: canSave ? submit : null,
+            ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Change Password & Security', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
-                const SizedBox(height: 14),
+                const RQSectionLabel('Change password'),
+                const SizedBox(height: 10),
                 // currentPassword is only checked server-side if the donor
                 // already has a password set — an OTP-only donor setting
                 // their first one here can leave it blank (see
                 // updateMyProfile, donorPortal.controller.js).
-                TextField(
+                RQTextField(
                   controller: currentPw,
+                  label: 'Current password',
                   obscureText: obscureCurrent,
-                  decoration: InputDecoration(
-                    labelText: 'Current Password',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscureCurrent ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                      onPressed: () => setModalState(() => obscureCurrent = !obscureCurrent),
-                    ),
-                  ),
+                  enabled: !saving,
+                  suffix: eye(obscureCurrent, () => setModalState(() => obscureCurrent = !obscureCurrent)),
                 ),
-                const SizedBox(height: 10),
-                TextField(
+                const SizedBox(height: 12),
+                RQTextField(
                   controller: newPw,
+                  label: 'New password',
                   obscureText: obscureNew,
-                  decoration: InputDecoration(
-                    labelText: 'New Password (min. 8 characters)',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                      onPressed: () => setModalState(() => obscureNew = !obscureNew),
-                    ),
-                  ),
+                  enabled: !saving,
+                  onChanged: (_) => setModalState(() {}),
+                  suffix: eye(obscureNew, () => setModalState(() => obscureNew = !obscureNew)),
                 ),
-                if (error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),
+                if (pw.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      for (int i = 0; i < 4; i++) ...[
+                        if (i > 0) const SizedBox(width: 4),
+                        Expanded(
+                          child: Container(
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: i < score ? strengthColor : RQColors.hairline,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 10),
+                      Text(labels[score],
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: strengthColor)),
+                    ],
+                  ),
                 ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            if (newPw.text.length < 8) {
-                              setModalState(() => error = 'New password must be at least 8 characters.');
-                              return;
-                            }
-                            setModalState(() {
-                              saving = true;
-                              error = null;
-                            });
-                            try {
-                              await ApiService.updateMyProfile(widget.token, {
-                                'password': newPw.text,
-                                'currentPassword': currentPw.text,
-                              });
-                              if (!mounted) return;
-                              if (!ctx.mounted) return;
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Account security credentials updated!'), backgroundColor: Color(0xFF2E7D32)),
-                              );
-                            } on ApiException catch (e) {
-                              setModalState(() {
-                                saving = false;
-                                error = e.message;
-                              });
-                            } catch (_) {
-                              setModalState(() {
-                                saving = false;
-                                error = 'Could not reach the ResQ server.';
-                              });
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
-                    child: saving
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('UPDATE PASSWORD', style: TextStyle(color: Colors.white)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: rule(hasLen, '8+ characters')),
+                    Expanded(child: rule(hasUpper, 'Uppercase letter')),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: rule(hasNum, 'A number')),
+                    Expanded(child: rule(hasSym, 'A symbol (!@#)')),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                RQTextField(
+                  controller: confirmPw,
+                  label: 'Confirm new password',
+                  obscureText: obscureNew,
+                  enabled: !saving,
+                  onChanged: (_) => setModalState(() {}),
+                  suffix: confirmPw.text.isEmpty
+                      ? null
+                      : Icon(
+                          matches ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+                          color: matches ? RQColors.success : const Color(0xFFB91C1C),
+                        ),
+                ),
+                if (confirmPw.text.isNotEmpty && !matches) ...[
+                  const SizedBox(height: 6),
+                  const Text("Passwords don't match",
+                      style: TextStyle(fontSize: 12, color: Color(0xFFB91C1C))),
+                ],
+                if (error != null) ...[
+                  const SizedBox(height: 12),
+                  _sheetError(error!),
+                ],
+                const SizedBox(height: 22),
+                const RQSectionLabel('Sign-in security'),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: RQColors.hairline),
+                  ),
+                  child: RQToggleRow(
+                    title: 'Fingerprint / Face unlock',
+                    subtitle: 'Open ResQ without typing your password',
+                    value: _biometricLogin,
+                    showDivider: false,
+                    onChanged: (val) {
+                      setState(() => _biometricLogin = val);
+                      setModalState(() {});
+                      SessionStorage.setBiometricEnabled(val);
+                    },
                   ),
                 ),
               ],
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -1058,4 +1368,56 @@ class _SettingsViewState extends State<SettingsView> {
       ),
     );
   }
+}
+
+/// Preview for the alert-radius sheet: faint rings for every option and the
+/// chosen radius filled, with "you" in the middle. Uses a square-root scale
+/// so the 5 km ring is still visible next to the 50 km one.
+class _RadiusPainter extends CustomPainter {
+  final double selectedKm;
+  final double maxKm;
+  final List<int> ringsKm;
+
+  _RadiusPainter({required this.selectedKm, required this.maxKm, required this.ringsKm});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final double maxR = size.height / 2 - 12;
+    double radiusFor(double km) => maxR * math.sqrt((km / maxKm).clamp(0.0, 1.0));
+
+    // A couple of plain "roads" so it reads as a map.
+    final road = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 6;
+    canvas.drawLine(Offset(0, size.height * 0.35), Offset(size.width, size.height * 0.45), road);
+    canvas.drawLine(Offset(size.width * 0.3, 0), Offset(size.width * 0.38, size.height), road..strokeWidth = 4);
+    canvas.drawLine(Offset(size.width * 0.78, 0), Offset(size.width * 0.7, size.height), road..strokeWidth = 3);
+
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0x33000000);
+    for (final km in ringsKm) {
+      canvas.drawCircle(center, radiusFor(km.toDouble()), ring);
+    }
+
+    final r = radiusFor(selectedKm);
+    canvas.drawCircle(center, r, Paint()..color = RQColors.blood.withValues(alpha: 0.14));
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = RQColors.blood,
+    );
+
+    canvas.drawCircle(center, 13, Paint()..color = RQColors.navy.withValues(alpha: 0.2));
+    canvas.drawCircle(center, 9, Paint()..color = Colors.white);
+    canvas.drawCircle(center, 6, Paint()..color = RQColors.navy);
+  }
+
+  @override
+  bool shouldRepaint(_RadiusPainter old) => old.selectedKm != selectedKm || old.maxKm != maxKm;
 }

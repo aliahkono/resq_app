@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:resq/model/broadcast_notif_model.dart';
 import 'package:resq/services/notif_service.dart';
-import 'package:resq/views/appointment/eligible_appoint_view.dart';
+import 'package:resq/views/notifications/broadcast_view.dart';
 
 class AppNotificationBell extends StatelessWidget {
   final bool isEligible;
   final String donorBloodType;
   // Needed both to load the real notification list (NotificationService
-  // .refresh(token), triggered by HomeView on open) and so the "accept
-  // slot" flow below can open EligibleAppointView, which requires a real
-  // session token to book for real.
+  // .refresh(token)) and so the "accept slot" flow can open
+  // EligibleAppointView, which requires a real session token to book.
   final String token;
   // Shared with every other "book an appointment" entry point (see
   // home_view.dart's _handleBookingCompleted) so a booking accepted from a
-  // broadcast notification also shows up on the Appointment tab, instead of
-  // being the one entry point that silently forgets about it.
+  // broadcast notification also shows up on the Appointment tab.
   final void Function(Map<String, dynamic> appointment)? onBookingCompleted;
   final bool isVerified;
 
@@ -39,25 +35,28 @@ class AppNotificationBell extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             IconButton(
+              tooltip: 'Broadcasts & SMS',
               icon: const Icon(Icons.notifications_rounded, color: Colors.white, size: 24),
-              onPressed: () => _showBroadcastSheet(context),
+              onPressed: () => _openBroadcasts(context),
             ),
             if (unreadCount > 0)
               Positioned(
                 right: 6,
                 top: -2,
-                child: Container(
-                  padding: const EdgeInsets.all(3.5),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFC62828),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    unreadCount > 9 ? '9+' : '$unreadCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.all(3.5),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFC62828),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -68,387 +67,19 @@ class AppNotificationBell extends StatelessWidget {
     );
   }
 
-  void _showBroadcastSheet(BuildContext context) {
-    final service = NotificationService();
-
-    // Re-fetch every time the bell is opened, not just once when HomeView
-    // first mounted — otherwise a broadcast sent while the donor already
-    // had the app open wouldn't show up here either without a full app
-    // restart, same gap the Priority Request Feed had. The AnimatedBuilder
-    // below re-reads service.notifications live, so the sheet updates in
-    // place once this resolves instead of only refreshing the bell icon's
-    // badge behind it.
-    service.refresh(token);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => AnimatedBuilder(
-        animation: service,
-        builder: (ctx, _) => _BroadcastModalSheet(
-        notifications: service.notifications,
-        isLoading: service.isLoading,
-        isEligible: isEligible,
-        onMarkAllRead: () => service.markAllAsReadRemote(token),
-        // Referral cards need "mark read" without the rest of
-        // onSelectBroadcast's booking/eligibility navigation below — they
-        // have nothing to accept or book.
-        onMarkRead: (item) => service.markAsRead(item.id),
-        onSelectBroadcast: (item) {
-          service.markAsRead(item.id);
-          Navigator.pop(ctx);
-          if (!isEligible) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('You are temporarily deferred. Please complete your recovery period before accepting slots.'),
-                backgroundColor: Color(0xFF9B1B20),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            return;
-          }
-          if (!item.isStillOpen) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('This request has already been closed out — check the Home tab for other open broadcasts.'),
-                backgroundColor: Color(0xFF9B1B20),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            return;
-          }
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => EligibleAppointView(
-                isFirstTimeDonor: false,
-                token: token,
-                isVerified: isVerified,
-                preselectedHospitalId: item.hospitalId,
-                onBookingCompleted: (appointment) {
-                  Navigator.pop(context);
-                  onBookingCompleted?.call(appointment);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Reserved slot at ${appointment['hospitalName']}!'),
-                      backgroundColor: const Color(0xFF2E7D32),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        },
+  /// Opens Hospital Broadcasts & SMS as a full screen (it used to be a
+  /// bottom sheet). BroadcastsView refreshes the list itself on open.
+  void _openBroadcasts(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BroadcastsView(
+          isEligible: isEligible,
+          donorBloodType: donorBloodType,
+          token: token,
+          isVerified: isVerified,
+          onBookingCompleted: onBookingCompleted,
         ),
       ),
     );
-  }
-}
-
-class _BroadcastModalSheet extends StatelessWidget {
-  final List<BloodBroadcastNotification> notifications;
-  final bool isLoading;
-  final bool isEligible;
-  final VoidCallback onMarkAllRead;
-  final Function(BloodBroadcastNotification) onSelectBroadcast;
-  final Function(BloodBroadcastNotification) onMarkRead;
-
-  const _BroadcastModalSheet({
-    required this.notifications,
-    this.isLoading = false,
-    required this.isEligible,
-    required this.onMarkAllRead,
-    required this.onSelectBroadcast,
-    required this.onMarkRead,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF4F4F6),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          // Drag Handle
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.campaign_rounded, color: Color(0xFF9B1B20), size: 22),
-                      const SizedBox(width: 8),
-                      const Flexible(
-                        child: Text(
-                          'Hospital Broadcasts & SMS',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E1E)),
-                        ),
-                      ),
-                      if (isLoading) ...[
-                        const SizedBox(width: 10),
-                        const SizedBox(
-                          width: 13,
-                          height: 13,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF9B1B20)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: onMarkAllRead,
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
-                  child: const Text('Mark all read', style: TextStyle(fontSize: 12, color: Color(0xFF9B1B20), fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // Notification List
-          Expanded(
-            child: notifications.isEmpty
-                ? const Center(
-              child: Text('No active emergency blood broadcasts.'),
-            )
-                : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = notifications[index];
-                return _buildNotificationCard(context, item);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationCard(BuildContext context, BloodBroadcastNotification item) {
-    if (item.isReferral) return _buildReferralCard(context, item);
-
-    Color badgeBg;
-    Color badgeColor;
-    IconData badgeIcon;
-
-    switch (item.urgency) {
-      case UrgencyLevel.critical:
-        badgeBg = const Color(0xFFFFEBEE);
-        badgeColor = const Color(0xFFC62828);
-        badgeIcon = Icons.warning_amber_rounded;
-        break;
-      case UrgencyLevel.urgent:
-        badgeBg = const Color(0xFFFFF3E0);
-        badgeColor = const Color(0xFFE65100);
-        badgeIcon = Icons.priority_high_rounded;
-        break;
-      case UrgencyLevel.normal:
-        badgeBg = const Color(0xFFE8F5E9);
-        badgeColor = const Color(0xFF2E7D32);
-        badgeIcon = Icons.info_outline_rounded;
-        break;
-    }
-
-    return InkWell(
-      onTap: () => onSelectBroadcast(item),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: item.isRead ? Colors.white : const Color(0xFFFFF7F7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF9B1B20),
-            width: item.isRead ? 1.0 : 1.4,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(badgeIcon, size: 12, color: badgeColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        item.urgencyLabel,
-                        style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    if (item.smsDispatched) ...[
-                      const Icon(Icons.sms_outlined, size: 13, color: Color(0xFF6B7280)),
-                      const SizedBox(width: 4),
-                      const Text('SMS Sent', style: TextStyle(fontSize: 10.5, color: Color(0xFF6B7280))),
-                      const SizedBox(width: 8),
-                    ],
-                    if (!item.isRead)
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(color: Color(0xFF9B1B20), shape: BoxShape.circle),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              item.hospitalName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF1E1E1E)),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${item.location} • Requires ${item.unitsNeeded} unit(s) of Type ${item.bloodType}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 36,
-              child: ElevatedButton(
-                onPressed: () => onSelectBroadcast(item),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: item.urgency == UrgencyLevel.critical
-                      ? const Color(0xFF9B1B20)
-                      : const Color(0xFF9B1B20),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-                child: const Text('RESPOND & ACCEPT SLOT', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Shown instead of _buildNotificationCard's normal card for a donor who
-  // was currently deferred when this broadcast went out — they can't
-  // donate right now, so this doesn't offer "accept slot" at all. Its own
-  // self-contained card (no onSelectBroadcast tap-through, no booking
-  // flow) — just a different ask: pass the word to someone who can help.
-  Widget _buildReferralCard(BuildContext context, BloodBroadcastNotification item) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: item.isRead ? Colors.white : const Color(0xFFF3F8FB),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFF0E6E8C),
-          width: item.isRead ? 1.0 : 1.4,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2F7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.diversity_3_rounded, size: 12, color: Color(0xFF0E6E8C)),
-                    SizedBox(width: 4),
-                    Text('REFERRAL OPPORTUNITY', style: TextStyle(color: Color(0xFF0E6E8C), fontSize: 10, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-              if (!item.isRead)
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(color: Color(0xFF0E6E8C), shape: BoxShape.circle),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            item.hospitalName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF1E1E1E)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "You're on a short recovery hold, so this one isn't for you to fulfill — but if you "
-            "know someone who's ${item.bloodType} and eligible, ${item.hospitalName} could really use their help "
-            "(${item.location}).",
-            style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563), height: 1.35),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 36,
-            child: OutlinedButton.icon(
-              onPressed: () => _shareReferral(context, item),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF0E6E8C),
-                side: const BorderSide(color: Color(0xFF0E6E8C)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              icon: const Icon(Icons.share_rounded, size: 15),
-              label: const Text('SHARE WITH A FRIEND', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Opens the OS share sheet directly (Messages, WhatsApp, Mail, etc.) via
-  // share_plus, rather than just copying text and expecting the donor to
-  // manually paste it somewhere — this is what actually lets them forward
-  // it to a specific contact in one tap.
-  void _shareReferral(BuildContext context, BloodBroadcastNotification item) {
-    onMarkRead(item); // no booking navigation for a referral card — nothing to accept
-    final text = 'ResQ Alert: ${item.hospitalName} needs ${item.bloodType} blood donors '
-        '(${item.location}). If you know someone who\'s ${item.bloodType} and eligible to donate, '
-        'please share this with them — every donor helps.';
-    // sharePositionOrigin anchors the share sheet's popover on iPad, and on
-    // recent iOS versions its absence can also make the sheet silently fail
-    // to appear at all on iPhone too, not just crash on iPad as older
-    // share_plus versions documented — so this is passed unconditionally
-    // rather than only for iPad.
-    final box = context.findRenderObject() as RenderBox?;
-    final origin = box != null ? (box.localToGlobal(Offset.zero) & box.size) : null;
-    SharePlus.instance.share(ShareParams(text: text, sharePositionOrigin: origin));
   }
 }

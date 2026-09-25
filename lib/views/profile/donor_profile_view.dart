@@ -10,6 +10,7 @@ import 'package:resq/views/profile/digital_health_card_view.dart';
 import 'package:resq/views/profile/get_ver_view.dart';
 import 'package:resq/views/profile/qr_pass_modal_view.dart';
 import 'package:resq/widgets/editable_avatar.dart';
+import 'package:resq/widgets/resq_ui.dart';
 
 class DonorProfileView extends StatelessWidget {
   final ScreenNPTModel? screeningModel;
@@ -642,176 +643,487 @@ class DonorProfileView extends StatelessWidget {
 
   // --- Modals for Clinical Records ---
   void _showVitalsModal(BuildContext context) {
-    showModalBottomSheet(
+    final v = clinicalVitals;
+    showResQSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Vitals & Hemoglobin History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                if (clinicalVitals != null)
+      builder: (ctx) => ResQSheet(
+        icon: Icons.monitor_heart_outlined,
+        title: 'Vitals & Hemoglobin',
+        subtitle: v != null ? 'Recorded ${_formatDate(v.recordedDate)}' : 'No screenings recorded yet',
+        footer: RQButton(label: 'Close', onPressed: () => Navigator.pop(ctx)),
+        child: v == null
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 28),
+                child: Column(
+                  children: const [
+                    RQIconBox(icon: Icons.monitor_heart_outlined, size: 64),
+                    SizedBox(height: 14),
+                    Text('No vitals yet',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: RQColors.ink)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Your hemoglobin, blood pressure, pulse and temperature will show here after your first screening at the facility.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, height: 1.5, color: RQColors.muted),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHemoglobinSummary(v),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: _vitalTile('BLOOD PRESSURE', v.bloodPressure, 'mmHg')),
+                      const SizedBox(width: 10),
+                      Expanded(child: _vitalTile('PULSE', '${v.pulseRate}', 'bpm')),
+                      const SizedBox(width: 10),
+                      Expanded(child: _vitalTile('TEMP', v.bodyTemp.toStringAsFixed(1), '°C')),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Screening record',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: RQColors.bloodText)),
+                      ),
+                      const RQPill(label: 'Hospital verified', background: RQColors.successTint, color: RQColors.success),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: RQColors.hairline),
                     ),
-                    child: const Text(
-                      'Hospital Verified',
-                      style: TextStyle(color: Color(0xFF2E7D32), fontSize: 10.5, fontWeight: FontWeight.bold),
+                    child: Column(
+                      children: [
+                        _sheetRow('Date', _formatDate(v.recordedDate)),
+                        _sheetRow('Facility', v.facility),
+                        _sheetRow('Evaluated by', v.medTechName, last: true),
+                      ],
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (clinicalVitals != null) ...[
-              _buildModalRow(
-                'Hemoglobin',
-                '${clinicalVitals!.hemoglobin.toStringAsFixed(1)} g/dL (${clinicalVitals!.hemoglobinStatus} Range: 12.5 - 17.5)',
+                ],
               ),
-              _buildModalRow('Blood Pressure', '${clinicalVitals!.bloodPressure} mmHg'),
-              _buildModalRow('Pulse Rate', '${clinicalVitals!.pulseRate} bpm'),
-              _buildModalRow('Body Temperature', '${clinicalVitals!.bodyTemp.toStringAsFixed(1)} °C'),
-              _buildModalRow('Evaluated By', clinicalVitals!.medTechName),
-              _buildModalRow('Clinical Facility', clinicalVitals!.facility),
-              _buildModalRow('Recorded Date', _formatDate(clinicalVitals!.recordedDate)),
-            ] else ...[
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Text(
-                    'No vitals recorded by clinical staff yet.\nYour vitals will appear here after your first screening at the facility.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey, fontSize: 12.5, height: 1.4),
-                  ),
+      ),
+    );
+  }
+
+  /// Latest hemoglobin with a range bar showing where it sits against the
+  /// 12.5–17.5 g/dL donor range.
+  Widget _buildHemoglobinSummary(ClinicalVitalsRecord v) {
+    const double minG = 10, maxG = 20, lowG = 12.5, highG = 17.5;
+    final bool normal = v.hemoglobinStatus == 'Normal';
+    final String statusLabel = v.hemoglobinStatus == 'Low'
+        ? 'Below 12.5 minimum'
+        : v.hemoglobinStatus == 'High'
+            ? 'Above 17.5 maximum'
+            : 'Within donor range';
+    final double pos = ((v.hemoglobin - minG) / (maxG - minG)).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: RQColors.surface, borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const RQSectionLabel('Latest hemoglobin'),
+                    const SizedBox(height: 2),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: v.hemoglobin.toStringAsFixed(1),
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w700,
+                              color: normal ? RQColors.ink : RQColors.warning,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: ' g/dL',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: RQColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: RQPill(
+                  label: statusLabel,
+                  background: normal ? RQColors.successTint : RQColors.warningTint,
+                  color: normal ? RQColors.success : RQColors.warning,
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
-                child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
-              ),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth;
+              final lowX = w * (lowG - minG) / (maxG - minG);
+              final highX = w * (highG - minG) / (maxG - minG);
+              return SizedBox(
+                height: 22,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 7,
+                      child: Container(
+                        height: 8,
+                        decoration: BoxDecoration(color: RQColors.hairline, borderRadius: BorderRadius.circular(999)),
+                      ),
+                    ),
+                    Positioned(
+                      left: lowX,
+                      width: highX - lowX,
+                      top: 7,
+                      child: Container(
+                        height: 8,
+                        decoration: BoxDecoration(color: const Color(0xFFBFE3C3), borderRadius: BorderRadius.circular(999)),
+                      ),
+                    ),
+                    Positioned(
+                      left: (w * pos - 11).clamp(0.0, w - 22),
+                      top: 0,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: normal ? RQColors.blood : RQColors.warning,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              Text('10', style: TextStyle(fontSize: 11, color: RQColors.muted)),
+              Spacer(),
+              Text('Donor range 12.5 – 17.5', style: TextStyle(fontSize: 11, color: RQColors.success)),
+              Spacer(),
+              Text('20', style: TextStyle(fontSize: 11, color: RQColors.muted)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _vitalTile(String label, String value, String unit) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RQColors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.5, color: RQColors.muted)),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: RQColors.ink)),
+          ),
+          Text(unit, style: const TextStyle(fontSize: 11, color: RQColors.muted)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sheetRow(String label, String value, {bool last = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: last ? null : const Border(bottom: BorderSide(color: RQColors.hairline)),
+      ),
+      child: Row(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13, color: RQColors.muted)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RQColors.ink),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   void _showScreeningHistoryModal(BuildContext context) {
-    final double weight = screeningModel?.screensNPT.weight ?? 0.0;
-    final int age = screeningModel?.screensNPT.age ?? 0;
-    final String sex = (screeningModel?.screensNPT.gender == BioSex.female) ? 'Female' : 'Male';
-    final bool hasTravelFlag = screeningModel?.screensNPT.hasTravelOrNeedleStick ?? false;
-    final bool hasMedicalFlag = screeningModel?.screensNPT.hasMajorMedicalHistory ?? false;
-    final String? travelDesc = screeningModel?.screensNPT.travelOrNeedleDesc;
-    final String? medicalDesc = screeningModel?.screensNPT.majorMedicalHistoryDesc;
+    final s = screeningModel?.screensNPT;
+    final bool hasTravelFlag = s?.hasTravelOrNeedleStick ?? false;
+    final bool hasMedicalFlag = s?.hasMajorMedicalHistory ?? false;
+    final String? travelDesc = s?.travelOrNeedleDesc;
+    final String? medicalDesc = s?.majorMedicalHistoryDesc;
     final travelAssessment = MedicalKeywordRules.assessTravelOrNeedleStick(travelDesc);
     final medicalAssessment = MedicalKeywordRules.assessMajorMedicalHistory(medicalDesc);
 
-    showModalBottomSheet(
+    final bool travelDeferred = hasTravelFlag && travelAssessment.verdict == KeywordVerdict.deferred;
+    final bool medicalDeferred = hasMedicalFlag && medicalAssessment.verdict == KeywordVerdict.deferred;
+    final bool surgery = s?.hasTransfusionOrSurgery ?? false;
+    final bool tattoo = s?.hasTattsOrPierce ?? false;
+    final bool recentMeds = s?.recentMedProcedures.isNotEmpty ?? false;
+    final bool alcohol = s?.hasAlcoholPast24hr ?? false;
+    final int flagged = [travelDeferred, medicalDeferred, surgery, tattoo, recentMeds, alcohol].where((f) => f).length;
+
+    showResQSheet(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Container(
-        // Bounded height + the inner content in its own SingleChildScrollView
-        // — without this, a donor with BOTH a Recent Travel Risk reason and
-        // a Medication Disclosures reason (each can wrap several lines once
-        // highlighted keywords are added) could push this sheet's content
-        // taller than the screen, which pushed RETAKE SCREENING/CLOSE off
-        // the bottom entirely with no way to reach them. Title and buttons
-        // stay outside the scrollable area so they're always visible
-        // regardless of how long the reason text gets.
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => ResQSheet(
+        icon: Icons.fact_check_outlined,
+        title: 'Travel & Medical Screening',
+        subtitle: screeningModel != null ? 'Answered ${_formatDate(screeningModel!.submissionDate)}' : 'No screening on file',
+        bodyColor: RQColors.surface,
+        bodyPadding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        footer: Row(
           children: [
-            const Text('Medical & Screening Disclosures', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildModalRow('Biological Sex', sex),
-                    _buildModalRow('Recorded Age', age > 0 ? '$age yrs' : 'N/A'),
-                    _buildModalRow('Recorded Weight', weight > 0 ? '$weight kg' : 'N/A'),
-                    _buildModalRow(
-                      'Recent Travel Risk',
-                      !hasTravelFlag
-                          ? 'None reported'
-                          : (travelAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Low Risk'),
+            Expanded(
+              child: RQButton.secondary(
+                label: 'Retake screening',
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => RegistrationWizView(
+                        isRetake: true,
+                        initialScreening: screeningModel,
+                        donorName: donorName,
+                        bloodType: bloodType,
+                        donorId: donorId,
+                        token: token,
+                        onRetakeCompleted: onProfileUpdated,
+                      ),
                     ),
-                    if (hasTravelFlag) _buildReasonBlock(travelDesc, travelAssessment),
-                    _buildModalRow(
-                      'Medication Disclosures',
-                      !hasMedicalFlag
-                          ? 'None reported'
-                          : (medicalAssessment.verdict == KeywordVerdict.deferred ? 'Disclosed • Deferred' : 'Disclosed • Manageable'),
-                    ),
-                    if (hasMedicalFlag) _buildReasonBlock(medicalDesc, medicalAssessment),
-                    _buildModalRow('Assessment Status', 'Evaluated via Real-time Logic'),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => RegistrationWizView(
-                            isRetake: true,
-                            initialScreening: screeningModel,
-                            donorName: donorName,
-                            bloodType: bloodType,
-                            donorId: donorId,
-                            token: token,
-                            onRetakeCompleted: onProfileUpdated,
-                          ),
-                        ),
-                      );
-                    },
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('RETAKE SCREENING', style: TextStyle(color: Color(0xFF9B1B20), fontSize: 12), maxLines: 1),
-                    ),
-                  ),
+            const SizedBox(width: 12),
+            Expanded(child: RQButton(label: 'Done', onPressed: () => Navigator.pop(ctx))),
+          ],
+        ),
+        child: s == null
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Text(
+                  'Complete your health screening to see your answers here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: RQColors.muted),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9B1B20)),
-                    child: const Text('CLOSE', style: TextStyle(color: Colors.white, fontSize: 12)),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _screeningBanner(flagged),
+                  const SizedBox(height: 14),
+                  _screeningCard(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Basics',
+                    children: [
+                      _answerRow('Sex', valueText: s.gender == BioSex.female ? 'Female' : 'Male'),
+                      _answerRow('Age', valueText: s.age > 0 ? '${s.age} yrs' : 'N/A'),
+                      _answerRow('Weight',
+                          valueText: s.weight > 0 ? '${s.weight.toStringAsFixed(1)} kg' : 'N/A',
+                          valueColor: s.weight > 0 && s.weight < 50 ? RQColors.warning : RQColors.ink,
+                          last: true),
+                    ],
                   ),
+                  const SizedBox(height: 14),
+                  _screeningCard(
+                    icon: Icons.public_rounded,
+                    title: 'Travel · last 12 months',
+                    children: [
+                      _answerRow(
+                        'Traveled abroad or had a needle-stick?',
+                        yes: hasTravelFlag,
+                        flagged: travelDeferred,
+                        last: true,
+                        detail: hasTravelFlag ? _buildReasonBlock(travelDesc, travelAssessment) : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _screeningCard(
+                    icon: Icons.medical_services_outlined,
+                    title: 'Medical history',
+                    children: [
+                      _answerRow(
+                        'Heart disease, asthma, diabetes or other major condition?',
+                        yes: hasMedicalFlag,
+                        flagged: medicalDeferred,
+                        detail: hasMedicalFlag ? _buildReasonBlock(medicalDesc, medicalAssessment) : null,
+                      ),
+                      _answerRow(
+                        'Medication or minor procedure in the last 4 weeks?',
+                        yes: recentMeds,
+                        flagged: recentMeds,
+                        detail: recentMeds ? _chipList(s.recentMedProcedures) : null,
+                      ),
+                      _answerRow('Transfusion or surgery in the last 12 months?', yes: surgery, flagged: surgery),
+                      _answerRow('Tattoo or piercing?', yes: tattoo, flagged: tattoo),
+                      _answerRow('Alcohol in the last 24 hours?', yes: alcohol, flagged: alcohol, last: true),
+                    ],
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _screeningBanner(int flagged) {
+    final bool ok = flagged == 0;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ok ? RQColors.successTint : RQColors.caution,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ok ? const Color(0xFFBFE3C3) : RQColors.cautionBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(ok ? Icons.verified_outlined : Icons.warning_amber_rounded,
+              color: ok ? RQColors.success : RQColors.warning, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ok ? 'No answers flagged' : '$flagged ${flagged == 1 ? 'answer needs' : 'answers need'} attention',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RQColors.ink),
+                ),
+                Text(
+                  ok ? 'Nothing here is stopping you from donating.' : 'These can defer you for a while. Staff may check them before you donate.',
+                  style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF555555)),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _screeningCard({required IconData icon, required String title, required List<Widget> children}) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      decoration: BoxDecoration(color: RQColors.card, borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: RQColors.bloodText),
+                const SizedBox(width: 8),
+                RQSectionLabel(title, color: RQColors.bloodText),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1, color: RQColors.hairline),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// One question → answer row. Pass [valueText] for a plain value, or
+  /// [yes] for a Yes/No chip ([flagged] colours a "Yes" orange).
+  Widget _answerRow(
+    String question, {
+    String? valueText,
+    Color valueColor = RQColors.ink,
+    bool yes = false,
+    bool flagged = false,
+    bool last = false,
+    Widget? detail,
+  }) {
+    Widget trailing;
+    if (valueText != null) {
+      trailing = Text(valueText, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: valueColor));
+    } else {
+      final bool warn = yes && flagged;
+      trailing = Container(
+        constraints: const BoxConstraints(minWidth: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: warn ? RQColors.warningTint : RQColors.surface,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          yes ? 'Yes' : 'No',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: warn ? RQColors.warning : const Color(0xFF555555)),
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: last ? null : const Border(bottom: BorderSide(color: RQColors.hairline)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(question, style: const TextStyle(fontSize: 14, height: 1.4, color: RQColors.ink)),
+              ),
+              const SizedBox(width: 16),
+              trailing,
+            ],
+          ),
+          if (detail != null) ...[const SizedBox(height: 8), detail],
+        ],
+      ),
+    );
+  }
+
+  Widget _chipList(Iterable<String> items) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: items
+          .map((e) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: RQColors.surface, borderRadius: BorderRadius.circular(10)),
+                child: Text(e, style: const TextStyle(fontSize: 12, color: RQColors.body)),
+              ))
+          .toList(),
     );
   }
 
@@ -900,27 +1212,6 @@ class DonorProfileView extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-
-  Widget _buildModalRow(String label, String val) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12.5)),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              val,
-              textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF2C2C2C)),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1018,4 +1309,4 @@ class _EligibilityInfo {
     required this.headerColor,
     required this.reasonDescription,
   });
-}
+}
