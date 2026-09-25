@@ -513,45 +513,52 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
       }),
       child: Container(
         width: 56,
-        // Was vertical: 8 — with three lines of text (weekday/day/month)
-        // stacked inside, that left the Column about 2px too tall for
-        // whatever fixed height its parent (the horizontal date-chip strip)
-        // gives this chip, overflowing on every render. 6 gives just enough
-        // slack without visibly changing the chip's proportions.
         padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF9B1B20) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isSelected ? const Color(0xFF9B1B20) : const Color(0xFFD1D5DB)),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              weekdays[date.weekday - 1],
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white70 : const Color(0xFF6B7280),
+        // FittedBox + mainAxisSize.min instead of relying on this fixed-size
+        // chip having exactly enough room for 3 stacked lines of text at
+        // every possible device font-scale setting — a device with a larger
+        // system font size (reported on a Samsung Galaxy A53) or a bigger
+        // display-text accessibility setting could make weekday/day/month
+        // together taller than this chip's available height, overflowing.
+        // FittedBox scales the whole Column down to fit instead, so it can
+        // never overflow regardless of the device's text scale.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                weekdays[date.weekday - 1],
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white70 : const Color(0xFF6B7280),
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${date.day}',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : const Color(0xFF1E1E1E),
+              const SizedBox(height: 2),
+              Text(
+                '${date.day}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : const Color(0xFF1E1E1E),
+                ),
               ),
-            ),
-            Text(
-              months[date.month - 1],
-              style: TextStyle(
-                fontSize: 9.5,
-                color: isSelected ? Colors.white70 : const Color(0xFF6B7280),
+              Text(
+                months[date.month - 1],
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: isSelected ? Colors.white70 : const Color(0xFF6B7280),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

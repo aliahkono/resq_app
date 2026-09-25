@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
-import 'package:resq/views/auth/auth_landing_view.dart';
+import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/home_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
@@ -882,11 +882,15 @@ class _LoginViewState extends State<LoginView> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
-                              // --- UPDATED: Routes using AuthLandingView when signing out ---
+                              // Was routing to AuthLandingView (the
+                              // Log In/Register choice screen) — tapping
+                              // "Sign Up" from here should go straight to
+                              // the registration form, not back to a
+                              // landing page the donor didn't ask for.
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const AuthLandingView(),
+                                  builder: (context) => const RegistrationWizView(),
                                 ),
                               );
                             },

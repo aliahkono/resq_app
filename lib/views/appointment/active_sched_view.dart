@@ -153,19 +153,40 @@ class ActiveSchedView extends StatelessWidget {
                       title: const Text('Cancel Appointment?'),
                       content: const Text(
                           'Are you sure you want to cancel this scheduled donation slot?'),
+                      actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Keep Slot')),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            onCancelAppointment();
-                          },
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF9B1B20)),
-                          child: const Text('Yes, Cancel',
-                              style: TextStyle(color: Colors.white)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF9B1B20),
+                                  side: const BorderSide(color: Color(0xFF9B1B20), width: 1.2),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: const Text('Keep Slot', textAlign: TextAlign.center),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  onCancelAppointment();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF9B1B20),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                child: const Text('Yes, Cancel',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

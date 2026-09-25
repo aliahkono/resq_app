@@ -555,14 +555,14 @@ class _SettingsViewState extends State<SettingsView> {
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.logout_rounded, color: Color(0xFF1E2432), size: 20),
+            Icon(Icons.logout_rounded, color: Color(0xFF9B1B20), size: 20),
             SizedBox(width: 8),
             Text(
               'Sign Out',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E2432),
+                color: Color(0xFF9B1B20),
               ),
             ),
           ],

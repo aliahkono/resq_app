@@ -18,6 +18,7 @@ import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/notif_service.dart';
 import 'package:resq/services/push_service.dart';
+import 'package:resq/services/realtime_service.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
@@ -77,6 +78,27 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   VerificationStatus _verificationStatus = VerificationStatus.notStarted;
   DateTime? _lastDonationAt;
 
+  /// What the Lifetime Impact Record / Community Impact / Lifesaving Hero
+  /// cards should actually show. Two bugs reported together here (checklist
+  /// item 2):
+  ///  - Scenario 1: retaking screening and toggling "First-time donating"
+  ///    should zero these cards out and flip the dashboard back to the
+  ///    first-time layout, not keep showing a previous donor's numbers.
+  ///  - Scenario 2: a donor who sets a last-donation-date + a donation count
+  ///    during retake (e.g. donated elsewhere before ever using ResQ) should
+  ///    see THAT reflected here too, not just whatever the hospital's own
+  ///    donor_arrivals count happens to be (which starts at 0 for anyone who
+  ///    hasn't yet donated through a partner hospital tracked by this app).
+  /// _completedDonations (hospital-verified, from GET /api/donor/me) stays
+  /// the floor — it can only ever grow, and a self-report can never make it
+  /// go down, so use whichever of the two is larger, and force it to 0 the
+  /// instant the donor explicitly says "first-time" again.
+  int get _effectiveDonations {
+    if (_isFirstTime) return 0;
+    final selfReported = _currentScreeningModel?.screensNPT.totalDonations ?? 0;
+    return _completedDonations > selfReported ? _completedDonations : selfReported;
+  }
+
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
   List<EmergencyBloodRequest> _activeRequests = [];
@@ -89,7 +111,13 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   // _refreshBroadcastData already re-fetches on those triggers, just on a
   // fixed interval too, so the dashboard and Appointment tab stay
   // reasonably current on their own while open.
+  // Fallback poll, kept as a safety net alongside the WebSocket connection
+  // below — a much longer interval than before (was 8s, the only mechanism
+  // at all) now that the socket handles the "instant" half of this, and
+  // this just covers the gap while a socket is reconnecting or a network
+  // doesn't allow WebSocket traffic at all.
   Timer? _pollTimer;
+  final RealtimeService _realtime = RealtimeService();
 
   @override
   void initState() {
@@ -123,24 +151,69 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _loadDonorProfile();
     NotificationService().refresh(widget.token);
     PushService.instance.registerDevice(widget.token);
-    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _refreshBroadcastData());
+    // 30s fallback poll — see _pollTimer's own comment for why this is no
+    // longer the only mechanism.
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBroadcastData());
+    _realtime.onEvent = _handleRealtimeEvent;
+    _realtime.connect(widget.token);
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _realtime.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  // A hospital staffer completing this donor's appointment by scanning
-  // their QR pass (donors.controller.js's completeAppointment) isn't one of
-  // the four push trigger types (see push_service.dart) and has no
-  // real-time channel of its own on the donor side (the realtime hub only
-  // pushes to the *admin* dashboard). Re-checking whenever the app comes
-  // back to the foreground means the donor's own screen "closes" that
-  // appointment on its own the next time they glance at their phone,
-  // without needing a manual pull-to-refresh.
+  /// Reacts to a push from the backend's /ws channel (see
+  /// lib/services/realtime_service.dart and server/src/realtime) by
+  /// re-fetching the real data for whatever changed — never trusting the
+  /// event payload itself as the new state, same as every other place in
+  /// this app that treats the backend's REST responses as the only source
+  /// of truth. This is what makes the checklist's "Dashboard & Appointment
+  /// Real-Time Update" item (and the admin "mark eligible" live-update ask
+  /// bundled into item 6) actually instant instead of waiting on the next
+  /// poll tick.
+  void _handleRealtimeEvent(Map<String, dynamic> event) {
+    switch (event['type']) {
+      case 'blood_request_created':
+        _loadOpenRequests();
+        break;
+      case 'appointment_status_changed':
+      case 'donation_completed':
+        _loadCurrentAppointment();
+        _loadDonorProfile();
+        break;
+      case 'eligibility_changed':
+        // Straight from the admin's Donor Management action (see
+        // setDonorEligibility, donors.controller.js) — applied immediately
+        // rather than waiting on a re-fetch, since the decision tree's own
+        // evaluateEligibility() has no way to know an admin just overrode
+        // the 90-day cooldown by hand.
+        final eligible = event['eligible'] == true;
+        setState(() {
+          _effectiveResult = ClassificationResult(
+            status: eligible ? EligibleStats.eligible : EligibleStats.deferredInterval,
+          );
+        });
+        _loadDonorProfile();
+        break;
+      default:
+        // Unknown event type — refresh everything rather than silently
+        // ignoring a push this build doesn't recognize yet.
+        _refreshBroadcastData();
+    }
+  }
+
+  // Belt-and-suspenders alongside the WebSocket push above: re-checks on
+  // every foreground too, in case the socket was disconnected (backgrounded
+  // long enough to get killed, flaky network) at the moment a check-in or
+  // broadcast actually happened. Also covers a hospital staffer completing
+  // this donor's appointment by scanning their QR pass (donors.controller.js's
+  // completeAppointment), which isn't one of the four push trigger types
+  // (see push_service.dart) and has no real-time channel of its own on the
+  // donor side (the realtime hub only pushes to the *admin* dashboard).
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -292,12 +365,16 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
         _verificationStatus = verification;
         _lastDonationAt = lastDonationAt ?? _lastDonationAt;
-        // Hospital-verified donation count is more authoritative than the
-        // self-reported toggle from registration — once a donation is
-        // actually recorded, this flips the dashboard off the first-time
-        // UI even if the donor's original self-report said otherwise, and
-        // keeps it correct on every future login.
-        if (completed > 0) _isFirstTime = false;
+        // _isFirstTime is deliberately left alone here — it's governed by
+        // the donor's own screening self-report (screensNPT.isFirstTimeDonor,
+        // set at registration or retake), not silently overridden by
+        // whichever way completedDonations happens to point. This used to
+        // force _isFirstTime = false the moment completedDonations > 0,
+        // which meant a donor who retook screening and explicitly toggled
+        // "First-time donating" back on (checklist item 2, scenario 1)
+        // would see that get immediately reverted the next time this ran
+        // (every poll tick), instead of staying on the first-time dashboard
+        // layout they just asked for.
       });
     } catch (e) {
       debugPrint('HomeView._loadDonorProfile failed: $e');
@@ -410,6 +487,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       _effectiveResult = result;
       _isFirstTime = updatedModel.screensNPT.isFirstTimeDonor;
     });
+    // Re-pull completedDonations/lastDonationAt/verificationStatus from the
+    // backend right away — this used to only ever update on the next poll
+    // tick, foreground event, or pull-to-refresh, so the dashboard/profile
+    // could keep showing pre-retake numbers for up to 8 seconds (or longer)
+    // after a retake that changed first-time status or donation history.
+    _loadDonorProfile();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -569,10 +652,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           // Impact Record" card on DonorProfileView already uses, so both
           // screens report the same numbers instead of one being a
           // hardcoded placeholder.
-          // Hospital-verified count (GET /api/donor/me), not the
-          // self-reported totalDonations from screening — see
-          // _loadDonorProfile's comment for why.
-          totalDonations: _completedDonations,
+          // max(hospital-verified count, self-reported total), zeroed out
+          // for a first-time donor — see _effectiveDonations' own comment.
+          totalDonations: _effectiveDonations,
           isVerified: _verificationStatus.isVerified,
           onSwitchToAppointmentTab: () => setState(() => _currentTabIndex = 1),
           onBookingCompleted: _handleBookingCompleted,
@@ -661,7 +743,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           token: widget.token,
           onProfileUpdated: _handleRetakeCompleted,
           clinicalVitals: _clinicalVitalsRecord,
-          completedDonations: _completedDonations,
+          completedDonations: _effectiveDonations,
           photoUrl: _photoUrl,
           onPhotoUpdated: (url) => setState(() => _photoUrl = url),
           verificationStatus: _verificationStatus,
