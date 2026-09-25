@@ -224,10 +224,9 @@ class ApiService {
 
   /// POST /api/donor/me/photo — multipart upload of the donor's profile
   /// photo, returning the new hosted URL (e.g. { "photoUrl": "https://..." }).
-  /// NOTE: this route does not exist on the backend yet — needs a handler
-  /// added there (accepting a multipart field named "photo", storing it
-  /// wherever donor photos are meant to live, and returning the resulting
-  /// URL) before this call will succeed, same as deleteMyAccount above.
+  /// Stored server-side as bytea on the donor's row and served back via the
+  /// public GET /api/donor-photos/:id route (see migration 016 and
+  /// donorPortal.controller.js) — no external file storage involved.
   static Future<String> uploadProfilePhoto(String token, String filePath) async {
     final uri = Uri.parse('$kApiBaseUrl/donor/me/photo');
     final request = http.MultipartRequest('POST', uri);
