@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:resq/model/broadcast_notif_model.dart';
 import 'package:resq/services/notif_service.dart';
 import 'package:resq/views/appointment/eligible_appoint_view.dart';
@@ -418,14 +418,14 @@ class _BroadcastModalSheet extends StatelessWidget {
             width: double.infinity,
             height: 36,
             child: OutlinedButton.icon(
-              onPressed: () => _copyReferralDetails(context, item),
+              onPressed: () => _shareReferral(context, item),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF0E6E8C),
                 side: const BorderSide(color: Color(0xFF0E6E8C)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              icon: const Icon(Icons.copy_rounded, size: 15),
-              label: const Text('COPY DETAILS TO SHARE', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.share_rounded, size: 15),
+              label: const Text('SHARE WITH A FRIEND', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -433,18 +433,18 @@ class _BroadcastModalSheet extends StatelessWidget {
     );
   }
 
-  void _copyReferralDetails(BuildContext context, BloodBroadcastNotification item) {
+  // Opens the OS share sheet directly (Messages, WhatsApp, Mail, etc.) via
+  // share_plus, rather than just copying text and expecting the donor to
+  // manually paste it somewhere — this is what actually lets them forward
+  // it to a specific contact in one tap.
+  void _shareReferral(BuildContext context, BloodBroadcastNotification item) {
     onMarkRead(item); // no booking navigation for a referral card — nothing to accept
     final text = 'ResQ Alert: ${item.hospitalName} needs ${item.bloodType} blood donors '
         '(${item.location}). If you know someone who\'s ${item.bloodType} and eligible to donate, '
         'please share this with them — every donor helps.';
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied! Paste it in a message to share.'),
-        backgroundColor: Color(0xFF0E6E8C),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    // sharePositionOrigin isn't set here — required on iPad (for the share
+    // sheet's popover anchor) but not on iPhone/Android, and this app
+    // doesn't target iPad.
+    SharePlus.instance.share(ShareParams(text: text));
   }
 }
