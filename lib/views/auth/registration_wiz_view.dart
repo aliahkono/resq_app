@@ -7,9 +7,9 @@ import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/login_view.dart';
 import 'package:resq/views/auth/med_history_details_view.dart';
 import 'package:resq/views/auth/registration_summary_view.dart';
-import 'package:resq/widgets/custom_input_field.dart';
 import 'package:resq/utils/helpers/responsive.dart';
 import 'package:resq/widgets/editable_avatar.dart';
+import 'package:resq/widgets/resq_ui.dart';
 
 class RegistrationWizView extends StatefulWidget {
   final bool isRetake;
@@ -190,8 +190,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   }
 
   String _formatDate(DateTime? date) {
-    if (date == null) return 'Date Picker';
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    if (date == null) return 'Select a date';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   Future<void> _pickDate({
@@ -210,7 +211,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF7D1B22),
+              primary: RQColors.blood,
               onPrimary: Colors.white,
               onSurface: Color(0xFF1E1E1E),
             ),
@@ -224,146 +225,255 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     }
   }
 
+  /// Lifetime donation count — a bottom sheet with a −/+ counter and quick
+  /// picks, shown right after the donor picks their last donation date (and
+  /// from the "Edit" link under it).
   Future<void> _promptForDonationCount(BuildContext context) async {
-    final TextEditingController countController = TextEditingController(
-      text: _totalDonations > 0 ? _totalDonations.toString() : '',
-    );
+    int count = _totalDonations > 0 ? _totalDonations : 1;
+    const quick = [1, 2, 3, 4, 5, 10];
 
-    return showDialog(
+    await showResQSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Lifetime Donation History',
-            style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'How many times have you donated blood in total (lifetime)?',
-                style: TextStyle(fontSize: 13, height: 1.4),
-              ),
-              const SizedBox(height: 14),
-              CustomInputField(
-                controller: countController,
-                hintText: 'e.g., 4',
-                labelText: 'Total Lifetime Donations',
-                icon: Icons.history_edu_rounded,
-                keyboardType: TextInputType.number,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Skip', style: TextStyle(color: Colors.grey)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          return ResQSheet(
+            icon: Icons.history_rounded,
+            title: 'Lifetime donations',
+            subtitle: 'How many times have you given blood in total?',
+            footer: Row(
+              children: [
+                Expanded(child: RQButton.secondary(label: 'Skip', onPressed: () => Navigator.pop(ctx))),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: RQButton(
+                    label: 'Save',
+                    onPressed: () {
+                      setState(() => _totalDonations = count);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                final int? count = int.tryParse(countController.text.trim());
-                if (count != null && count >= 0) {
-                  setState(() => _totalDonations = count);
-                  Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid number.')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-              child: const Text('Save', style: TextStyle(color: Colors.white)),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _roundStepButton(
+                      icon: Icons.remove_rounded,
+                      tooltip: 'Decrease',
+                      filled: false,
+                      onTap: count > 1 ? () => setSheet(() => count--) : null,
+                    ),
+                    SizedBox(
+                      width: 120,
+                      child: Column(
+                        children: [
+                          Text('$count',
+                              style: const TextStyle(
+                                  fontSize: 56, height: 1.1, fontWeight: FontWeight.w700, color: RQColors.bloodText)),
+                          Text(count == 1 ? 'donation' : 'donations',
+                              style: const TextStyle(fontSize: 13, color: RQColors.muted)),
+                        ],
+                      ),
+                    ),
+                    _roundStepButton(
+                      icon: Icons.add_rounded,
+                      tooltip: 'Increase',
+                      filled: true,
+                      onTap: count < 300 ? () => setSheet(() => count++) : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final q in quick)
+                      _choiceChip(
+                        label: q == 10 ? '10+' : '$q',
+                        selected: count == q,
+                        onTap: () => setSheet(() => count = q),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _noteBox(
+                  Icons.info_outline_rounded,
+                  'Count every donation, including those before ResQ. New donations are added for you automatically.',
+                ),
+              ],
             ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
-  /// Instant follow-up popup shown the moment a donor checks one of the
-  /// "recent meds/procedures" chips (Antibiotics, Aspirin, Vaccines, Dental
+  Widget _roundStepButton({
+    required IconData icon,
+    required String tooltip,
+    required bool filled,
+    required VoidCallback? onTap,
+  }) {
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: filled
+          ? IconButton.filled(
+              onPressed: onTap,
+              tooltip: tooltip,
+              style: IconButton.styleFrom(
+                backgroundColor: RQColors.blood,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: RQColors.hairline,
+              ),
+              icon: Icon(icon),
+            )
+          : IconButton.outlined(
+              onPressed: onTap,
+              tooltip: tooltip,
+              style: IconButton.styleFrom(
+                foregroundColor: RQColors.ink,
+                side: const BorderSide(color: RQColors.hairline, width: 1.5),
+              ),
+              icon: Icon(icon),
+            ),
+    );
+  }
+
+  /// Instant follow-up sheet shown the moment a donor taps one of the
+  /// "recent meds/procedures" tiles (Antibiotics, Aspirin, Vaccines, Dental
   /// Work) — collects when it happened and the dosage/reason so the
   /// decision tree can judge the 4-week window against a real date instead
-  /// of deferring forever. Confirming closes the popup and checks the
-  /// chip; cancelling leaves the chip unselected.
+  /// of deferring forever. Confirming checks the tile; tapping an already
+  /// checked tile reopens this with a "Remove" option.
   Future<void> _promptMedProcedureDetail(String option) async {
+    final bool editing = _recentMedProcedures.contains(option);
     DateTime? pickedDate = _medProcedureDetails[option]?.date;
     final reasonController = TextEditingController(text: _medProcedureDetails[option]?.dosageOrReason ?? '');
+    String? error;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final earliest = today.subtract(const Duration(days: 90));
+    const quick = <List<Object>>[
+      ['Today', 0],
+      ['1 week ago', 7],
+      ['2 weeks ago', 14],
+      ['3 weeks ago', 21],
+    ];
 
-    await showDialog(
+    await showResQSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text(
-                option,
-                style: const TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('When did you take/undergo this?', style: TextStyle(fontSize: 13, height: 1.4)),
-                  const SizedBox(height: 10),
-                  _buildCrimsonDateButton(
-                    title: pickedDate != null ? _formatDate(pickedDate) : 'Select Date',
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: dialogContext,
-                        initialDate: pickedDate ?? DateTime.now(),
-                        firstDate: DateTime.now().subtract(const Duration(days: 90)),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => pickedDate = picked);
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          return ResQSheet(
+            icon: _medIcon(option),
+            title: option,
+            subtitle: 'Tell us when you last took or had it',
+            footer: Row(
+              children: [
+                Expanded(
+                  child: RQButton.secondary(
+                    label: editing ? 'Remove' : 'Cancel',
+                    color: editing ? RQColors.blood : null,
+                    onPressed: () {
+                      if (editing) {
+                        setState(() {
+                          _recentMedProcedures.remove(option);
+                          _medProcedureDetails.remove(option);
+                        });
                       }
+                      Navigator.pop(ctx);
                     },
                   ),
-                  const SizedBox(height: 14),
-                  CustomInputField(
-                    controller: reasonController,
-                    hintText: 'e.g., 500mg twice daily / Wisdom tooth removal',
-                    labelText: 'Dosage or Reason',
-                    icon: Icons.medical_information_outlined,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (pickedDate == null) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(content: Text('Please select a date.')),
-                      );
-                      return;
-                    }
-                    setState(() {
-                      _recentMedProcedures.add(option);
-                      _medProcedureDetails[option] = MedProcedureDetail(
-                        date: pickedDate,
-                        dosageOrReason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
-                      );
-                    });
-                    Navigator.pop(dialogContext);
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7D1B22)),
-                  child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: RQButton(
+                    label: 'Confirm',
+                    onPressed: () {
+                      if (pickedDate == null) {
+                        setSheet(() => error = 'Please choose when you last took or had it.');
+                        return;
+                      }
+                      final reason = reasonController.text.trim();
+                      setState(() {
+                        _recentMedProcedures.add(option);
+                        _medProcedureDetails[option] = MedProcedureDetail(
+                          date: pickedDate,
+                          dosageOrReason: reason.isEmpty ? null : reason,
+                        );
+                      });
+                      Navigator.pop(ctx);
+                    },
+                  ),
                 ),
               ],
-            );
-          },
-        );
-      },
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const RQSectionLabel('When was your last dose?'),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final q in quick)
+                      _choiceChip(
+                        label: q[0] as String,
+                        selected: pickedDate != null &&
+                            _sameDay(pickedDate!, today.subtract(Duration(days: q[1] as int))),
+                        onTap: () => setSheet(() {
+                          pickedDate = today.subtract(Duration(days: q[1] as int));
+                          error = null;
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _dateField(
+                  label: 'Exact date',
+                  value: pickedDate,
+                  onTap: () async {
+                    final initial = (pickedDate != null && !pickedDate!.isBefore(earliest)) ? pickedDate! : today;
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: initial,
+                      firstDate: earliest,
+                      lastDate: today,
+                      builder: _datePickerTheme,
+                    );
+                    if (picked != null) {
+                      setSheet(() {
+                        pickedDate = picked;
+                        error = null;
+                      });
+                    }
+                  },
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(fontSize: 12.5, color: Color(0xFFB91C1C))),
+                ],
+                const SizedBox(height: 18),
+                const RQSectionLabel('Dosage or reason (optional)'),
+                const SizedBox(height: 10),
+                RQTextField(controller: reasonController, label: 'e.g. 500mg twice a day / tooth extraction'),
+                const SizedBox(height: 16),
+                _noteBox(Icons.info_outline_rounded, 'We use this date to check the 4-week waiting window.'),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -613,1474 +723,1550 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     }
   }
 
+  // ===========================================================================
+  // LAYOUT: header with labelled stepper · scrolling step content · footer
+  // ===========================================================================
+
+  static const List<String> _stepNames = ['Account', 'Body', 'Health', 'Medical', 'Final'];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F3F5),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF7D1B22)))
-            : Column(
-                children: [
-                  if (_currentStep > 1) _buildCurvedTopHeader(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: Responsive.horizontalPadding(context),
-                        vertical: 16,
-                      ),
-                      child: ResponsiveContentArea(
-                        child: Column(
-                          children: [
-                            if (_currentStep == 1) _buildStep1AccountUI(),
-                            if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
-                            if (_currentStep == 3) _buildStep3HealthScreeningUI(),
-                            if (_currentStep == 4) _buildStep4MedicalHistoryUI(),
-                            if (_currentStep == 5) _buildStep5FinalScreeningUI(),
-                          ],
-                        ),
+      backgroundColor: RQColors.surface,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: RQColors.blood))
+          : Column(
+              children: [
+                _buildStepHeader(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.horizontalPadding(context),
+                      vertical: 16,
+                    ),
+                    child: ResponsiveContentArea(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_currentStep == 1) _buildStep1AccountUI(),
+                          if (_currentStep == 2) _buildStep2PhysicalMetricsUI(),
+                          if (_currentStep == 3) _buildStep3HealthScreeningUI(),
+                          if (_currentStep == 4) _buildStep4MedicalHistoryUI(),
+                          if (_currentStep == 5) _buildStep5FinalScreeningUI(),
+                          const SizedBox(height: 8),
+                        ],
                       ),
                     ),
                   ),
-                  if (_currentStep == 3 || _currentStep == 4)
-                    _buildStepNavRow(
-                      onPrev: _prevStep,
-                      onNext: _nextStep,
+                ),
+                _buildFooter(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildStepHeader() {
+    final int floor = widget.isRetake ? 2 : 1;
+    const titles = {
+      1: 'Create your account',
+      2: 'Physical metrics',
+      3: 'How are you today?',
+      4: 'Medical & risk factors',
+      5: 'Final screening',
+    };
+    final subtitles = {
+      1: 'Join donors answering urgent blood requests near you.',
+      2: 'Basic details that decide if you can donate safely.',
+      3: 'Quick checks so donating is safe for you and the patient.',
+      4: 'Recent medicines, conditions and exposures.',
+      5: 'A few private questions for ${_gender == BioSex.female ? 'female' : 'male'} donors.',
+    };
+
+    return Container(
+      width: double.infinity,
+      color: RQColors.blood,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: ResponsiveContentArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: () {
+                        if (_currentStep > floor) {
+                          _prevStep();
+                        } else {
+                          Navigator.of(context).maybePop();
+                        }
+                      },
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0x29FFFFFF),
+                        fixedSize: const Size(44, 44),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        widget.isRetake ? 'Update your health screening' : 'Create your donor profile',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white),
+                      ),
+                    ),
+                    Text(
+                      '$_currentStep of $_totalSteps',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xE6FFFFFF)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildStepper(),
+                const SizedBox(height: 16),
+                Text(
+                  titles[_currentStep] ?? '',
+                  style: const TextStyle(fontSize: 22, height: 1.35, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+                Text(
+                  subtitles[_currentStep] ?? '',
+                  style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xE6FFFFFF)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Five labelled dots joined by a line — done steps get a check, the
+  /// current one a white glow, upcoming ones an outline.
+  Widget _buildStepper() {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final double colW = c.maxWidth / _totalSteps;
+        final double span = c.maxWidth - colW;
+        final double progress = ((_currentStep - 1) / (_totalSteps - 1)).clamp(0.0, 1.0);
+        return SizedBox(
+          height: 48,
+          child: Stack(
+            children: [
+              Positioned(
+                left: colW / 2,
+                width: span,
+                top: 11,
+                child: Container(height: 2, color: const Color(0x4DFFFFFF)),
+              ),
+              Positioned(
+                left: colW / 2,
+                width: span * progress,
+                top: 11,
+                child: Container(height: 2, color: Colors.white),
+              ),
+              Row(
+                children: [
+                  for (int i = 1; i <= _totalSteps; i++)
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _stepDot(i),
+                          const SizedBox(height: 6),
+                          Text(
+                            _stepNames[i - 1],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: i == _currentStep ? FontWeight.w600 : FontWeight.w400,
+                              color: i == _currentStep ? Colors.white : const Color(0xCCFFFFFF),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                 ],
               ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCurvedTopHeader() {
+  Widget _stepDot(int i) {
+    if (i < _currentStep) {
+      return Container(
+        width: 24,
+        height: 24,
+        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        child: const Icon(Icons.check_rounded, size: 15, color: RQColors.blood),
+      );
+    }
+    if (i == _currentStep) {
+      return Container(
+        width: 24,
+        height: 24,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: Color(0x4DFFFFFF), spreadRadius: 4)],
+        ),
+        child: Text('$i', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: RQColors.blood)),
+      );
+    }
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 14, bottom: 22, left: 18, right: 18),
-      decoration: const BoxDecoration(
-        color: Color(0xFF7D1B22),
-        borderRadius: BorderRadius.vertical(bottom: Radius.elliptical(240, 30)),
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: RQColors.blood,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0x73FFFFFF), width: 2),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/rq_logo_white.png',
-            height: 32,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Text(
-              'RQ',
-              style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(width: 1.5, height: 26, color: Colors.white70),
-          const SizedBox(width: 12),
-          const Text(
-            'Connect, Save Lives, On time.',
-            style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w500),
-          ),
-        ],
+      child: Text('$i', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xD9FFFFFF))),
+    );
+  }
+
+  Widget _buildFooter() {
+    final bool showBack = _currentStep >= 3;
+    String label;
+    switch (_currentStep) {
+      case 1:
+        label = 'Continue to your details';
+        break;
+      case 2:
+        label = 'Continue to health screening';
+        break;
+      case 5:
+        label = widget.isRetake ? 'Save my answers' : 'Review my answers';
+        break;
+      default:
+        label = 'Continue';
+    }
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        color: RQColors.card,
+        border: Border(top: BorderSide(color: RQColors.hairline)),
+      ),
+      child: ResponsiveContentArea(
+        child: Row(
+          children: [
+            if (showBack) ...[
+              SizedBox(
+                width: 54,
+                height: 54,
+                child: OutlinedButton(
+                  onPressed: _prevStep,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: RQColors.ink,
+                    side: const BorderSide(color: RQColors.hairline, width: 1.5),
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Icon(Icons.arrow_back_rounded, semanticLabel: 'Previous step'),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(child: RQButton(label: label, height: 54, onPressed: _nextStep)),
+          ],
+        ),
       ),
     );
   }
 
+  // ===========================================================================
+  // STEP 1 · Account
+  // ===========================================================================
   Widget _buildStep1AccountUI() {
     return Form(
       key: _formKey,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 10),
-          Container(
-            width: 90,
-            height: 90,
-            decoration: BoxDecoration(
-              color: const Color(0xFF7D1B22),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7D1B22).withValues(alpha: 0.2),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Image.asset(
-              'assets/images/rq_logo_white.png',
-              height: 52,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Text(
-                'RQ',
-                style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Create Your Account',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E), letterSpacing: -0.5),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Join our community of lifesaving donors.',
-            style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: EditableAvatar(
-              localPhotoPath: _photoPath,
-              radius: 42,
-              onLocalFilePicked: (path) => setState(() => _photoPath = path),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Center(
-            child: Text('Add a profile photo (optional)', style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
-          ),
-          const SizedBox(height: 24),
-          _buildBorderedInput(
-            controller: _nameController,
-            hintText: 'Full Name',
-            icon: Icons.person_rounded,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) return 'Please enter your full name';
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildBorderedInput(
-            controller: _emailController,
-            hintText: 'Email Address',
-            icon: Icons.email_rounded,
-            keyboardType: TextInputType.emailAddress,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) return 'Please enter your email';
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                return 'Please enter a valid email address';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildPhoneInput(),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.info_rounded, size: 16, color: Color(0xFF7D1B22)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  "We'll send a 6-digit verification code via SMS to this number.",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildBorderedInput(
-            controller: _passwordController,
-            hintText: 'Password',
-            icon: Icons.lock_rounded,
-            obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter a password';
-              if (value.length < 8) return 'Password must be at least 8 characters';
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildBorderedInput(
-            controller: _confirmPasswordController,
-            hintText: 'Confirm Password',
-            icon: Icons.lock_clock_rounded,
-            obscureText: _obscureConfirmPassword,
-            suffixIcon: IconButton(
-              icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.grey[400], size: 22),
-              onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please confirm your password';
-              if (value != _passwordController.text) return 'Passwords do not match';
-              return null;
-            },
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF6F6),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEAA1A5).withValues(alpha: 0.5)),
-            ),
+          _card(
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7D1B22).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.shield_rounded, color: Color(0xFF7D1B22), size: 20),
+                EditableAvatar(
+                  localPhotoPath: _photoPath,
+                  radius: 32,
+                  onLocalFilePicked: (path) => setState(() => _photoPath = path),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Privacy Guaranteed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7D1B22))),
-                      SizedBox(height: 4),
-                      Text(
-                        'Your data is encrypted and strictly used for medical eligibility checks within our secure network',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
-                      ),
+                      Text('Profile photo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: RQColors.ink)),
+                      Text('Optional. Helps hospital staff recognize you.',
+                          style: TextStyle(fontSize: 12, height: 1.4, color: RQColors.muted)),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _cardTitle('Your details'),
+                const SizedBox(height: 12),
+                _formField(
+                  controller: _nameController,
+                  label: 'Full name',
+                  capitalization: TextCapitalization.words,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return 'Please enter your full name';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _formField(
+                  controller: _emailController,
+                  label: 'Email',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return 'Please enter your email';
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                      return 'Please enter a valid email address';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _formField(
+                  controller: _phoneController,
+                  label: 'Mobile number',
+                  hint: '9XX XXX XXXX',
+                  prefixText: '+63',
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 6),
+                const Row(
+                  children: [
+                    Icon(Icons.sms_outlined, size: 14, color: RQColors.navy),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text("We'll text a 6-digit code to verify this number.",
+                          style: TextStyle(fontSize: 12, color: RQColors.muted)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _cardTitle('Password'),
+                const SizedBox(height: 12),
+                _formField(
+                  controller: _passwordController,
+                  label: 'Create password',
+                  obscure: _obscurePassword,
+                  onChanged: (_) => setState(() {}),
+                  suffix: IconButton(
+                    tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                    icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: RQColors.muted),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Please enter a password';
+                    if (value.length < 8) return 'Password must be at least 8 characters';
+                    return null;
+                  },
+                ),
+                if (_passwordController.text.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _strengthMeter(_passwordController.text),
+                ],
+                const SizedBox(height: 12),
+                _formField(
+                  controller: _confirmPasswordController,
+                  label: 'Confirm password',
+                  obscure: _obscureConfirmPassword,
+                  suffix: IconButton(
+                    tooltip: _obscureConfirmPassword ? 'Show password' : 'Hide password',
+                    icon: Icon(_obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: RQColors.muted),
+                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Please confirm your password';
+                    if (value != _passwordController.text) return 'Passwords do not match';
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _noteBox(
+            Icons.verified_user_outlined,
+            'Your data is encrypted and only used to check if you can donate.',
+            background: RQColors.successTint,
+            iconColor: RQColors.success,
+          ),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Already have an account? ', style: TextStyle(fontSize: 14, color: Color(0xFF4B5563))),
-              InkWell(
-                onTap: () {
+              const Text('Already have an account?', style: TextStyle(fontSize: 14, color: Color(0xFF555555))),
+              TextButton(
+                onPressed: () {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => const LoginView()),
                   );
                 },
-                child: const Text('Log In', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF7D1B22))),
+                style: TextButton.styleFrom(foregroundColor: RQColors.blood),
+                child: const Text('Log in', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          _buildPrimaryCTA(
-            title: 'Continue to Details',
-            onTap: _nextStep,
-          ),
-          const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  Widget _buildPhoneInput() {
-    return TextFormField(
-      controller: _phoneController,
-      keyboardType: TextInputType.phone,
-      style: const TextStyle(fontSize: 14, color: Color(0xFF1E1E1E), fontWeight: FontWeight.w600),
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        filled: true,
-        fillColor: Colors.white,
-        hintText: 'Phone Number',
-        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.normal),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 16, right: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('🇵🇭 +63', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E1E1E))),
-              const Icon(Icons.arrow_drop_down, color: Color(0xFF1E1E1E), size: 20),
-              const SizedBox(width: 12),
-              Container(width: 1.5, height: 24, color: const Color(0xFFE5E7EB)),
-            ],
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep2PhysicalMetricsUI() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _strengthMeter(String pw) {
+    final int score = [
+      pw.length >= 8,
+      pw.contains(RegExp(r'[A-Z]')),
+      pw.contains(RegExp(r'[0-9]')),
+      pw.contains(RegExp(r'[^A-Za-z0-9]')),
+    ].where((b) => b).length;
+    const labels = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
+    final Color color = score >= 3 ? RQColors.success : (score == 2 ? RQColors.warning : const Color(0xFFB91C1C));
+    return Row(
       children: [
-        const SizedBox(height: 8),
-        const Center(
-          child: Text(
-            'Physical Metrics',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Center(
-          child: Text(
-            'Please provide your basic physical information to help us determine your donation eligibility.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), height: 1.35),
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text('Blood Type Selection', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E))),
-        const SizedBox(height: 2),
-        const Text('Select your blood type if known. Otherwise, choose "I\'m not sure".', style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280))),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.25,
-          ),
-          itemCount: _bloodTypes.length,
-          itemBuilder: (context, index) {
-            final type = _bloodTypes[index];
-            final isSelected = _selectedBloodType == type;
-            return InkWell(
-              onTap: () => setState(() => _selectedBloodType = type),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF7D1B22) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF7D1B22), width: 1.4),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  type,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : const Color(0xFF7D1B22),
-                  ),
-                ),
+        for (int i = 0; i < 4; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          Expanded(
+            child: Container(
+              height: 5,
+              decoration: BoxDecoration(
+                color: i < score ? color : RQColors.hairline,
+                borderRadius: BorderRadius.circular(999),
               ),
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () => setState(() => _selectedBloodType = "I'm not sure"),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: _selectedBloodType == "I'm not sure" ? const Color(0xFF7D1B22) : Colors.white,
-              side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text(
-              "I'm not sure",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: _selectedBloodType == "I'm not sure" ? Colors.white : const Color(0xFF7D1B22),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        if (!widget.isRetake) ...[
-          const Text('Date of Birth', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildCrimsonDateButton(
-            title: _dob != null ? _formatDate(_dob) : 'Date Picker',
-            onTap: () => _pickDate(
-              context: context,
-              initialDate: DateTime(2002),
-              firstDate: DateTime(1940),
-              lastDate: DateTime.now(),
-              onPicked: (d) => _dob = d,
-            ),
-          ),
-        ] else ...[
-          // No real DOB is ever stored server-side (only a computed age), so
-          // a retake can't re-show the actual date picker with the donor's
-          // real birthdate — that would just always look reset to blank.
-          // This shows their real last-known age instead, and lets them
-          // update it directly if it's changed since their last screening.
-          const Text('Age', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildBorderedInput(
-            controller: _ageController,
-            hintText: 'Enter your age',
-            icon: Icons.cake_outlined,
-            keyboardType: TextInputType.number,
-          ),
-        ],
-        const SizedBox(height: 16),
-        const Text('Biological Sex', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          height: 44,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFD4D4D8),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _gender = BioSex.female),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _gender == BioSex.female ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Female',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.5,
-                        color: _gender == BioSex.female ? const Color(0xFF1E1E1E) : const Color(0xFF52525B),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _gender = BioSex.male),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _gender == BioSex.male ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Male',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.5,
-                        color: _gender == BioSex.male ? const Color(0xFF1E1E1E) : const Color(0xFF52525B),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text('Weight (kg)', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        _buildBorderedInput(
-          controller: _weightController,
-          hintText: 'Enter your weight here',
-          icon: Icons.monitor_weight_outlined,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        const SizedBox(height: 18),
-        const Text('Last Blood Donation', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        _buildCrimsonDateButton(
-          title: _lastDonationDate != null ? _formatDate(_lastDonationDate) : 'Date Picker',
-          onTap: () async {
-            await _pickDate(
-              context: context,
-              initialDate: DateTime.now().subtract(const Duration(days: 90)),
-              firstDate: DateTime(2000),
-              lastDate: DateTime.now(),
-              onPicked: (d) {
-                _lastDonationDate = d;
-                _isFirstTimeDonor = false;
-              },
-            );
-            if (!mounted) return;
-            await _promptForDonationCount(context);
-          },
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => setState(() {
-            _isFirstTimeDonor = !_isFirstTimeDonor;
-            if (_isFirstTimeDonor) _lastDonationDate = null;
-          }),
-          child: Row(
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: _isFirstTimeDonor ? const Color(0xFF7D1B22) : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
-                ),
-                child: _isFirstTimeDonor ? const Icon(Icons.check, color: Colors.white, size: 14) : null,
-              ),
-              const SizedBox(width: 8),
-              const Text('First time donating.', style: TextStyle(fontSize: 12.5, color: Color(0xFF4B5563))),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text('Recent Procedures', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        _buildProcedureOption(
-          label: 'No Tattoos or Piercings',
-          isSelected: !_hasTattoosOrPiercings,
-          onTap: () => setState(() => _hasTattoosOrPiercings = false),
-        ),
-        const SizedBox(height: 8),
-        _buildProcedureOption(
-          label: 'Yes, I have Tattoos / Piercings',
-          isSelected: _hasTattoosOrPiercings,
-          onTap: () => setState(() => _hasTattoosOrPiercings = true),
-        ),
-        if (_hasTattoosOrPiercings) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE2EDFE),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Standard deferral period is 6 months to 12 months. Please provide the date of your last procedure for verification',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF1E3A8A), height: 1.35),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text('Date of Last Tattoo / Piercing', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          _buildCrimsonDateButton(
-            title: _tattooDate != null ? _formatDate(_tattooDate) : 'dd/mm/yyyy',
-            onTap: () => _pickDate(
-              context: context,
-              initialDate: DateTime.now().subtract(const Duration(days: 180)),
-              firstDate: DateTime(2010),
-              lastDate: DateTime.now(),
-              onPicked: (d) => _tattooDate = d,
             ),
           ),
         ],
-        const SizedBox(height: 24),
-        _buildPrimaryCTA(
-          title: 'Continue to Health Screening',
-          onTap: _nextStep,
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(width: 10),
+        Text(labels[score], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
       ],
     );
   }
 
+  // ===========================================================================
+  // STEP 2 · Physical metrics
+  // ===========================================================================
+  Widget _buildStep2PhysicalMetricsUI() {
+    final double? weight = double.tryParse(_weightController.text.trim());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('Blood type', subtitle: 'Pick yours, or choose "I\'m not sure".'),
+              const SizedBox(height: 12),
+              GridView.count(
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.35,
+                children: _bloodTypes.map(_bloodTypeTile).toList(),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 44,
+                child: _selectableButton(
+                  label: "I'm not sure",
+                  icon: Icons.help_outline_rounded,
+                  selected: _selectedBloodType == "I'm not sure",
+                  onTap: () => setState(() => _selectedBloodType = "I'm not sure"),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('About you'),
+              const SizedBox(height: 12),
+              if (!widget.isRetake)
+                _dateField(
+                  label: 'Date of birth',
+                  value: _dob,
+                  chip: _dob != null ? '${_ageFrom(_dob!)} yrs' : null,
+                  onTap: () => _pickDate(
+                    context: context,
+                    initialDate: _dob ?? DateTime(2002),
+                    firstDate: DateTime(1940),
+                    lastDate: DateTime.now(),
+                    onPicked: (d) => _dob = d,
+                  ),
+                )
+              else
+                // No real DOB is stored server-side (only a computed age), so a
+                // retake shows the donor's last-known age instead, editable.
+                RQTextField(controller: _ageController, label: 'Age', keyboardType: TextInputType.number),
+              const SizedBox(height: 14),
+              const Text('Biological sex', style: TextStyle(fontSize: 12, color: RQColors.muted)),
+              const SizedBox(height: 6),
+              _segmented(
+                labels: const ['Female', 'Male'],
+                selectedIndex: _gender == BioSex.female ? 0 : 1,
+                onChanged: (i) => setState(() => _gender = i == 0 ? BioSex.female : BioSex.male),
+              ),
+              const SizedBox(height: 14),
+              RQTextField(
+                controller: _weightController,
+                label: 'Weight',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() {}),
+                suffix: const Padding(
+                  padding: EdgeInsets.only(right: 14),
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text('kg', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RQColors.muted)),
+                  ),
+                ),
+              ),
+              if (weight != null && weight > 0) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      weight >= 50 ? Icons.check_rounded : Icons.info_outline_rounded,
+                      size: 15,
+                      color: weight >= 50 ? RQColors.success : RQColors.warning,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        weight >= 50 ? 'Meets the 50 kg minimum' : 'Below the 50 kg minimum for donating',
+                        style: TextStyle(fontSize: 12, color: weight >= 50 ? RQColors.success : RQColors.warning),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('Donation history'),
+              const SizedBox(height: 10),
+              _optionCard(
+                label: "I've donated before",
+                selected: !_isFirstTimeDonor,
+                onTap: () => setState(() => _isFirstTimeDonor = false),
+                expanded: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _dateField(
+                      label: 'Last donation',
+                      value: _lastDonationDate,
+                      onTap: () async {
+                        await _pickDate(
+                          context: context,
+                          initialDate: _lastDonationDate ?? DateTime.now().subtract(const Duration(days: 90)),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now(),
+                          onPicked: (d) {
+                            _lastDonationDate = d;
+                            _isFirstTimeDonor = false;
+                          },
+                        );
+                        if (!mounted || _lastDonationDate == null) return;
+                        await _promptForDonationCount(context);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                      decoration: BoxDecoration(
+                        color: RQColors.card,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: RQColors.hairline),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Lifetime donations', style: TextStyle(fontSize: 11, color: RQColors.muted)),
+                                Text(
+                                  _totalDonations > 0
+                                      ? '$_totalDonations ${_totalDonations == 1 ? 'donation' : 'donations'}'
+                                      : 'Not set yet',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: RQColors.ink),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => _promptForDonationCount(context),
+                            style: TextButton.styleFrom(foregroundColor: RQColors.navy),
+                            child: Text(_totalDonations > 0 ? 'Edit' : 'Add',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              _optionCard(
+                label: 'This is my first time',
+                selected: _isFirstTimeDonor,
+                onTap: () => setState(() {
+                  _isFirstTimeDonor = true;
+                  _lastDonationDate = null;
+                }),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('Tattoos or piercings', subtitle: 'In the last 12 months'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: _selectableButton(
+                        label: 'None',
+                        icon: !_hasTattoosOrPiercings ? Icons.check_rounded : null,
+                        selected: !_hasTattoosOrPiercings,
+                        onTap: () => setState(() => _hasTattoosOrPiercings = false),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: _selectableButton(
+                        label: 'Yes, I have',
+                        icon: _hasTattoosOrPiercings ? Icons.check_rounded : null,
+                        selected: _hasTattoosOrPiercings,
+                        onTap: () => setState(() => _hasTattoosOrPiercings = true),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (_hasTattoosOrPiercings) ...[
+                _noteBox(Icons.info_outline_rounded,
+                    'A 6–12 month wait usually applies. Add the date of your most recent one.'),
+                const SizedBox(height: 10),
+                _dateField(
+                  label: 'Date of last tattoo or piercing',
+                  value: _tattooDate,
+                  onTap: () => _pickDate(
+                    context: context,
+                    initialDate: _tattooDate ?? DateTime.now().subtract(const Duration(days: 180)),
+                    firstDate: DateTime(2010),
+                    lastDate: DateTime.now(),
+                    onPicked: (d) => _tattooDate = d,
+                  ),
+                ),
+              ] else
+                const Text("If yes, we'll ask for the date. A 6–12 month wait usually applies.",
+                    style: TextStyle(fontSize: 12, height: 1.4, color: RQColors.muted)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _bloodTypeTile(String type) {
+    final bool selected = _selectedBloodType == type;
+    return Material(
+      color: selected ? RQColors.blood : RQColors.card,
+      elevation: selected ? 3 : 0,
+      shadowColor: const Color(0x669B1B20),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: selected ? BorderSide.none : const BorderSide(color: RQColors.hairline, width: 1.5),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _selectedBloodType = type),
+        child: Center(
+          child: Text(
+            type.replaceAll('-', '−'),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: selected ? Colors.white : RQColors.ink,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _ageFrom(DateTime dob) {
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) age--;
+    return age;
+  }
+
+  // ===========================================================================
+  // STEP 3 · Health screening
+  // ===========================================================================
   Widget _buildStep3HealthScreeningUI() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 8),
-        const Center(
-          child: Text(
-            'Health Screening',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Center(
-          child: Text(
-            'Answer truthfully to ensure donor and recipient safety.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
-          ),
-        ),
-        const SizedBox(height: 18),
-        _buildInfoBanner(
-          'Your data is encrypted and handled according to medical privacy standards (HIPAA compliance). We only use this information to determine eligibility.',
-        ),
-        const SizedBox(height: 20),
-        _buildSectionHeader(Icons.access_time_filled_rounded, 'Immediate Readiness'),
+        _privacyLine('Private. Only used to check your eligibility.'),
         const SizedBox(height: 12),
-        _buildYesNoCard(
+        _questionCard(
+          icon: Icons.sentiment_satisfied_alt_outlined,
           question: 'Are you feeling well and healthy today?',
           value: _feelsWellToday,
           onChanged: (val) => setState(() => _feelsWellToday = val),
         ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Have you had a full meal & fluids in the last 4-6 hrs?',
+        const SizedBox(height: 12),
+        _questionCard(
+          icon: Icons.restaurant_outlined,
+          question: 'Had a full meal and fluids in the last 4–6 hours?',
           value: _hasEatenRecently,
           onChanged: (val) => setState(() => _hasEatenRecently = val),
         ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Have you consumed alcohol in the past 24 hours?',
+        const SizedBox(height: 12),
+        _questionCard(
+          icon: Icons.local_bar_outlined,
+          question: 'Had alcohol in the past 24 hours?',
           value: _hasAlcoholPast24hr,
           onChanged: (val) => setState(() => _hasAlcoholPast24hr = val),
         ),
-        const SizedBox(height: 16),
       ],
     );
+  }
+
+  Widget _questionCard({
+    required IconData icon,
+    required String question,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              RQIconBox(icon: icon, size: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(question,
+                    style: const TextStyle(fontSize: 15, height: 1.4, fontWeight: FontWeight.w500, color: RQColors.ink)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _yesNo(value, onChanged),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // STEP 4 · Medical & risk factors
+  // ===========================================================================
+  static const Map<String, String> _medHints = {
+    'Antibiotics': 'Any course',
+    'Aspirin': 'Pain relievers',
+    'Vaccines': 'Any shot',
+    'Dental Work': 'Extraction, cleaning',
+  };
+
+  IconData _medIcon(String option) {
+    switch (option) {
+      case 'Antibiotics':
+        return Icons.medication_outlined;
+      case 'Aspirin':
+        return Icons.healing_outlined;
+      case 'Vaccines':
+        return Icons.vaccines_outlined;
+      case 'Dental Work':
+        return Icons.medical_services_outlined;
+      default:
+        return Icons.medication_outlined;
+    }
   }
 
   Widget _buildStep4MedicalHistoryUI() {
+    final bool followUp = _hasMajorMedicalHistory || _hasTransfusionOrSurgery || _hasTravelOrNeedleStick;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 8),
-        _buildSectionHeader(Icons.assignment_rounded, 'Medical History'),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        _card(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Check all that apply in the last 4 weeks:',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
-              ),
+              _cardTitle('Medicines & procedures', subtitle: 'In the last 4 weeks. Tap all that apply.'),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _medProcedureOptions.map((option) {
-                  final isSelected = _recentMedProcedures.contains(option);
-                  return _buildChipToggle(
-                    label: option,
-                    isSelected: isSelected,
-                    onTap: () {
-                      if (isSelected) {
-                        setState(() {
-                          _recentMedProcedures.remove(option);
-                          _medProcedureDetails.remove(option);
-                        });
-                      } else {
-                        _promptMedProcedureDetail(option);
-                      }
-                    },
-                  );
-                }).toList(),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.45,
+                children: _medProcedureOptions.map(_medTile).toList(),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Major Medical History',
-          subtitle: 'Heart disease, Asthma, Diabetes, etc.',
-          value: _hasMajorMedicalHistory,
-          onChanged: (val) => setState(() => _hasMajorMedicalHistory = val),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('Medical history'),
+              const SizedBox(height: 8),
+              const Text('Heart disease, asthma, diabetes or another major condition?',
+                  style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink)),
+              const SizedBox(height: 12),
+              _yesNo(_hasMajorMedicalHistory, (val) => setState(() => _hasMajorMedicalHistory = val)),
+            ],
+          ),
         ),
-        const SizedBox(height: 22),
-        _buildSectionHeader(Icons.warning_rounded, 'Risk Factors'),
-        const SizedBox(height: 12),
-        _buildYesNoCard(
-          question: 'Transfusions or Surgeries?',
-          subtitle: 'In the last 12 months',
-          value: _hasTransfusionOrSurgery,
-          onChanged: (val) => setState(() => _hasTransfusionOrSurgery = val),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('Risk factors', subtitle: 'In the last 12 months'),
+              const SizedBox(height: 12),
+              const Text('Blood transfusion or surgery?', style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink)),
+              const SizedBox(height: 10),
+              _yesNo(_hasTransfusionOrSurgery, (val) => setState(() => _hasTransfusionOrSurgery = val)),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Divider(height: 1, thickness: 1, color: RQColors.hairline),
+              ),
+              const Text('Travel abroad or an accidental needle-stick?',
+                  style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink)),
+              const SizedBox(height: 10),
+              _yesNo(_hasTravelOrNeedleStick, (val) => setState(() => _hasTravelOrNeedleStick = val)),
+              if (followUp) ...[
+                const SizedBox(height: 12),
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 15, color: RQColors.navy),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text("We'll ask a few details on the next screen.",
+                          style: TextStyle(fontSize: 12, color: RQColors.navy)),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
-        _buildYesNoCard(
-          question: 'Travel or Needle Sticks?',
-          subtitle: 'International travel or accidental sticks (12 mos)',
-          value: _hasTravelOrNeedleStick,
-          onChanged: (val) => setState(() => _hasTravelOrNeedleStick = val),
+        const SizedBox(height: 14),
+        _noteBox(
+          Icons.favorite_border_rounded,
+          'Not sure about an answer? Choose the closest one. Staff will go over it with you before you donate.',
+          background: RQColors.navyTint,
         ),
-        const SizedBox(height: 20),
-        _buildComfortBanner(),
-        const SizedBox(height: 16),
       ],
     );
   }
 
+  Widget _medTile(String option) {
+    final bool selected = _recentMedProcedures.contains(option);
+    final detail = _medProcedureDetails[option];
+    String caption = _medHints[option] ?? '';
+    if (selected && detail != null) {
+      final parts = <String>[
+        if (detail.date != null) _shortDate(detail.date!),
+        if (detail.dosageOrReason != null && detail.dosageOrReason!.isNotEmpty) detail.dosageOrReason!,
+      ];
+      if (parts.isNotEmpty) caption = parts.join(' · ');
+    }
+
+    return Material(
+      color: selected ? const Color(0xFFFDF5F5) : RQColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: selected ? RQColors.blood : RQColors.hairline, width: selected ? 2 : 1.5),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _promptMedProcedureDetail(option),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(_medIcon(option), size: 22, color: selected ? RQColors.blood : RQColors.muted),
+                  const SizedBox(height: 6),
+                  Text(option,
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.w500, color: RQColors.ink)),
+                  Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: selected ? RQColors.blood : RQColors.muted),
+                  ),
+                ],
+              ),
+              if (selected)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(color: RQColors.blood, shape: BoxShape.circle),
+                    child: const Icon(Icons.check_rounded, size: 13, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // STEP 5 · Final screening (sex-specific)
+  // ===========================================================================
   Widget _buildStep5FinalScreeningUI() {
+    final bool female = _gender == BioSex.female;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 8),
-        const Center(
-          child: Text(
-            'Final Screening',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Center(
-          child: Text(
-            'Additional questions based on the biological sex.',
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
-          ),
-        ),
-        const SizedBox(height: 18),
-        if (_gender == BioSex.female) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        _privacyLine('Confidential. Only clinical staff see these answers.'),
+        const SizedBox(height: 12),
+        if (female) ...[
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'If you are currently pregnant or nursing, your donation will be temporarily deferred.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF92400E), height: 1.35),
+                _cardTitle('Menstrual cycle'),
+                const SizedBox(height: 12),
+                _dateField(
+                  label: 'First day of your last period',
+                  value: _lastMensDate,
+                  onTap: () => _pickDate(
+                    context: context,
+                    initialDate: _lastMensDate ?? DateTime.now().subtract(const Duration(days: 14)),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                    onPicked: (d) => _lastMensDate = d,
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          const Text('Date of Last Menstrual Period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          InkWell(
-            onTap: () => _pickDate(
-              context: context,
-              initialDate: DateTime.now().subtract(const Duration(days: 14)),
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now(),
-              onPicked: (d) => _lastMensDate = d,
-            ),
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _lastMensDate != null ? _formatDate(_lastMensDate) : 'mm/dd/yyyy',
-                style: TextStyle(fontSize: 13, color: _lastMensDate != null ? const Color(0xFF1E1E1E) : const Color(0xFF9CA3AF)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text('Pregnancy Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildSelectionOption(
-            title: 'Not currently pregnant',
-            isSelected: _pregnancyStatusIndex == 0,
-            onTap: () => setState(() => _pregnancyStatusIndex = 0),
-          ),
-          const SizedBox(height: 8),
-          _buildSelectionOption(
-            title: 'Currently pregnant',
-            isSelected: _pregnancyStatusIndex == 1,
-            onTap: () => setState(() => _pregnancyStatusIndex = 1),
-          ),
-          const SizedBox(height: 8),
-          _buildSelectionOption(
-            title: 'Pregnant within last 6 weeks',
-            isSelected: _pregnancyStatusIndex == 2,
-            onTap: () => setState(() => _pregnancyStatusIndex = 2),
           ),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Currently Breastfeeding', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    SizedBox(height: 2),
-                    Text('Toggle if nursing a child', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-                  ],
+                _cardTitle('Pregnancy'),
+                const SizedBox(height: 10),
+                _optionCard(
+                  label: 'Not currently pregnant',
+                  selected: _pregnancyStatusIndex == 0,
+                  onTap: () => setState(() => _pregnancyStatusIndex = 0),
                 ),
-                Switch(
+                const SizedBox(height: 8),
+                _optionCard(
+                  label: 'Currently pregnant',
+                  selected: _pregnancyStatusIndex == 1,
+                  onTap: () => setState(() => _pregnancyStatusIndex = 1),
+                ),
+                const SizedBox(height: 8),
+                _optionCard(
+                  label: 'Gave birth in the last 6 weeks',
+                  selected: _pregnancyStatusIndex == 2,
+                  onTap: () => setState(() => _pregnancyStatusIndex = 2),
+                ),
+                const SizedBox(height: 4),
+                const Divider(height: 20, thickness: 1, color: RQColors.hairline),
+                RQToggleRow(
+                  title: 'Currently breastfeeding',
+                  subtitle: 'Nursing a child right now',
                   value: _isBreastfeeding,
+                  showDivider: false,
                   onChanged: (val) => setState(() => _isBreastfeeding = val),
-                  activeThumbColor: const Color(0xFF7D1B22),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "If you're pregnant or nursing, donation is paused for now to protect you and your baby.",
+                  style: TextStyle(fontSize: 12, height: 1.4, color: RQColors.muted),
                 ),
               ],
             ),
           ),
-        ],
-        if (_gender == BioSex.male) ...[
-          const Text('History of STI/STD (Last 12 mos)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDualChoiceButton('Yes', _hasStiHistory, () => setState(() => _hasStiHistory = true)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDualChoiceButton('No', !_hasStiHistory, () => setState(() => _hasStiHistory = false)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text('High-Risk Sexual Contact (Last 12 mos)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(14),
-            ),
+        ] else ...[
+          _card(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _cardTitle('STI history', subtitle: 'Any sexually transmitted infection in the last 12 months?'),
+                const SizedBox(height: 12),
+                _yesNo(_hasStiHistory, (val) => setState(() => _hasStiHistory = val)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _cardTitle('High-risk contact', subtitle: 'In the last 12 months'),
+                const SizedBox(height: 8),
                 const Text(
-                  'Have you had sexual contact with anyone who has ever had a positive HIV test or used needles for non-prescription drugs?',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.35),
+                  'Sexual contact with anyone who has tested positive for HIV or injected non-prescribed drugs?',
+                  style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDualChoiceButton('Yes', _hasHighRiskContact, () => setState(() => _hasHighRiskContact = true)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildDualChoiceButton('No', !_hasHighRiskContact, () => setState(() => _hasHighRiskContact = false)),
-                    ),
-                  ],
+                _yesNo(_hasHighRiskContact, (val) => setState(() => _hasHighRiskContact = val)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _cardTitle('Sexual contact with men'),
+                const SizedBox(height: 10),
+                _optionCard(
+                  label: 'Never',
+                  selected: _msmHistoryIndex == 0,
+                  onTap: () => setState(() => _msmHistoryIndex = 0),
+                ),
+                const SizedBox(height: 8),
+                _optionCard(
+                  label: 'More than 3 months ago',
+                  selected: _msmHistoryIndex == 1,
+                  onTap: () => setState(() => _msmHistoryIndex = 1),
+                ),
+                const SizedBox(height: 8),
+                _optionCard(
+                  label: 'Within the last 3 months',
+                  selected: _msmHistoryIndex == 2,
+                  onTap: () => setState(() => _msmHistoryIndex = 2),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          const Text('MSM History (Men who have sex with men)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildSelectionOption(
-            title: 'Never had sex with a man',
-            isSelected: _msmHistoryIndex == 0,
-            onTap: () => setState(() => _msmHistoryIndex = 0),
-          ),
-          const SizedBox(height: 8),
-          _buildSelectionOption(
-            title: 'Last contact over 3 months ago',
-            isSelected: _msmHistoryIndex == 1,
-            onTap: () => setState(() => _msmHistoryIndex = 1),
-          ),
-          const SizedBox(height: 8),
-          _buildSelectionOption(
-            title: 'Recent contact within 3 months',
-            isSelected: _msmHistoryIndex == 2,
-            onTap: () => setState(() => _msmHistoryIndex = 2),
-          ),
         ],
-        const SizedBox(height: 16),
-        const Text('Recent Sexual Risk', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => setState(() => _hasRecentSexualRisk = !_hasRecentSexualRisk),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Checkbox(
-                  value: _hasRecentSexualRisk,
-                  onChanged: (val) => setState(() => _hasRecentSexualRisk = val ?? false),
-                  activeColor: const Color(0xFF7D1B22),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('Recent sexual risk'),
+              const SizedBox(height: 10),
+              Material(
+                color: _hasRecentSexualRisk ? const Color(0xFFFDF5F5) : RQColors.card,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: _hasRecentSexualRisk ? RQColors.blood : RQColors.hairline,
+                    width: _hasRecentSexualRisk ? 2 : 1.5,
+                  ),
                 ),
-                const SizedBox(width: 4),
-                const Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => setState(() => _hasRecentSexualRisk = !_hasRecentSexualRisk),
                   child: Padding(
-                    padding: EdgeInsets.only(top: 10.0),
-                    child: Text(
-                      'I have had a new sexual partner or multiple partners in the last 3 months.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.3),
+                    padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _hasRecentSexualRisk,
+                          onChanged: (val) => setState(() => _hasRecentSexualRisk = val ?? false),
+                          activeColor: RQColors.blood,
+                        ),
+                        const Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 12, bottom: 8),
+                            child: Text(
+                              "I've had a new partner or more than one partner in the last 3 months.",
+                              style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFD32F2F),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 26),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Almost Ready',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Review your details to ensure eligibility verification matches your government clinical records.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280), height: 1.4),
+              const Text("Leave unchecked if this doesn't apply to you.",
+                  style: TextStyle(fontSize: 12, color: RQColors.muted)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _card(
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(color: RQColors.successTint, shape: BoxShape.circle),
+                child: const Icon(Icons.verified_user_outlined, color: RQColors.success),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("You're almost done",
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: RQColors.ink)),
+                    Text(
+                      widget.isRetake
+                          ? "Next, we'll save your updated answers."
+                          : 'Next, review your answers before we create your account.',
+                      style: const TextStyle(fontSize: 12.5, height: 1.45, color: RQColors.muted),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            SizedBox(
-              width: 56,
-              height: 50,
-              child: OutlinedButton(
-                onPressed: _prevStep,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  padding: EdgeInsets.zero,
-                ),
-                child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF7D1B22)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildPrimaryCTA(
-                title: 'Review Registration Summary',
-                onTap: _nextStep,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
       ],
     );
   }
 
-  Widget _buildBorderedInput({
-    required TextEditingController controller,
-    required String hintText,
-    required IconData icon,
-    bool obscureText = false,
-    Widget? suffixIcon,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
+  // ===========================================================================
+  // Shared building blocks
+  // ===========================================================================
+
+  Widget _card({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: RQColors.card, borderRadius: BorderRadius.circular(20)),
+      child: child,
+    );
+  }
+
+  Widget _cardTitle(String title, {String? subtitle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: RQColors.ink)),
+        if (subtitle != null)
+          Text(subtitle, style: const TextStyle(fontSize: 12, height: 1.4, color: RQColors.muted)),
+      ],
+    );
+  }
+
+  Widget _privacyLine(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline_rounded, size: 15, color: RQColors.success),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: Color(0xFF555555)))),
+        ],
+      ),
+    );
+  }
+
+  Widget _noteBox(
+    IconData icon,
+    String text, {
+    Color background = RQColors.surface,
+    Color iconColor = RQColors.navy,
   }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      validator: validator,
-      autovalidateMode: AutovalidateMode.onUserInteraction,
-      style: const TextStyle(fontSize: 14, color: Color(0xFF1E1E1E), fontWeight: FontWeight.w600),
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        filled: true,
-        fillColor: Colors.white,
-        hintText: hintText,
-        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.normal),
-        prefixIcon: Icon(icon, color: const Color(0xFF7D1B22), size: 20),
-        suffixIcon: suffixIcon,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF7D1B22), width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCrimsonDateButton({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF8A1E26),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.bold),
-            ),
-            const Icon(Icons.calendar_month_rounded, color: Colors.white70, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProcedureOption({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
-            width: 1.4,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
-              color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFF64748B),
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSelectionOption({
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
-            width: 1.4,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF8A1E26) : Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF94A3B8), width: 1.5),
-              ),
-              child: isSelected ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDualChoiceButton(String label, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFCBD5E1),
-            width: 1.2,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : const Color(0xFF334155),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPrimaryCTA({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF8A1E26),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                title,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, letterSpacing: 0.3),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF8A1E26), size: 14),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoBanner(String text) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE2EDFE),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(14)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, color: Color(0xFF1D4ED8), size: 20),
+          Icon(icon, size: 18, color: iconColor),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A), height: 1.35),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, height: 1.45, color: RQColors.ink))),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(IconData icon, String title) {
+  /// Yes / No pair — the chosen one is filled red.
+  Widget _yesNo(bool value, ValueChanged<bool> onChanged) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF7D1B22), size: 20),
+        Expanded(
+          child: SizedBox(
+            height: 44,
+            child: _selectableButton(label: 'Yes', selected: value, filled: true, onTap: () => onChanged(true)),
+          ),
+        ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+        Expanded(
+          child: SizedBox(
+            height: 44,
+            child: _selectableButton(label: 'No', selected: !value, filled: true, onTap: () => onChanged(false)),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildYesNoCard({
-    required String question,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  question,
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF1E1E1E), height: 1.3),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _buildCompactYesNo(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactYesNo({
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildCompactYesNoOption(label: 'Yes', isSelected: value, onTap: () => onChanged(true), isLeft: true),
-          _buildCompactYesNoOption(label: 'No', isSelected: !value, onTap: () => onChanged(false), isLeft: false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactYesNoOption({
+  /// A button that shows a selected state. [filled] = solid red when
+  /// selected (Yes/No); otherwise a red outline on a light tint.
+  Widget _selectableButton({
     required String label,
-    required bool isSelected,
+    required bool selected,
     required VoidCallback onTap,
-    required bool isLeft,
+    IconData? icon,
+    bool filled = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.horizontal(
-        left: isLeft ? const Radius.circular(9) : Radius.zero,
-        right: !isLeft ? const Radius.circular(9) : Radius.zero,
-      ),
-      child: Container(
-        width: 52,
-        height: 34,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : Colors.transparent,
-          borderRadius: BorderRadius.horizontal(
-            left: isLeft ? const Radius.circular(9) : Radius.zero,
-            right: !isLeft ? const Radius.circular(9) : Radius.zero,
-          ),
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    final content = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
+        Flexible(
+          child: Text(label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
         ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : const Color(0xFF6B7280),
-          ),
+      ],
+    );
+    final Widget button;
+    if (selected && filled) {
+      button = ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: RQColors.blood,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          shape: shape,
         ),
-      ),
+        child: content,
+      );
+    } else {
+      button = OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: selected ? const Color(0xFFFDF5F5) : RQColors.card,
+          foregroundColor: selected ? RQColors.blood : RQColors.ink,
+          side: BorderSide(color: selected ? RQColors.blood : RQColors.hairline, width: selected ? 2 : 1.5),
+          minimumSize: Size.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          shape: shape,
+        ),
+        child: content,
+      );
+    }
+    return Semantics(selected: selected, button: true, child: button);
+  }
+
+  Widget _choiceChip({required String label, required bool selected, required VoidCallback onTap}) {
+    return SizedBox(
+      height: 36,
+      child: selected
+          ? ElevatedButton(
+              onPressed: onTap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: RQColors.blood,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: const StadiumBorder(),
+              ),
+              child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            )
+          : OutlinedButton(
+              onPressed: onTap,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: RQColors.ink,
+                side: const BorderSide(color: RQColors.hairline, width: 1.5),
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: const StadiumBorder(),
+              ),
+              child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
     );
   }
 
-  Widget _buildChipToggle({
+  /// Radio-style option card; [expanded] shows under the label when chosen.
+  Widget _optionCard({
     required String label,
-    required bool isSelected,
+    required bool selected,
     required VoidCallback onTap,
+    Widget? expanded,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF8A1E26) : const Color(0xFFE2E8F0),
-            width: 1.2,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF334155),
-          ),
-        ),
+    return Material(
+      color: selected ? const Color(0xFFFDF5F5) : RQColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: selected ? RQColors.blood : RQColors.hairline, width: selected ? 2 : 1.5),
       ),
-    );
-  }
-
-  Widget _buildComfortBanner() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF7D1B22), Color(0xFF3A0C10)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your comfort is our priority.',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Medical professionals are on-site for any questions.',
-                    style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepNavRow({
-    required VoidCallback onPrev,
-    required VoidCallback onNext,
-    String nextLabel = 'Next',
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F3F5),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SizedBox(
-              height: 46,
-              child: OutlinedButton(
-                onPressed: onPrev,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFF7D1B22), width: 1.4),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.arrow_back_rounded, size: 17, color: Color(0xFF7D1B22)),
-                    SizedBox(width: 6),
-                    Text('Prev', style: TextStyle(color: Color(0xFF7D1B22), fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: SizedBox(
-              height: 46,
-              child: ElevatedButton(
-                onPressed: onNext,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8A1E26),
-                  shape: const StadiumBorder(),
-                  elevation: 0,
-                ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                selected: selected,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(nextLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5)),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.arrow_forward_rounded, size: 17, color: Colors.white),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: selected ? RQColors.blood : RQColors.fieldBorder, width: 2),
+                      ),
+                      child: selected
+                          ? Center(
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: const BoxDecoration(color: RQColors.blood, shape: BoxShape.circle),
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                          color: RQColors.ink,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
+              if (selected && expanded != null) ...[const SizedBox(height: 12), expanded],
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Tappable field that shows a picked date, with a calendar icon.
+  Widget _dateField({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+    String? chip,
+  }) {
+    return Material(
+      color: RQColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: RQColors.fieldBorder),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 11, color: RQColors.muted)),
+                    Text(
+                      value != null ? _formatDate(value) : 'Select a date',
+                      style: TextStyle(fontSize: 15, color: value != null ? RQColors.ink : const Color(0xFF9CA3AF)),
+                    ),
+                  ],
+                ),
+              ),
+              if (chip != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: RQColors.surface, borderRadius: BorderRadius.circular(999)),
+                  child: Text(chip, style: const TextStyle(fontSize: 12, color: RQColors.body)),
+                ),
+                const SizedBox(width: 10),
+              ],
+              const Icon(Icons.calendar_month_outlined, size: 20, color: RQColors.muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Two-option segmented control (Female / Male).
+  Widget _segmented({
+    required List<String> labels,
+    required int selectedIndex,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: RQColors.surface, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          for (int i = 0; i < labels.length; i++)
+            Expanded(
+              child: Semantics(
+                selected: i == selectedIndex,
+                button: true,
+                child: Material(
+                  color: i == selectedIndex ? RQColors.card : Colors.transparent,
+                  elevation: i == selectedIndex ? 1 : 0,
+                  borderRadius: BorderRadius.circular(9),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(9),
+                    onTap: () => onChanged(i),
+                    child: SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: Text(
+                          labels[i],
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: i == selectedIndex ? FontWeight.w600 : FontWeight.w500,
+                            color: i == selectedIndex ? RQColors.ink : RQColors.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  /// Outlined form field with its label inside the box (Step 1).
+  Widget _formField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    String? prefixText,
+    TextInputType? keyboardType,
+    bool obscure = false,
+    Widget? suffix,
+    String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
+    TextCapitalization capitalization = TextCapitalization.none,
+  }) {
+    OutlineInputBorder border(Color c, double w) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: c, width: w),
+        );
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscure,
+      validator: validator,
+      onChanged: onChanged,
+      textCapitalization: capitalization,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      style: const TextStyle(fontSize: 15, color: RQColors.ink),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(fontSize: 13, color: RQColors.muted),
+        floatingLabelStyle: const TextStyle(fontSize: 13, color: RQColors.blood, fontWeight: FontWeight.w500),
+        hintStyle: const TextStyle(fontSize: 15, color: Color(0xFF9CA3AF)),
+        prefixText: prefixText != null ? '$prefixText  ' : null,
+        prefixStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: RQColors.ink),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+        suffixIcon: suffix,
+        border: border(RQColors.fieldBorder, 1),
+        enabledBorder: border(RQColors.fieldBorder, 1),
+        focusedBorder: border(RQColors.blood, 2),
+        errorBorder: border(const Color(0xFFB91C1C), 1.5),
+        focusedErrorBorder: border(const Color(0xFFB91C1C), 2),
+      ),
+    );
+  }
+
+  Widget _datePickerTheme(BuildContext context, Widget? child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: RQColors.blood,
+          onPrimary: Colors.white,
+          onSurface: RQColors.ink,
+        ),
+      ),
+      child: child!,
+    );
+  }
+
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _shortDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[d.month - 1]} ${d.day}';
   }
 }
