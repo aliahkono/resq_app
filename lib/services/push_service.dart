@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -30,7 +31,17 @@ class PushService {
   PushService._();
   static final PushService instance = PushService._();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  // Looked up only when actually needed, never while this singleton is being
+  // built. Touching FirebaseMessaging.instance before Firebase.initializeApp()
+  // has succeeded throws [core/no-app] — which is exactly what happens on a
+  // build without google-services.json — and used to crash HomeView the
+  // moment it called PushService.instance.registerDevice().
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
+
+  /// True only once Firebase.initializeApp() has actually succeeded (see
+  /// main.dart). Every public method checks this first, so push quietly
+  /// does nothing on a build with no Firebase project instead of throwing.
+  bool get _firebaseReady => Firebase.apps.isNotEmpty;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
   // Must match AndroidManifest.xml's default_notification_channel_id so a
@@ -56,7 +67,7 @@ class PushService {
   /// after Firebase.initializeApp(). Safe to call more than once.
   Future<void> init(GlobalKey<NavigatorState> navigatorKey) async {
     _navigatorKey = navigatorKey;
-    if (_initialized) return;
+    if (_initialized || !_firebaseReady) return;
     _initialized = true;
 
     await _localNotifications
@@ -144,7 +155,7 @@ class PushService {
   /// these calls depending on platform, and push registration should never
   /// be able to break sign-in.
   Future<void> registerDevice(String donorAuthToken) async {
-    if (donorAuthToken.isEmpty) return;
+    if (donorAuthToken.isEmpty || !_firebaseReady) return;
 
     try {
       final granted = await _requestPermission();
@@ -203,6 +214,7 @@ class PushService {
   Future<void> unregisterDevice(String donorAuthToken) async {
     await _tokenRefreshSub?.cancel();
     _tokenRefreshSub = null;
+    if (!_firebaseReady) return;
     try {
       final fcmToken = await _messaging.getToken();
       if (fcmToken != null && donorAuthToken.isNotEmpty) {
