@@ -332,7 +332,7 @@ class _OtpVerViewState extends State<OtpVerView> {
         donor = verifyResponse['donor'] as Map<String, dynamic>?;
       }
 
-      await SessionStorage.saveToken(sessionToken);
+      await SessionStorage.saveToken(sessionToken, donorId: donor?['id']?.toString());
       _sessionToken = sessionToken;
 
       if (!mounted) return;

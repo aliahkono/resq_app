@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/ver_stats_model.dart';
+import 'package:resq/model/broadcast_notif_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/appointment/active_sched_view.dart';
@@ -19,6 +21,7 @@ import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/notif_service.dart';
 import 'package:resq/services/push_service.dart';
+import 'package:resq/services/local_prefs.dart';
 import 'package:resq/services/realtime_service.dart';
 
 class HomeView extends StatefulWidget {
@@ -114,6 +117,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   ClinicalVitalsRecord? _clinicalVitalsRecord;
   ConfirmedAppointmentData? _confirmedAppointment;
   List<EmergencyBloodRequest> _activeRequests = [];
+  // Raw GET /api/donor/requests result — merged with the donor's own
+  // hospital broadcast notifications into _activeRequests (see
+  // _rebuildActiveRequests).
+  List<EmergencyBloodRequest> _apiRequests = [];
   // The app has no push/WebSocket channel of its own (see
   // didChangeAppLifecycleState's comment below), so a hospital broadcast or
   // appointment update made on the admin dashboard while a donor is
@@ -161,8 +168,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _loadCurrentAppointment();
     _loadOpenRequests();
     _loadDonorProfile();
+    NotificationService().addListener(_rebuildActiveRequests);
     NotificationService().refresh(widget.token);
-    PushService.instance.registerDevice(widget.token);
+    _registerPushIfEnabled();
     // 30s fallback poll — see _pollTimer's own comment for why this is no
     // longer the only mechanism.
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBroadcastData());
@@ -170,9 +178,20 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _realtime.connect(widget.token);
   }
 
+  /// Registers this device for push unless the donor switched "Push App
+  /// Notifications" off in Settings (defaults to on).
+  Future<void> _registerPushIfEnabled() async {
+    final enabled = widget.donorId.isEmpty
+        ? null
+        : await LocalPrefs.getBool(widget.donorId, 'pushNotifications');
+    if (enabled == false) return;
+    PushService.instance.registerDevice(widget.token);
+  }
+
   @override
   void dispose() {
     _pollTimer?.cancel();
+    NotificationService().removeListener(_rebuildActiveRequests);
     _realtime.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -191,6 +210,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     switch (event['type']) {
       case 'blood_request_created':
         _loadOpenRequests();
+        NotificationService().refresh(widget.token);
         break;
       case 'appointment_status_changed':
       case 'donation_completed':
@@ -300,18 +320,68 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final raw = await ApiService.listOpenRequests(widget.token);
       debugPrint('HomeView._loadOpenRequests: got ${raw.length} row(s): $raw');
       if (!mounted) return;
-      setState(() {
-        _activeRequests = raw
-            .cast<Map<String, dynamic>>()
-            .map(_toEmergencyBloodRequest)
-            .toList();
-      });
+      _apiRequests = raw
+          .cast<Map<String, dynamic>>()
+          .map(_toEmergencyBloodRequest)
+          .toList();
+      _rebuildActiveRequests();
     } catch (e, st) {
       // Was silent before — logged now (debugPrint is a no-op cost-wise,
       // stays out of the user's way, but makes failures visible while
       // debugging instead of just always showing "no broadcasts").
       debugPrint('HomeView._loadOpenRequests failed: $e\n$st');
     }
+  }
+
+  /// "Urgent requests near you" (Dashboard) and the Appointment tab's
+  /// active request. GET /api/donor/requests alone missed broadcasts a
+  /// hospital had actually sent this donor (the backend scopes that list
+  /// more narrowly — see NoActiveSchedView's comment), so those only ever
+  /// showed up in the notification bell. This merges in every still-open,
+  /// non-referral broadcast from GET /api/donor/notifications that isn't
+  /// already in the API list, most urgent first.
+  void _rebuildActiveRequests() {
+    if (!mounted) return;
+    final merged = <EmergencyBloodRequest>[..._apiRequests];
+    String key(String hospitalId, String hospital, String bloodType) =>
+        '${hospitalId.isNotEmpty ? hospitalId : hospital.toLowerCase()}|$bloodType';
+    final seen = merged.map((r) => key(r.hospitalId, r.hospital, r.bloodType)).toSet();
+
+    for (final n in NotificationService().notifications) {
+      if (n.isReferral || !n.isStillOpen) continue;
+      final k = key(n.hospitalId ?? '', n.hospitalName, n.bloodType);
+      if (!seen.add(k)) continue;
+      final remaining = (n.unitsNeeded - n.unitsFulfilled).clamp(0, n.unitsNeeded).toInt();
+      merged.add(EmergencyBloodRequest(
+        id: n.id,
+        hospital: n.hospitalName,
+        hospitalId: n.hospitalId ?? '',
+        bloodType: n.bloodType,
+        urgency: switch (n.urgency) {
+          UrgencyLevel.critical => 'CRITICAL',
+          UrgencyLevel.urgent => 'URGENT',
+          UrgencyLevel.normal => 'NORMAL',
+        },
+        distance: n.location,
+        unitsNeeded: remaining,
+        timeAgo: _formatSecondsAgo(math.max(0, DateTime.now().difference(n.timestamp).inSeconds)),
+      ));
+    }
+
+    int rank(String urgency) {
+      final u = urgency.toLowerCase();
+      if (u.contains('crit') || u.contains('emerg')) return 0;
+      if (u.contains('urg') || u.contains('high')) return 1;
+      return 2;
+    }
+
+    // Stable sort: keeps the API's own ordering within the same urgency.
+    final indexed = merged.asMap().entries.toList()
+      ..sort((a, b) {
+        final r = rank(a.value.urgency).compareTo(rank(b.value.urgency));
+        return r != 0 ? r : a.key.compareTo(b.key);
+      });
+    setState(() => _activeRequests = indexed.map((e) => e.value).toList());
   }
 
   EmergencyBloodRequest _toEmergencyBloodRequest(Map<String, dynamic> r) {
@@ -746,11 +816,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           } else {
             return NoActiveSchedView(
               isFirstTimeDonor: _isFirstTime,
-              // Backend already scopes GET /api/donor/requests to PRC-Quezon
-              // Chapter only (see COORDINATING_HOSPITAL_NAME), so the first
-              // entry in _activeRequests — if any — is the one and only
-              // bookable request. No client-side name filtering needed.
-              activeRequest: _activeRequests.isNotEmpty ? _activeRequests.first : null,
+              // Same merged list as the Dashboard's "Urgent requests near
+              // you" (see _rebuildActiveRequests).
+              requests: _activeRequests,
               onBookAppointment: (hospitalId) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -758,7 +826,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                       isFirstTimeDonor: _isFirstTime,
                       token: widget.token,
                       isVerified: _verificationStatus.isVerified,
-                      preselectedHospitalId: hospitalId,
+                      preselectedHospitalId: hospitalId.isNotEmpty ? hospitalId : null,
                       onBookingCompleted: (appointment) {
                         Navigator.pop(context);
                         _handleBookingCompleted(appointment);

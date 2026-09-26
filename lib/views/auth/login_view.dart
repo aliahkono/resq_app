@@ -84,7 +84,16 @@ class AuthService {
       final token = loginResponse['token'] as String;
 
       final profile = await ApiService.getMyProfile(token);
-      await SessionStorage.saveToken(token);
+      // A session kept on-device for biometric login (see
+      // SessionStorage.signOut) is replaced by this new one — end the old
+      // one server-side so it doesn't linger until its 30-day expiry.
+      final previous = await SessionStorage.readToken();
+      if (previous != null && previous != token) {
+        try {
+          await ApiService.logout(previous);
+        } catch (_) {}
+      }
+      await SessionStorage.saveToken(token, donorId: profile['id']?.toString());
 
       return AuthResult(
         success: true,
@@ -181,7 +190,10 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
-    SessionStorage.isBiometricEnabled().then((enabled) async {
+    SessionStorage.isBiometricEnabled().then((biometricOn) async {
+      // Needs a session kept on this phone to sign back into (see
+      // SessionStorage.signOut) — otherwise there's nothing to unlock.
+      final enabled = biometricOn && await SessionStorage.readToken() != null;
       if (!mounted) return;
       setState(() => _biometricAvailable = enabled);
       if (!enabled) return;
@@ -372,7 +384,7 @@ class _LoginViewState extends State<LoginView> {
 
       // 2. UPDATED local_auth implementation for version 3.0.x
       final bool didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Scan fingerprint or enter device PIN to sign in to ResQ',
+        localizedReason: 'Scan your fingerprint or face to sign in to ResQ',
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );

@@ -1,8 +1,10 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:gal/gal.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/services/api_service.dart';
@@ -169,14 +171,63 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     setState(() => _showingBack = !_showingBack);
   }
 
-  void _shareCard() {
-    final tier = _tierFor(widget.completedDonations);
-    final text = 'ResQ Blood Donor Card\n'
-        '${widget.donorName} · ${widget.bloodType}\n'
-        'Donor ID: ${widget.donorCode}\n'
-        'Donations: ${widget.completedDonations} · ${tier.label} (Level ${tier.level})\n'
-        'Verification: ${widget.verificationStatus.label}';
-    SharePlus.instance.share(ShareParams(text: text));
+  // Keys on the front/back faces (see _buildFlipCard) so the visible side
+  // can be captured as an image for "Download".
+  final GlobalKey _frontFaceKey = GlobalKey();
+  final GlobalKey _backFaceKey = GlobalKey();
+  bool _saving = false;
+
+  /// Download: saves the side of the card that's showing as a PNG straight
+  /// into the phone's gallery / Photos (not the share sheet).
+  Future<void> _downloadCard() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      // Let a flip in progress finish so the right face is captured.
+      while (_flipController.isAnimating) {
+        await Future.delayed(const Duration(milliseconds: 60));
+      }
+      final key = _showingBack ? _backFaceKey : _frontFaceKey;
+      final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw StateError('Card not ready');
+      final image = await boundary.toImage(pixelRatio: 4);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw StateError('Could not encode card');
+
+      // Photos permission (iOS, and Android 9 and below).
+      if (!await Gal.hasAccess()) {
+        if (!await Gal.requestAccess()) {
+          _showSnack('Allow ResQ to access your photos to save the card.');
+          return;
+        }
+      }
+
+      final side = _showingBack ? 'back' : 'front';
+      await Gal.putImageBytes(
+        bytes.buffer.asUint8List(),
+        name: 'resq_health_card_${side}_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      _showSnack('Health card saved to your gallery.');
+    } on GalException catch (e) {
+      debugPrint('DigitalHealthCardView: save to gallery failed: ${e.type}');
+      _showSnack(e.type == GalExceptionType.accessDenied
+          ? 'Allow ResQ to access your photos to save the card.'
+          : e.type == GalExceptionType.notEnoughSpace
+              ? 'Not enough storage to save the card.'
+              : 'Could not save the card. Please try again.');
+    } catch (e) {
+      debugPrint('DigitalHealthCardView: download failed: $e');
+      _showSnack('Could not save the card. Please try again.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 
   // Splits a full name into (surname, given names) the way the physical ID
@@ -210,9 +261,15 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
             title: const Text('Digitalized Health Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
             actions: [
               IconButton(
-                onPressed: _shareCard,
-                icon: const Icon(Icons.ios_share_rounded),
-                tooltip: 'Share card details',
+                onPressed: _saving ? null : _downloadCard,
+                tooltip: 'Download card',
+                icon: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_alt_rounded),
               ),
             ],
           ),
@@ -311,11 +368,11 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
               final angle = _flipController.value * math.pi;
               final showFront = angle < math.pi / 2;
               final content = showFront
-                  ? _buildCardFront(tier)
+                  ? RepaintBoundary(key: _frontFaceKey, child: _buildCardFront(tier))
                   : Transform(
                       alignment: Alignment.center,
                       transform: Matrix4.identity()..rotateY(math.pi),
-                      child: _buildCardBack(),
+                      child: RepaintBoundary(key: _backFaceKey, child: _buildCardBack()),
                     );
               return Transform(
                 alignment: Alignment.center,
@@ -920,14 +977,37 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
             ],
           ),
           const SizedBox(height: 10),
+          // Count + label on the left, tier badge on the right. Both sides
+          // can shrink/wrap, so a 2–3 digit count or a long tier name
+          // ("Guardian of Life") never pushes "Life Donations" off screen.
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('$donations blood donation${donations == 1 ? '' : 's'}', style: const TextStyle(fontSize: 13, color: ResQTheme.textMuted, fontWeight: FontWeight.w600)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: ResQTheme.lightPinkTint, borderRadius: BorderRadius.circular(14)),
-                child: Text(tier.label.toUpperCase(), style: const TextStyle(color: ResQTheme.primaryCrimson, fontSize: 10.5, fontWeight: FontWeight.bold)),
+              Text(
+                '$donations',
+                style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: ResQTheme.primaryCrimson, height: 1.0),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  donations == 1 ? 'Life Donation' : 'Life Donations',
+                  maxLines: 2,
+                  style: const TextStyle(fontSize: 14, color: ResQTheme.textDark, fontWeight: FontWeight.w700, height: 1.2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: ResQTheme.lightPinkTint, borderRadius: BorderRadius.circular(14)),
+                  child: Text(
+                    tier.label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: ResQTheme.primaryCrimson, fontSize: 10.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
             ],
           ),
