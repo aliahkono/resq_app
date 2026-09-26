@@ -350,7 +350,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ'),
+          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ', trailing: widget.bloodType),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
