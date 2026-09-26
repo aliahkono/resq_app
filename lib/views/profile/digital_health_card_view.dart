@@ -89,12 +89,38 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   bool _loadingHistory = true;
   String? _signatureUrl;
 
+  // The back face (QR + donation history + MRZ) is naturally taller than
+  // the front (compact identity fields), so flipping used to visibly change
+  // the card's height. We measure the back's real rendered height via a
+  // hidden offstage copy (see build()'s Offstage widget) and lock both
+  // faces to that height, rather than guessing a fixed number that would
+  // drift out of sync whenever the back's content changes (donation
+  // history length, emergency contact set or not, etc).
+  final GlobalKey _backMeasureKey = GlobalKey();
+  double? _cardHeight;
+
   @override
   void initState() {
     super.initState();
     _signatureUrl = widget.signatureUrl;
     _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
     _loadHistory();
+  }
+
+  // Re-measures the hidden back-card copy after every frame and adopts its
+  // height if it changed. Cheap to call on every build: once the measured
+  // height stabilizes (typically the very next frame), this becomes a
+  // no-op since the comparison below stops triggering further setStates.
+  void _scheduleHeightMeasurement() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _backMeasureKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+      final measured = box.size.height;
+      if (_cardHeight == null || (measured - _cardHeight!).abs() > 0.5) {
+        setState(() => _cardHeight = measured);
+      }
+    });
   }
 
   // Opens the signature pad (see signature_pad_view.dart); on a successful
@@ -170,6 +196,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   @override
   Widget build(BuildContext context) {
     final tier = _tierFor(widget.completedDonations);
+    _scheduleHeightMeasurement();
 
     return Scaffold(
       backgroundColor: ResQTheme.bgOffWhite,
@@ -207,6 +234,14 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                 _buildDonationStamps(tier),
                 const SizedBox(height: 16),
                 _buildPriorityAccess(tier),
+                // Invisible but still laid out (Offstage, not hidden via
+                // opacity/size-zero) — same width as the real card thanks
+                // to this shared SliverPadding, so its measured height is
+                // exactly what the real back face would render at.
+                Offstage(
+                  offstage: true,
+                  child: KeyedSubtree(key: _backMeasureKey, child: _buildCardBack()),
+                ),
               ]),
             ),
           ),
@@ -264,26 +299,33 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         alignment: Alignment.topCenter,
-        child: AnimatedBuilder(
-          animation: _flipController,
-          builder: (context, child) {
-            final angle = _flipController.value * math.pi;
-            final showFront = angle < math.pi / 2;
-            final content = showFront
-                ? _buildCardFront(tier)
-                : Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()..rotateY(math.pi),
-                    child: _buildCardBack(),
-                  );
-            return Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, 0.0012)
-                ..rotateY(angle),
-              child: content,
-            );
-          },
+        // Locks both faces to the back's measured height (see
+        // _scheduleHeightMeasurement) so flipping never changes the card's
+        // size — null only very briefly before the first measurement
+        // resolves, during which this just falls back to natural sizing.
+        child: SizedBox(
+          height: _cardHeight,
+          child: AnimatedBuilder(
+            animation: _flipController,
+            builder: (context, child) {
+              final angle = _flipController.value * math.pi;
+              final showFront = angle < math.pi / 2;
+              final content = showFront
+                  ? _buildCardFront(tier)
+                  : Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()..rotateY(math.pi),
+                      child: _buildCardBack(),
+                    );
+              return Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.0012)
+                  ..rotateY(angle),
+                child: content,
+              );
+            },
+          ),
         ),
       ),
     );
@@ -366,6 +408,12 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       decoration: _cardDecoration,
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        // spaceBetween rather than start: the front is naturally shorter
+        // than the back, and the card is now locked to the back's height
+        // (see _cardHeight), so any leftover space is split above/below
+        // the identity fields instead of collecting as a dead gap under
+        // the bottom band.
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ', trailing: widget.bloodType),
           IntrinsicHeight(
