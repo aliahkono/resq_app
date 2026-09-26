@@ -684,7 +684,8 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   }
 
   Widget _buildBracketedQr() {
-    const bracketSize = 72.0;
+    const bracketSize = 96.0;
+    const qrSize = bracketSize - 10; // small margin so the corner brackets stay visible around it
     return SizedBox(
       width: bracketSize,
       height: bracketSize,
@@ -692,11 +693,11 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
         children: [
           Center(
             child: widget.donorCode.isEmpty
-                ? const Icon(Icons.qr_code_2_rounded, size: 56)
+                ? const Icon(Icons.qr_code_2_rounded, size: qrSize)
                 : QrImageView(
                     data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(widget.donorCode)}',
                     version: QrVersions.auto,
-                    size: 56,
+                    size: qrSize,
                     backgroundColor: Colors.transparent,
                   ),
           ),
