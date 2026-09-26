@@ -711,16 +711,20 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // actual name/blood type/birth date/donor code so it's at least
   // consistent with the rest of the card, rather than fabricated digits.
   String _buildMrz(String surname, String given) {
-    String pad(String s, int len) => s.length >= len ? s.substring(0, len) : s.padRight(len, '<');
+    // Pads SHORT values up to a minimum width for the MRZ look — never
+    // truncates real content. A donor whose code happens to be a long UUID
+    // (rather than the usual short "D-1234" form) just gets a longer line
+    // instead of having their name or code cut off mid-string.
+    String minPad(String s, int minLen) => s.length >= minLen ? s : s.padRight(minLen, '<');
     final surnamePart = surname.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
     final givenPart = given.toUpperCase().replaceAll(RegExp(r'\s+'), '<');
-    final line1 = pad('RQD<PHL<$surnamePart<<$givenPart', 30);
+    final line1 = minPad('RQD<PHL<$surnamePart<<$givenPart', 30);
     final codePart = widget.donorCode.toUpperCase().replaceAll('-', '');
     final sexLetter = widget.gender == 'female' ? 'F' : 'M';
     String ymd(DateTime? d) => d == null
         ? '000000'
         : '${(d.year % 100).toString().padLeft(2, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
-    final line2 = pad('RQ$codePart<0<<${ymd(widget.birthDate)}$sexLetter${ymd(widget.memberSince)}', 30);
+    final line2 = minPad('RQ$codePart<0<<${ymd(widget.birthDate)}$sexLetter${ymd(widget.memberSince)}', 30);
     return '$line1\n$line2';
   }
 
