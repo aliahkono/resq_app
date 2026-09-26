@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
@@ -97,12 +99,24 @@ class _OnboardingViewState extends State<OnboardingView>
                 return Positioned(
                   left: parallaxOffset + oscillationOffset - 80,
                   top: MediaQuery.of(context).size.height * 0.22,
-                  child: Image.asset(
-                    'assets/images/GradientWave.png',
-                    height: 380,
-                    fit: BoxFit.fitHeight,
-                    errorBuilder: (context, error, stackTrace) =>
-                    const SizedBox.shrink(),
+                  // Blurred into a soft colour wash so it reads as a
+                  // background glow instead of a hard shape.
+                  child: ImageFiltered(
+                    imageFilter: ui.ImageFilter.blur(
+                      sigmaX: 36,
+                      sigmaY: 36,
+                      tileMode: TileMode.decal,
+                    ),
+                    child: Opacity(
+                      opacity: 0.35,
+                      child: Image.asset(
+                        'assets/images/GradientWave.png',
+                        height: 380,
+                        fit: BoxFit.fitHeight,
+                        errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                      ),
+                    ),
                   ),
                 );
               },
@@ -274,49 +288,33 @@ class OnboardingPage extends StatelessWidget {
 
           const Spacer(),
 
-          // Graphic / Asset Preview Area
+          // Graphic / Asset Preview Area — the illustration sits directly on
+          // the blurred background (no circle frame behind it).
           Center(
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.85),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: ResQTheme.primaryCrimson.withValues(alpha: 0.08),
-                    blurRadius: 32,
-                    spreadRadius: 8,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Image.asset(
-                    data['image']!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.image_outlined,
-                          size: 56,
-                          color: ResQTheme.primaryCrimson.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          data['title']!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: ResQTheme.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+            child: SizedBox(
+              width: 300,
+              height: 270,
+              child: Image.asset(
+                data['image']!,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.image_outlined,
+                      size: 56,
+                      color: ResQTheme.primaryCrimson.withValues(alpha: 0.5),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      data['title']!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: ResQTheme.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

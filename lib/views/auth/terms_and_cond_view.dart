@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resq/services/local_prefs.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
 
@@ -13,6 +14,30 @@ class _TermsAndConditionsViewState extends State<TermsAndConditionsView> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
   bool _isAgreed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreAgreement();
+  }
+
+  /// Restores the checkbox so a donor who already agreed still sees it
+  /// ticked when they come back to this screen.
+  Future<void> _restoreAgreement() async {
+    try {
+      final agreed = await LocalPrefs.getTermsAgreed();
+      if (mounted && agreed) setState(() => _isAgreed = true);
+    } catch (e) {
+      debugPrint('TermsAndConditionsView: could not read agreement: $e');
+    }
+  }
+
+  void _setAgreed(bool value) {
+    setState(() => _isAgreed = value);
+    LocalPrefs.setTermsAgreed(value).catchError(
+      (Object e) => debugPrint('TermsAndConditionsView: could not save agreement: $e'),
+    );
+  }
 
   final List<Map<String, String>> _termsSections = [
     {
@@ -262,17 +287,13 @@ class _TermsAndConditionsViewState extends State<TermsAndConditionsView> {
                         if (isLastStep) ...[
                           const SizedBox(height: 12),
                           InkWell(
-                            onTap: () {
-                              setState(() => _isAgreed = !_isAgreed);
-                            },
+                            onTap: () => _setAgreed(!_isAgreed),
                             child: Row(
                               children: [
                                 Checkbox(
                                   value: _isAgreed,
                                   activeColor: ResQTheme.primaryCrimson,
-                                  onChanged: (val) {
-                                    setState(() => _isAgreed = val ?? false);
-                                  },
+                                  onChanged: (val) => _setAgreed(val ?? false),
                                 ),
                                 const Expanded(
                                   child: Text(
@@ -336,12 +357,19 @@ class _TermsAndConditionsViewState extends State<TermsAndConditionsView> {
                             curve: Curves.easeInOut,
                           );
                         } else {
-                          // Navigate to Landing View
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => const AuthLandingView(),
-                            ),
-                          );
+                          _setAgreed(true);
+                          // Opened from the landing screen: go back to it
+                          // rather than stacking a second copy on top.
+                          final nav = Navigator.of(context);
+                          if (nav.canPop()) {
+                            nav.pop(true);
+                          } else {
+                            nav.pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => const AuthLandingView(),
+                              ),
+                            );
+                          }
                         }
                       },
                       style: ElevatedButton.styleFrom(

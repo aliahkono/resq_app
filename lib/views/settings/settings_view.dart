@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
@@ -108,12 +109,110 @@ class _SettingsViewState extends State<SettingsView> {
     }
     final location = await LocalPrefs.getBool(widget.donorId, 'locationServices');
     final radius = await LocalPrefs.getString(widget.donorId, 'alertRadius');
+    // The saved toggle can be stale if location permission was revoked in
+    // the phone's settings since — only show it as on while it's granted.
+    var locationOn = location ?? false;
+    if (locationOn && !await _hasLocationPermission()) {
+      locationOn = false;
+      LocalPrefs.setBool(widget.donorId, 'locationServices', false);
+    }
     if (!mounted) return;
     setState(() {
       _biometricLogin = biometric;
-      if (location != null) _locationServices = location;
+      _locationServices = locationOn;
       if (radius != null) _selectedRadius = radius;
     });
+  }
+
+  Future<bool> _hasLocationPermission() async {
+    try {
+      final p = await Geolocator.checkPermission();
+      return p == LocationPermission.whileInUse || p == LocationPermission.always;
+    } catch (e) {
+      debugPrint('SettingsView: checkPermission failed: $e');
+      return false;
+    }
+  }
+
+  /// "Use my location" / "Location Services Access" toggle. Turning it on
+  /// asks the OS for location permission (the system "Allow ResQ to access
+  /// this device's location?" prompt) and only stays on if it's granted.
+  /// [refresh] rebuilds the radius bottom sheet when called from there.
+  Future<void> _setLocationServices(bool enable, {VoidCallback? refresh}) async {
+    void apply(bool value) {
+      if (!mounted) return;
+      setState(() => _locationServices = value);
+      refresh?.call();
+      LocalPrefs.setBool(widget.donorId, 'locationServices', value);
+    }
+
+    if (!enable) {
+      apply(false);
+      return;
+    }
+
+    try {
+      // Device-wide location (GPS) switch.
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        final open = await _askToOpenSettings(
+          title: 'Turn on location',
+          message: 'Your phone\'s location is turned off. Turn it on so ResQ can find hospitals near you.',
+        );
+        if (open) await Geolocator.openLocationSettings();
+        if (!await Geolocator.isLocationServiceEnabled()) {
+          apply(false);
+          return;
+        }
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        // Shows the system permission dialog.
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        // The OS won't show the prompt again — the donor has to allow it
+        // from the app's settings page.
+        final open = await _askToOpenSettings(
+          title: 'Location permission needed',
+          message: 'Location access for ResQ is blocked. Allow it in your phone\'s app settings to use your location for urgent alerts.',
+        );
+        if (open) await Geolocator.openAppSettings();
+        apply(false);
+        return;
+      }
+
+      final granted = permission == LocationPermission.whileInUse || permission == LocationPermission.always;
+      apply(granted);
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission was not allowed.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('SettingsView: location permission failed: $e');
+      apply(false);
+    }
+  }
+
+  Future<bool> _askToOpenSettings({required String title, required String message}) async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Not now')),
+          TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Open settings')),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   /// GET /api/donor/me — refreshes name/phone/email and the two real
@@ -263,10 +362,7 @@ class _SettingsViewState extends State<SettingsView> {
                       _buildSwitchTile(
                         title: 'Location Services Access',
                         value: _locationServices,
-                        onChanged: (val) {
-                          setState(() => _locationServices = val);
-                          LocalPrefs.setBool(widget.donorId, 'locationServices', val);
-                        },
+                        onChanged: (val) => _setLocationServices(val),
                       ),
                       const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildRadiusSelectorTile(context),
@@ -711,11 +807,12 @@ class _SettingsViewState extends State<SettingsView> {
                         title: 'Use my location',
                         subtitle: 'Needed to measure distance to hospitals',
                         value: _locationServices,
-                        onChanged: (val) {
-                          setState(() => _locationServices = val);
-                          setModalState(() {});
-                          LocalPrefs.setBool(widget.donorId, 'locationServices', val);
-                        },
+                        onChanged: (val) => _setLocationServices(
+                          val,
+                          refresh: () {
+                            if (ctx.mounted) setModalState(() {});
+                          },
+                        ),
                       ),
                       RQToggleRow(
                         title: 'Also send by SMS',

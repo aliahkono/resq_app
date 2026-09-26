@@ -328,11 +328,19 @@ class DonorProfileView extends StatelessWidget {
             children: [
               const Icon(Icons.psychology_outlined, color: Color(0xFF6B7280), size: 20),
               const SizedBox(width: 8),
-              Text(
-                donations == 0
-                    ? 'First-Time Hero (0 Donations Completed)'
-                    : 'Lifesaving Hero ($donations Donation${donations == 1 ? '' : 's'} Completed)',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
+              // Flexible so a 2–3 digit count wraps onto a second line
+              // instead of overflowing the card.
+              Flexible(
+                child: Text(
+                  donations == 0
+                      ? 'First-Time Hero (0 Donations Completed)'
+                      : 'Lifesaving Hero ($donations Donation${donations == 1 ? '' : 's'} Completed)',
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),

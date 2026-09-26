@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
@@ -88,7 +88,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   final _backKey = GlobalKey();
 
   bool _showBack = false;
-  bool _sharing = false;
+  bool _saving = false;
   TickerFuture? _flipDone;
 
   // Extra fields from GET /api/donor/me + /api/donor/appointments.
@@ -251,12 +251,12 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   }
 
   // ---------------------------------------------------------------------
-  // Download (share the visible side as a PNG)
+  // Download (save the visible side as a PNG to the phone's gallery)
   // ---------------------------------------------------------------------
 
-  Future<void> _downloadCard(Rect? shareOrigin) async {
-    if (_sharing) return;
-    setState(() => _sharing = true);
+  Future<void> _downloadCard() async {
+    if (_saving) return;
+    setState(() => _saving = true);
     try {
       // Only the side facing the user is in the tree, and it swaps halfway
       // through the flip — so finish any flip in progress before capturing.
@@ -280,29 +280,44 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       final image = await boundary.toImage(pixelRatio: 4);
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       if (bytes == null) throw StateError('Could not encode card');
+
+      // Photos / storage permission (iOS "Add to Photos", Android 9 and
+      // below). Newer Android versions don't need one.
+      if (!await Gal.hasAccess()) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          _showSnack('Allow ResQ to access your photos to save the card.');
+          return;
+        }
+      }
+
       final side = _showBack ? 'back' : 'front';
-      final fileName = 'resq_health_card_$side.png';
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile.fromData(bytes.buffer.asUint8List(), mimeType: 'image/png', name: fileName)],
-        fileNameOverrides: [fileName],
-        subject: 'ResQ Digital Health Card',
-        // Required on iPad, where the share sheet is a popover anchored to
-        // the button that opened it.
-        sharePositionOrigin: shareOrigin,
-      ));
+      final stamp = DateTime.now().millisecondsSinceEpoch;
+      await Gal.putImageBytes(
+        bytes.buffer.asUint8List(),
+        name: 'resq_health_card_${side}_$stamp',
+      );
+      _showSnack('Health card saved to your gallery.');
+    } on GalException catch (e) {
+      debugPrint('DigitalHealthCardView: save to gallery failed: ${e.type}');
+      _showSnack(e.type == GalExceptionType.accessDenied
+          ? 'Allow ResQ to access your photos to save the card.'
+          : e.type == GalExceptionType.notEnoughSpace
+              ? 'Not enough storage to save the card.'
+              : 'Could not save the card. Please try again.');
     } catch (e) {
       debugPrint('DigitalHealthCardView: download failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save the card. Please try again.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      _showSnack('Could not save the card. Please try again.');
     } finally {
-      if (mounted) setState(() => _sharing = false);
+      if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 
   // ---------------------------------------------------------------------
@@ -397,24 +412,16 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
             // Figma places a ~26px tray-download glyph 26px from the right edge.
             Padding(
               padding: const EdgeInsets.only(right: 14),
-              child: Builder(
-                builder: (buttonContext) => IconButton(
-                  tooltip: 'Download card',
-                  onPressed: _sharing
-                      ? null
-                      : () {
-                          final box = buttonContext.findRenderObject() as RenderBox?;
-                          final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
-                          _downloadCard(origin);
-                        },
-                  icon: _sharing
+              child: IconButton(
+                tooltip: 'Download card',
+                  onPressed: _saving ? null : _downloadCard,
+                  icon: _saving
                       ? const SizedBox(
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                         )
                       : const Icon(Icons.save_alt_rounded, color: Colors.white, size: 32),
-                ),
               ),
             ),
           ],
@@ -593,54 +600,76 @@ class _DonationStampsCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          // Count + label + tier badge. The label and badge are stacked in
+          // their own column so a long tier name (e.g. "Guardian of Life")
+          // or a 2–3 digit count never squeezes the label off screen.
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Text(
+                '$donations',
+                style: GoogleFonts.poppins(fontSize: 48, fontWeight: FontWeight.w600, color: _crimson, height: 1.0),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '$donations',
-                      style: GoogleFonts.poppins(fontSize: 48, fontWeight: FontWeight.w600, color: _crimson, height: 1.0),
+                      donations == 1 ? 'Life Donation' : 'Life Donations',
+                      maxLines: 2,
+                      softWrap: true,
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: _heading, height: 1.25),
                     ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        donations == 1 ? 'blood donation' : 'blood donations',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w500, color: _body),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: _pinkTint, borderRadius: BorderRadius.circular(999)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.workspace_premium_rounded, size: 14, color: _crimson),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              (current?.name ?? 'First-Time Hero').toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(fontSize: 10.5, fontWeight: FontWeight.w700, color: _crimson, letterSpacing: 0.5),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: _pinkTint, borderRadius: BorderRadius.circular(999)),
-                child: Text(
-                  (current?.name ?? 'First-Time Hero').toUpperCase(),
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w700, color: _crimson, letterSpacing: 0.5),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (slotCount > 0) ...[
-            Wrap(
-              spacing: 26,
-              runSpacing: 10,
-              children: [
-                for (var i = 1; i <= slotCount; i++)
-                  i <= donations
-                      ? const _FilledStamp()
-                      : _EmptyStamp(number: i, isGoal: i == target && next != null),
-              ],
+            // Five stamps per row, sized to the card width so they line up
+            // evenly on every screen size.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const perRow = 5;
+                const gap = 10.0;
+                final size = ((constraints.maxWidth - gap * (perRow - 1)) / perRow).clamp(36.0, 50.0);
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (var i = 1; i <= slotCount; i++)
+                      i <= donations
+                          ? _FilledStamp(size: size)
+                          : _EmptyStamp(number: i, isGoal: i == target && next != null, size: size),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
           ],
           Container(
             height: 6,
@@ -682,15 +711,17 @@ class _DonationStampsCard extends StatelessWidget {
 }
 
 class _FilledStamp extends StatelessWidget {
-  const _FilledStamp();
+  final double size;
+
+  const _FilledStamp({this.size = 50});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 50,
-      height: 50,
+      width: size,
+      height: size,
       decoration: const BoxDecoration(color: _crimson, shape: BoxShape.circle),
-      child: const Icon(Icons.water_drop_rounded, color: Colors.white, size: 24),
+      child: Icon(Icons.water_drop_rounded, color: Colors.white, size: size * 0.48),
     );
   }
 }
@@ -698,8 +729,9 @@ class _FilledStamp extends StatelessWidget {
 class _EmptyStamp extends StatelessWidget {
   final int number;
   final bool isGoal;
+  final double size;
 
-  const _EmptyStamp({required this.number, required this.isGoal});
+  const _EmptyStamp({required this.number, required this.isGoal, this.size = 50});
 
   @override
   Widget build(BuildContext context) {
@@ -707,8 +739,8 @@ class _EmptyStamp extends StatelessWidget {
     return CustomPaint(
       painter: _DashedCirclePainter(color: color, strokeWidth: 1.5),
       child: SizedBox(
-        width: 50,
-        height: 50,
+        width: size,
+        height: size,
         child: Center(
           child: Text(
             '$number',
