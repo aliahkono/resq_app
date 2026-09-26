@@ -283,19 +283,28 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   Widget _bandText(String text, {String? trailing}) {
     return Container(
       color: _band,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.clip,
-              style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+            // FittedBox scales the whole line down to fit rather than
+            // hard-clipping mid-word — the band was previously cutting text
+            // off abruptly (e.g. ending on a dangling "·") whenever the
+            // phrase was a hair too wide for the available space.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                text,
+                maxLines: 1,
+                style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
             ),
           ),
-          if (trailing != null)
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
             Text(trailing, style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+          ],
         ],
       ),
     );
@@ -317,7 +326,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ  ·  BLOOD DONOR  ·  DONOR NG DUGO'),
+          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ'),
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -327,7 +336,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
               ],
             ),
           ),
-          _bandText('SAVE A LIFE  ·  MAGSAVE NG BUHAY  ·  RESQ  ·  SAVE A LIFE  ·  MAGSAVE NG BUHAY'),
+          _bandText('OFFICIAL BLOOD DONOR IDENTIFICATION  ·  NON-TRANSFERABLE  ·  RESQ NETWORK'),
         ],
       ),
     );
