@@ -297,17 +297,41 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
               child: Text(
                 text,
                 maxLines: 1,
-                style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
             ),
           ),
           if (trailing != null) ...[
             const SizedBox(width: 8),
-            Text(trailing, style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+            // Capped to its own small box (not left to grow with the
+            // content) — a donor whose code happens to be a long UUID
+            // rather than the usual short "D-1234" form was otherwise
+            // dwarfing the actual "if found" instructions next to it.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 78),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  trailing,
+                  maxLines: 1,
+                  style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
           ],
         ],
       ),
     );
+  }
+
+  // Short, unique-per-donor label for the back band's badge — the donor's
+  // real code (hyphens stripped), capped to 10 characters. Full code is
+  // still shown in full on the front ("Donor ID") and in the MRZ strip
+  // below; this is just a compact tag, not a separate identifier.
+  String get _shortDonorCode {
+    final stripped = widget.donorCode.toUpperCase().replaceAll('-', '');
+    return stripped.length > 10 ? stripped.substring(0, 10) : stripped;
   }
 
   // Physical-ID-card-style front: photo/signature column on the left (with
@@ -560,7 +584,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _bandText('IF FOUND · KUNG NATAGPUAN · RETURN TO ANY RESQ PARTNER BLOOD BANK', trailing: widget.donorCode),
+          _bandText('IF FOUND · KUNG NATAGPUAN · RETURN TO ANY RESQ PARTNER BLOOD BANK', trailing: _shortDonorCode),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Row(
@@ -681,10 +705,29 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
           Container(
             width: double.infinity,
             color: const Color(0xFFF0EDE7),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Text(
-              _buildMrz(surname, given),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 7.5, color: Color(0xFF5B5648), height: 1.5),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            // Each line is stretched to fill the full card width (rather
+            // than sitting small and left-hugging) via BoxFit.fitWidth —
+            // so it looks right regardless of how long the donor's actual
+            // name/code happen to be, instead of tuning a fixed font size
+            // that only looks right for one particular donor's data.
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _buildMrz(surname, given)
+                  .map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: FittedBox(
+                        fit: BoxFit.fitWidth,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          line,
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF5B5648), letterSpacing: 1),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -719,22 +762,27 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // Decorative only (not a real scannable MRZ) — built from the donor's
   // actual name/blood type/birth date/donor code so it's at least
   // consistent with the rest of the card, rather than fabricated digits.
-  String _buildMrz(String surname, String given) {
-    // Pads SHORT values up to a minimum width for the MRZ look — never
-    // truncates real content. A donor whose code happens to be a long UUID
-    // (rather than the usual short "D-1234" form) just gets a longer line
-    // instead of having their name or code cut off mid-string.
+  // Decorative MRZ-style strip — built entirely from this donor's own real
+  // fields (name, donor code, gender, birth date, membership date), so it's
+  // already unique per donor rather than a shared placeholder; two donors
+  // only ever produce the same lines if they share the same name AND the
+  // same donor code, which can't happen (donor_code is unique in the DB).
+  // Each returned line is rendered stretched to the full card width (see
+  // the FittedBox(fit: fitWidth) at the call site) rather than left small
+  // and left-hugging, and padding only ever extends a short value — it
+  // never truncates real content.
+  List<String> _buildMrz(String surname, String given) {
     String minPad(String s, int minLen) => s.length >= minLen ? s : s.padRight(minLen, '<');
     final surnamePart = surname.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
     final givenPart = given.toUpperCase().replaceAll(RegExp(r'\s+'), '<');
-    final line1 = minPad('RQD<PHL<$surnamePart<<$givenPart', 30);
+    final line1 = minPad('RQD<PHL<$surnamePart<<$givenPart', 34);
     final codePart = widget.donorCode.toUpperCase().replaceAll('-', '');
     final sexLetter = widget.gender == 'female' ? 'F' : 'M';
     String ymd(DateTime? d) => d == null
         ? '000000'
         : '${(d.year % 100).toString().padLeft(2, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
-    final line2 = minPad('RQ$codePart<0<<${ymd(widget.birthDate)}$sexLetter${ymd(widget.memberSince)}', 30);
-    return '$line1\n$line2';
+    final line2 = minPad('RQ$codePart<0<<${ymd(widget.birthDate)}$sexLetter${ymd(widget.memberSince)}', 34);
+    return [line1, line2];
   }
 
   Widget _buildDonationStamps(_DonorTier tier) {
