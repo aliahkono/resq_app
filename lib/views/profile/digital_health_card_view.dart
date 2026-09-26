@@ -460,7 +460,6 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
               child: Column(
                 children: [
                   Expanded(
-                    flex: 3,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
@@ -493,39 +492,44 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     ),
                   ),
                   const SizedBox(height: 5),
-                  // Given a real fraction of the column's height (was a
-                  // cramped fixed 22px) — a signature needs room to actually
-                  // read, not just a token sliver under the photo.
-                  Expanded(
-                    flex: 2,
-                    child: GestureDetector(
-                      onTap: _openSignaturePad,
-                      child: Container(
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: ResQTheme.lightBorder),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: (_signatureUrl != null && _signatureUrl!.isNotEmpty)
-                            ? Padding(
-                                padding: const EdgeInsets.all(2),
-                                child: Image.network(
-                                  _signatureUrl!,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) => Text(
-                                    'Signature · Lagda',
-                                    style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted),
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                'Tap to\nsign · Lagda',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 7, color: ResQTheme.textMuted, height: 1.2),
-                              ),
+                  // A fixed height, not Expanded/flex — this Column sits
+                  // inside an IntrinsicHeight (see _buildCardFront), which
+                  // computes a shared row height from its children's
+                  // intrinsic sizes; two competing flexible children here
+                  // (this and the photo above) threw that computation off
+                  // and caused a real overflow ("bottom overflowed by NN
+                  // pixels", the yellow/black hazard-stripe indicator).
+                  // Bigger than the original cramped 22px so a drawn
+                  // signature is actually legible, without touching the
+                  // flex/intrinsic-sizing interaction that broke last time.
+                  GestureDetector(
+                    onTap: _openSignaturePad,
+                    child: Container(
+                      height: 42,
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: ResQTheme.lightBorder),
+                        borderRadius: BorderRadius.circular(5),
                       ),
+                      child: (_signatureUrl != null && _signatureUrl!.isNotEmpty)
+                          ? Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Image.network(
+                                _signatureUrl!,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => Text(
+                                  'Signature · Lagda',
+                                  style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted),
+                                ),
+                              ),
+                            )
+                          : Text(
+                              'Tap to\nsign · Lagda',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 7, color: ResQTheme.textMuted, height: 1.2),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 4),
