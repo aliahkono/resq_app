@@ -460,6 +460,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
               child: Column(
                 children: [
                   Expanded(
+                    flex: 3,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
@@ -492,34 +493,46 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     ),
                   ),
                   const SizedBox(height: 5),
-                  GestureDetector(
-                    onTap: _openSignaturePad,
-                    child: Container(
-                      height: 22,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: ResQTheme.lightBorder),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: (_signatureUrl != null && _signatureUrl!.isNotEmpty)
-                          ? Image.network(
-                              _signatureUrl!,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => Text(
-                                'Signature · Lagda',
-                                style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted),
+                  // Given a real fraction of the column's height (was a
+                  // cramped fixed 22px) — a signature needs room to actually
+                  // read, not just a token sliver under the photo.
+                  Expanded(
+                    flex: 2,
+                    child: GestureDetector(
+                      onTap: _openSignaturePad,
+                      child: Container(
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: ResQTheme.lightBorder),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: (_signatureUrl != null && _signatureUrl!.isNotEmpty)
+                            ? Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: Image.network(
+                                  _signatureUrl!,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Text(
+                                    'Signature · Lagda',
+                                    style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                'Tap to\nsign · Lagda',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 7, color: ResQTheme.textMuted, height: 1.2),
                               ),
-                            )
-                          : Text('Tap to sign · Lagda', style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted)),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Keep this card with you. Present at every blood donation.',
+                    'Keep this card with you.',
                     textAlign: TextAlign.center,
-                    maxLines: 3,
+                    maxLines: 1,
                     style: TextStyle(fontSize: 6, color: ResQTheme.textMuted, height: 1.2),
                   ),
                 ],
