@@ -685,7 +685,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
 
   Widget _buildBracketedQr() {
     const bracketSize = 96.0;
-    const qrSize = bracketSize - 10; // small margin so the corner brackets stay visible around it
+    const qrSize = bracketSize; // flush with the corner brackets, no gap
     return SizedBox(
       width: bracketSize,
       height: bracketSize,
