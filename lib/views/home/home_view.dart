@@ -734,6 +734,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           screeningModel: _currentScreeningModel,
           token: widget.token,
           onRetakeCompleted: _handleRetakeCompleted,
+          completedDonations: _effectiveDonations,
         );
       case 1:
         if (_effectiveResult.isEligible) {

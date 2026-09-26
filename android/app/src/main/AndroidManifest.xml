@@ -17,10 +17,21 @@
          (see notif_service.dart). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- "Use my location" (Settings > alert radius) — requested at runtime
+         through geolocator when the donor turns the toggle on. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Saving the Digital Health Card to the gallery (gal). Only needed on
+         Android 9 and below; newer versions save without a permission. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
     <application
         android:label="resq"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name="com.example.resq.MainActivity"
             android:exported="true"

@@ -4,6 +4,10 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
     <string>ResQ uses your camera to take a profile photo and to capture ID photos during donor verification.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>ResQ saves your Digital Health Card to your Photos when you tap Download.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>ResQ uses your location to send you urgent blood requests from hospitals near you.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>ResQ uses your photo library to set a profile photo.</string>
     <key>NSFaceIDUsageDescription</key>

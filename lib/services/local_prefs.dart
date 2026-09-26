@@ -24,4 +24,15 @@ class LocalPrefs {
       _storage.write(key: _key(donorId, name), value: value);
 
   static Future<String?> getString(String donorId, String name) => _storage.read(key: _key(donorId, name));
+
+  // Device-wide flags for screens shown before anyone is signed in (so
+  // there is no donor id to key them by yet), e.g. the Terms & Conditions
+  // agreement checkbox.
+  static const _termsAgreedKey = 'resq_device_terms_agreed';
+
+  static Future<void> setTermsAgreed(bool value) =>
+      _storage.write(key: _termsAgreedKey, value: value.toString());
+
+  static Future<bool> getTermsAgreed() async =>
+      (await _storage.read(key: _termsAgreedKey)) == 'true';
 }
