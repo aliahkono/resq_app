@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
+import 'package:resq/views/profile/signature_pad_view.dart';
 
 /// Donation-count tiers shown on the card + the Priority Blood Access
 /// section below it — matches the Figma "Digitalized Health Card" design.
@@ -49,6 +50,7 @@ class DigitalHealthCardView extends StatefulWidget {
   final String donorCode;
   final String bloodType;
   final String? photoUrl;
+  final String? signatureUrl;
   final int completedDonations;
   final VerificationStatus verificationStatus;
   final bool isEligible;
@@ -65,6 +67,7 @@ class DigitalHealthCardView extends StatefulWidget {
     required this.donorCode,
     required this.bloodType,
     this.photoUrl,
+    this.signatureUrl,
     required this.completedDonations,
     required this.verificationStatus,
     required this.isEligible,
@@ -84,12 +87,26 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   bool _showingBack = false;
   List<Map<String, dynamic>> _history = [];
   bool _loadingHistory = true;
+  String? _signatureUrl;
 
   @override
   void initState() {
     super.initState();
+    _signatureUrl = widget.signatureUrl;
     _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
     _loadHistory();
+  }
+
+  // Opens the signature pad (see signature_pad_view.dart); on a successful
+  // save it returns the new hosted signature URL, which we show on the
+  // card immediately without needing to reload the whole profile.
+  Future<void> _openSignaturePad() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => SignaturePadView(token: widget.token)),
+    );
+    if (result != null && result.isNotEmpty && mounted) {
+      setState(() => _signatureUrl = result);
+    }
   }
 
   @override
@@ -401,21 +418,54 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                         color: const Color(0xFFE5E0D8),
                         width: double.infinity,
                         child: (widget.photoUrl != null && widget.photoUrl!.isNotEmpty)
-                            ? Image.network(widget.photoUrl!, fit: BoxFit.cover)
+                            ? Image.network(
+                                widget.photoUrl!,
+                                fit: BoxFit.cover,
+                                // A transient load failure (e.g. slow
+                                // network on first open) shouldn't show
+                                // Flutter's default red error glyph — fall
+                                // back to the same placeholder as "no photo
+                                // set" instead.
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return const Center(
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(Icons.person_rounded, color: Color(0xFFAFA89C), size: 34),
+                              )
                             : const Icon(Icons.person_rounded, color: Color(0xFFAFA89C), size: 34),
                       ),
                     ),
                   ),
                   const SizedBox(height: 5),
-                  Container(
-                    height: 22,
-                    width: double.infinity,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: ResQTheme.lightBorder),
-                      borderRadius: BorderRadius.circular(5),
+                  GestureDetector(
+                    onTap: _openSignaturePad,
+                    child: Container(
+                      height: 22,
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: ResQTheme.lightBorder),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: (_signatureUrl != null && _signatureUrl!.isNotEmpty)
+                          ? Image.network(
+                              _signatureUrl!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Text(
+                                'Signature · Lagda',
+                                style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted),
+                              ),
+                            )
+                          : Text('Tap to sign · Lagda', style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted)),
                     ),
-                    child: Text('Signature · Lagda', style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted)),
                   ),
                   const SizedBox(height: 4),
                   Text(

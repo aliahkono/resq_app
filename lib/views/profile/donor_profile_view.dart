@@ -28,6 +28,7 @@ class DonorProfileView extends StatelessWidget {
   // admin actually marks an appointment completed.
   final int completedDonations;
   final String? photoUrl;
+  final String? signatureUrl;
   final ValueChanged<String>? onPhotoUpdated;
   final VerificationStatus verificationStatus;
   final DateTime? lastDonationAt;
@@ -50,6 +51,7 @@ class DonorProfileView extends StatelessWidget {
     this.token = '',
     this.completedDonations = 0,
     this.photoUrl,
+    this.signatureUrl,
     this.onPhotoUpdated,
     this.verificationStatus = VerificationStatus.notStarted,
     this.lastDonationAt,
@@ -616,6 +618,7 @@ class DonorProfileView extends StatelessWidget {
                   donorCode: donorId,
                   bloodType: bloodType.isNotEmpty ? bloodType : 'A+',
                   photoUrl: photoUrl,
+                  signatureUrl: signatureUrl,
                   completedDonations: completedDonations,
                   verificationStatus: verificationStatus,
                   isEligible: isEligible,

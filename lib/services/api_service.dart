@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 /// Base URL of the ResQ backend (server/src/app.js in the hospital-web-dashboard
@@ -240,6 +241,29 @@ class ApiService {
     final url = body['photoUrl'] as String?;
     if (url == null || url.isEmpty) {
       throw ApiException(response.statusCode, 'Upload succeeded but no photo URL was returned.');
+    }
+    return url;
+  }
+
+  /// POST /api/donor/me/signature — multipart upload of the donor's drawn
+  /// signature (a PNG exported from signature_pad_view.dart), returning the
+  /// new hosted URL. Same bytea-on-donors-row storage as the profile photo
+  /// (see migration 019 and donorPortal.controller.js), just uploaded from
+  /// in-memory bytes rather than a file path since the signature is drawn
+  /// on-canvas and never touches disk.
+  static Future<String> uploadSignature(String token, Uint8List pngBytes) async {
+    final uri = Uri.parse('$kApiBaseUrl/donor/me/signature');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(http.MultipartFile.fromBytes('signature', pngBytes, filename: 'signature.png'));
+
+    final streamedResponse = await request.send().timeout(_timeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    final body = _decode(response);
+
+    final url = body['signatureUrl'] as String?;
+    if (url == null || url.isEmpty) {
+      throw ApiException(response.statusCode, 'Upload succeeded but no signature URL was returned.');
     }
     return url;
   }

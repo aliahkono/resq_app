@@ -76,6 +76,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   // was signed in.
   int _completedDonations = 0;
   String? _photoUrl;
+  String? _signatureUrl;
   VerificationStatus _verificationStatus = VerificationStatus.notStarted;
   DateTime? _lastDonationAt;
   // When this donor account was created (donors.created_at) — the Digital
@@ -367,6 +368,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final raw = profile['completedDonations'];
       final completed = raw is num ? raw.toInt() : 0;
       final photoUrl = profile['photoUrl'] as String?;
+      final signatureUrl = profile['signatureUrl'] as String?;
       final verification = verificationStatusFromString(profile['verificationStatus'] as String?);
       final lastDonationAtStr = profile['lastDonationAt'] as String?;
       final lastDonationAt = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
@@ -378,6 +380,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       setState(() {
         _completedDonations = completed;
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
+        _signatureUrl = (signatureUrl != null && signatureUrl.isNotEmpty) ? signatureUrl : _signatureUrl;
         _verificationStatus = verification;
         _lastDonationAt = lastDonationAt ?? _lastDonationAt;
         _memberSince = memberSince ?? _memberSince;
@@ -685,6 +688,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 donorCode: activeDonorId,
                 bloodType: activeBloodType,
                 photoUrl: _photoUrl,
+                signatureUrl: _signatureUrl,
                 completedDonations: _effectiveDonations,
                 verificationStatus: _verificationStatus,
                 isEligible: _effectiveResult.isEligible,
@@ -784,6 +788,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           clinicalVitals: _clinicalVitalsRecord,
           completedDonations: _effectiveDonations,
           photoUrl: _photoUrl,
+          signatureUrl: _signatureUrl,
           onPhotoUpdated: (url) => setState(() => _photoUrl = url),
           verificationStatus: _verificationStatus,
           lastDonationAt: _lastDonationAt,
