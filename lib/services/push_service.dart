@@ -30,7 +30,15 @@ class PushService {
   PushService._();
   static final PushService instance = PushService._();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  // A getter, not an eager field: `FirebaseMessaging.instance` itself
+  // throws if Firebase.initializeApp() never succeeded (e.g. no Firebase
+  // web config when running on Chrome, or a build with no
+  // google-services.json yet). Every call site below already wraps its
+  // own use of _messaging in a try/catch, but an eager field initializer
+  // would throw the moment this singleton is first constructed —
+  // uncaught, since that first construction can happen from a plain
+  // (non-try/catch) call site like home_view.dart's initState.
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
   // Must match AndroidManifest.xml's default_notification_channel_id so a
