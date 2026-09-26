@@ -2,15 +2,18 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import 'package:resq/services/api_service.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 
 /// A finger-drawn signature pad for the Digital Health Card's "Signature ·
-/// Lagda" box. Draws strokes on a plain canvas, exports them as a PNG
-/// (transparent background, ink only) via RenderRepaintBoundary, uploads it
-/// through ApiService.uploadSignature, and pops back with the resulting
+/// Lagda" box. Draws strokes on a plain canvas and, on save, replays just
+/// those strokes onto a small offscreen canvas cropped tightly to their
+/// bounding box (see _exportPng) rather than capturing the whole drawing
+/// pad — the pad itself is much bigger than the signature box on the card,
+/// so exporting the full (mostly blank) canvas made the actual ink look
+/// tiny once it was scaled down to fit there. Uploads the cropped PNG
+/// through ApiService.uploadSignature and pops back with the resulting
 /// hosted URL so the caller can update the card immediately.
 class SignaturePadView extends StatefulWidget {
   final String token;
@@ -22,7 +25,6 @@ class SignaturePadView extends StatefulWidget {
 }
 
 class _SignaturePadViewState extends State<SignaturePadView> {
-  final GlobalKey _boundaryKey = GlobalKey();
   final List<List<Offset>> _strokes = [];
   List<Offset>? _currentStroke;
   bool _saving = false;
@@ -55,15 +57,7 @@ class _SignaturePadViewState extends State<SignaturePadView> {
     if (!_hasContent || _saving) return;
     setState(() => _saving = true);
     try {
-      final boundary = _boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw Exception('Could not capture the signature.');
-      // 3x pixel ratio so the exported PNG stays crisp on the card even
-      // though the drawing surface itself is comparatively small.
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception('Could not export the signature image.');
-      final pngBytes = byteData.buffer.asUint8List();
-
+      final pngBytes = await _exportPng();
       final url = await ApiService.uploadSignature(widget.token, pngBytes);
       if (!mounted) return;
       Navigator.of(context).pop(url);
@@ -75,6 +69,67 @@ class _SignaturePadViewState extends State<SignaturePadView> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  // Replays the drawn strokes onto a small offscreen canvas cropped to
+  // their bounding box (plus a small margin), instead of capturing the
+  // whole drawing pad. The pad is a big screen-sized rectangle so the
+  // donor has room to draw comfortably, but the card's signature box is
+  // tiny — exporting the full pad meant almost the entire image was blank,
+  // and BoxFit.contain on the card shrank that whole blank canvas down,
+  // making the actual ink barely visible. Cropping first means the ink
+  // fills the exported image, which is what actually gets scaled to fit
+  // the card.
+  Future<Uint8List> _exportPng() async {
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = -double.infinity, maxY = -double.infinity;
+    for (final stroke in _strokes) {
+      for (final point in stroke) {
+        if (point.dx < minX) minX = point.dx;
+        if (point.dy < minY) minY = point.dy;
+        if (point.dx > maxX) maxX = point.dx;
+        if (point.dy > maxY) maxY = point.dy;
+      }
+    }
+    if (!minX.isFinite) throw Exception('Nothing was drawn.');
+
+    const margin = 20.0;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    final width = maxX - minX;
+    final height = maxY - minY;
+
+    const scale = 4.0; // crisp on the card despite the small crop
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(scale);
+    final paint = Paint()
+      ..color = ResQTheme.textDark
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (final stroke in _strokes) {
+      final shifted = stroke.map((p) => p.translate(-minX, -minY)).toList();
+      if (shifted.length < 2) {
+        if (shifted.isNotEmpty) {
+          canvas.drawCircle(shifted.first, 1.5, Paint()..color = ResQTheme.textDark);
+        }
+        continue;
+      }
+      final path = Path()..moveTo(shifted.first.dx, shifted.first.dy);
+      for (final point in shifted.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage((width * scale).ceil(), (height * scale).ceil());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) throw Exception('Could not export the signature image.');
+    return byteData.buffer.asUint8List();
   }
 
   @override
@@ -103,16 +158,13 @@ class _SignaturePadViewState extends State<SignaturePadView> {
                   clipBehavior: Clip.antiAlias,
                   child: Stack(
                     children: [
-                      RepaintBoundary(
-                        key: _boundaryKey,
-                        child: GestureDetector(
-                          onPanStart: _onPanStart,
-                          onPanUpdate: _onPanUpdate,
-                          onPanEnd: _onPanEnd,
-                          child: CustomPaint(
-                            painter: _SignaturePainter(_strokes),
-                            size: Size.infinite,
-                          ),
+                      GestureDetector(
+                        onPanStart: _onPanStart,
+                        onPanUpdate: _onPanUpdate,
+                        onPanEnd: _onPanEnd,
+                        child: CustomPaint(
+                          painter: _SignaturePainter(_strokes),
+                          size: Size.infinite,
                         ),
                       ),
                       if (!_hasContent)
