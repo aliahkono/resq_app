@@ -82,6 +82,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   // Health Card's "issued" date. Not shown anywhere else, so it's only
   // fetched/stored here rather than threaded through registration/login.
   DateTime? _memberSince;
+  // Digital Health Card fields (migration 018) — optional, edited from
+  // Settings; blank/null until a donor fills them in there.
+  DateTime? _birthDate;
+  String? _gender;
+  String _emergencyContactName = '';
+  String _emergencyContactPhone = '';
 
   /// What the Lifetime Impact Record / Community Impact / Lifesaving Hero
   /// cards should actually show. Two bugs reported together here (checklist
@@ -366,6 +372,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final lastDonationAt = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
       final memberSinceStr = profile['memberSince'] as String?;
       final memberSince = memberSinceStr != null ? DateTime.tryParse(memberSinceStr) : null;
+      final birthDateStr = profile['birthDate'] as String?;
+      final birthDate = birthDateStr != null ? DateTime.tryParse(birthDateStr) : null;
       if (!mounted) return;
       setState(() {
         _completedDonations = completed;
@@ -373,6 +381,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         _verificationStatus = verification;
         _lastDonationAt = lastDonationAt ?? _lastDonationAt;
         _memberSince = memberSince ?? _memberSince;
+        _birthDate = birthDate ?? _birthDate;
+        _gender = (profile['gender'] as String?) ?? _gender;
+        _emergencyContactName = (profile['emergencyContactName'] as String?) ?? _emergencyContactName;
+        _emergencyContactPhone = (profile['emergencyContactPhone'] as String?) ?? _emergencyContactPhone;
         // _isFirstTime is deliberately left alone here — it's governed by
         // the donor's own screening self-report (screensNPT.isFirstTimeDonor,
         // set at registration or retake), not silently overridden by
@@ -677,6 +689,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 verificationStatus: _verificationStatus,
                 isEligible: _effectiveResult.isEligible,
                 memberSince: _memberSince,
+                birthDate: _birthDate,
+                gender: _gender,
+                emergencyContactName: _emergencyContactName,
+                emergencyContactPhone: _emergencyContactPhone,
               ),
             ),
           ),
@@ -772,6 +788,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           verificationStatus: _verificationStatus,
           lastDonationAt: _lastDonationAt,
           memberSince: _memberSince,
+          birthDate: _birthDate,
+          gender: _gender,
+          emergencyContactName: _emergencyContactName,
+          emergencyContactPhone: _emergencyContactPhone,
         );
       default:
         return const SizedBox.shrink();

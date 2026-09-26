@@ -71,6 +71,11 @@ class _SettingsViewState extends State<SettingsView> {
   late String _name;
   late String _phone;
   late String _email;
+  // Digital Health Card fields (migration 018) — optional, shown on the
+  // card's front/back once set here.
+  DateTime? _birthDate;
+  String _emergencyContactName = '';
+  String _emergencyContactPhone = '';
 
   // Location & Emergency Radius — no geofencing feature on the backend
   // (hospitals aren't matched to donors by a radius anywhere server-side),
@@ -132,6 +137,10 @@ class _SettingsViewState extends State<SettingsView> {
         _email = (profile['email'] as String?) ?? _email;
         _notifySms = (profile['notifySms'] as bool?) ?? _notifySms;
         _notifyEmail = (profile['notifyEmail'] as bool?) ?? _notifyEmail;
+        final birthDateStr = profile['birthDate'] as String?;
+        _birthDate = birthDateStr != null ? DateTime.tryParse(birthDateStr) : _birthDate;
+        _emergencyContactName = (profile['emergencyContactName'] as String?) ?? _emergencyContactName;
+        _emergencyContactPhone = (profile['emergencyContactPhone'] as String?) ?? _emergencyContactPhone;
         _loadingPrefs = false;
       });
     } catch (_) {
@@ -606,10 +615,15 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  String _formatBirthDate(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   void _showEditPersonalDetailsModal(BuildContext context) {
     final nameCtrl = TextEditingController(text: _name);
     final phoneCtrl = TextEditingController(text: _phone);
     final emailCtrl = TextEditingController(text: _email);
+    final emergencyNameCtrl = TextEditingController(text: _emergencyContactName);
+    final emergencyPhoneCtrl = TextEditingController(text: _emergencyContactPhone);
+    DateTime? birthDate = _birthDate;
 
     showModalBottomSheet(
       context: context,
@@ -647,6 +661,38 @@ class _SettingsViewState extends State<SettingsView> {
                     controller: emailCtrl,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: birthDate ?? DateTime(2000, 1, 1),
+                        firstDate: DateTime(1920),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setModalState(() => birthDate = picked);
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(labelText: 'Birth Date', border: OutlineInputBorder()),
+                      child: Text(
+                        birthDate != null ? _formatBirthDate(birthDate!) : 'Not set',
+                        style: TextStyle(color: birthDate != null ? Colors.black : Colors.grey.shade600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Emergency Contact', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20))),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: emergencyNameCtrl,
+                    decoration: const InputDecoration(labelText: 'Contact Name', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: emergencyPhoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Contact Phone', border: OutlineInputBorder()),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 10),
@@ -687,10 +733,19 @@ class _SettingsViewState extends State<SettingsView> {
                                   final newName = nameCtrl.text.trim();
                                   final newPhone = phoneCtrl.text.trim();
                                   final newEmail = emailCtrl.text.trim();
+                                  final newEmergencyName = emergencyNameCtrl.text.trim();
+                                  final newEmergencyPhone = emergencyPhoneCtrl.text.trim();
                                   final updates = <String, dynamic>{};
                                   if (newName != _name) updates['name'] = newName;
                                   if (newPhone != _phone) updates['phone'] = newPhone;
                                   if (newEmail != _email) updates['email'] = newEmail;
+                                  if (birthDate != _birthDate) updates['birthDate'] = birthDate != null ? _formatBirthDate(birthDate!) : null;
+                                  if (newEmergencyName != _emergencyContactName) {
+                                    updates['emergencyContactName'] = newEmergencyName.isEmpty ? null : newEmergencyName;
+                                  }
+                                  if (newEmergencyPhone != _emergencyContactPhone) {
+                                    updates['emergencyContactPhone'] = newEmergencyPhone.isEmpty ? null : newEmergencyPhone;
+                                  }
 
                                   if (updates.isEmpty) {
                                     Navigator.pop(ctx);
@@ -709,6 +764,10 @@ class _SettingsViewState extends State<SettingsView> {
                                       _name = (updated['name'] as String?) ?? newName;
                                       _phone = (updated['phone'] as String?) ?? newPhone;
                                       _email = (updated['email'] as String?) ?? newEmail;
+                                      final updatedBirthDateStr = updated['birthDate'] as String?;
+                                      _birthDate = updatedBirthDateStr != null ? DateTime.tryParse(updatedBirthDateStr) : null;
+                                      _emergencyContactName = (updated['emergencyContactName'] as String?) ?? '';
+                                      _emergencyContactPhone = (updated['emergencyContactPhone'] as String?) ?? '';
                                     });
                                     widget.onProfileDetailsUpdated?.call(name: _name, phone: _phone, email: _email);
                                     if (!ctx.mounted) return;

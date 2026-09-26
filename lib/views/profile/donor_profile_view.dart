@@ -32,6 +32,10 @@ class DonorProfileView extends StatelessWidget {
   final VerificationStatus verificationStatus;
   final DateTime? lastDonationAt;
   final DateTime? memberSince;
+  final DateTime? birthDate;
+  final String? gender;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
 
   const DonorProfileView({
     super.key,
@@ -50,6 +54,10 @@ class DonorProfileView extends StatelessWidget {
     this.verificationStatus = VerificationStatus.notStarted,
     this.lastDonationAt,
     this.memberSince,
+    this.birthDate,
+    this.gender,
+    this.emergencyContactName = '',
+    this.emergencyContactPhone = '',
   });
 
   String _formatDate(DateTime date) {
@@ -612,6 +620,10 @@ class DonorProfileView extends StatelessWidget {
                   verificationStatus: verificationStatus,
                   isEligible: isEligible,
                   memberSince: memberSince,
+                  birthDate: birthDate,
+                  gender: gender,
+                  emergencyContactName: emergencyContactName,
+                  emergencyContactPhone: emergencyContactPhone,
                 ),
               ),
             ),

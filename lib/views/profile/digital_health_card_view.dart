@@ -53,6 +53,10 @@ class DigitalHealthCardView extends StatefulWidget {
   final VerificationStatus verificationStatus;
   final bool isEligible;
   final DateTime? memberSince;
+  final DateTime? birthDate;
+  final String? gender;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
 
   const DigitalHealthCardView({
     super.key,
@@ -65,6 +69,10 @@ class DigitalHealthCardView extends StatefulWidget {
     required this.verificationStatus,
     required this.isEligible,
     this.memberSince,
+    this.birthDate,
+    this.gender,
+    this.emergencyContactName = '',
+    this.emergencyContactPhone = '',
   });
 
   @override
@@ -229,293 +237,490 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     );
   }
 
+  static const Color _cardCream = Color(0xFFFBF6EF);
+  static const Color _band = ResQTheme.primaryCrimson;
+
   Widget _buildFlipCard(_DonorTier tier) {
     return GestureDetector(
       onTap: _flip,
-      child: AnimatedBuilder(
-        animation: _flipController,
-        builder: (context, child) {
-          final angle = _flipController.value * math.pi;
-          final showFront = angle < math.pi / 2;
-          final content = showFront ? _buildCardFront(tier) : Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()..rotateY(math.pi),
-                child: _buildCardBack(),
-              );
-          return Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.0012)
-              ..rotateY(angle),
-            child: content,
-          );
-        },
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: Alignment.topCenter,
+        child: AnimatedBuilder(
+          animation: _flipController,
+          builder: (context, child) {
+            final angle = _flipController.value * math.pi;
+            final showFront = angle < math.pi / 2;
+            final content = showFront
+                ? _buildCardFront(tier)
+                : Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()..rotateY(math.pi),
+                    child: _buildCardBack(),
+                  );
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateY(angle),
+              child: content,
+            );
+          },
+        ),
       ),
     );
   }
 
   BoxDecoration get _cardDecoration => BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [ResQTheme.primaryCrimson, ResQTheme.logoDeepMaroon],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
+        color: _cardCream,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 8)),
         ],
       );
 
-  Widget _bandText(String text) {
+  Widget _bandText(String text, {String? trailing}) {
     return Container(
-      color: Colors.black.withValues(alpha: 0.15),
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.clip,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.85),
-          fontSize: 9.5,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
+      color: _band,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+            ),
+          ),
+          if (trailing != null)
+            Text(trailing, style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
 
+  // Physical-ID-card-style front: photo/signature column on the left (with
+  // a rotated "DONOR" sidebar label), identity fields on the right over a
+  // faint ring watermark — matches the printable "Blood donor ID" design.
   Widget _buildCardFront(_DonorTier tier) {
     final (surname, given) = _splitName(widget.donorName);
     final issued = widget.memberSince;
     final validUntil = issued?.add(const Duration(days: 365 * 2));
+    final sex = widget.gender == 'female' ? 'F' : (widget.gender == 'male' ? 'M' : '—');
 
     return Container(
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: _cardDecoration,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ  ·  BLOOD DONOR'),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 4),
+          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ  ·  BLOOD DONOR  ·  DONOR NG DUGO'),
+          IntrinsicHeight(
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white.withValues(alpha: 0.25),
-                  backgroundImage: (widget.photoUrl != null && widget.photoUrl!.isNotEmpty)
-                      ? NetworkImage(widget.photoUrl!)
-                      : null,
-                  child: (widget.photoUrl == null || widget.photoUrl!.isEmpty)
-                      ? const Icon(Icons.person_rounded, color: Colors.white, size: 32)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.water_drop_rounded, color: Colors.white, size: 16),
-                          SizedBox(width: 6),
-                          Text('ResQ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                        ],
-                      ),
-                      Text(
-                        'BLOOD DONOR CARD · KARD NG DONOR',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.4),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                  child: Text(
-                    widget.bloodType,
-                    style: const TextStyle(color: ResQTheme.primaryCrimson, fontWeight: FontWeight.w900, fontSize: 16),
-                  ),
-                ),
+                _buildLeftColumn(),
+                Expanded(child: _buildFrontFields(tier, surname, given, sex, issued, validUntil)),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _cardLabel('Surname · Apelyido'),
-                      _cardValue(surname.isNotEmpty ? surname : widget.donorName),
-                      const SizedBox(height: 8),
-                      _cardLabel('Given name · Pangalan'),
-                      _cardValue(given.isNotEmpty ? given : '—'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _cardLabel('Donor ID · Numero ng donor'),
-                      _cardValue(widget.donorCode.isNotEmpty ? widget.donorCode : '—'),
-                      const SizedBox(height: 8),
-                      _cardLabel('Blood priority · Prayoridad'),
-                      _cardValue('LEVEL ${tier.level} · ACTIVE'),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _cardLabel('Donations · Donasyon'),
-                      _cardValue('${widget.completedDonations}'),
-                      const SizedBox(height: 8),
-                      _cardLabel('Verification · Beripikasyon'),
-                      Row(
-                        children: [
-                          if (widget.verificationStatus.isVerified)
-                            const Padding(
-                              padding: EdgeInsets.only(right: 4),
-                              child: Icon(Icons.verified_rounded, color: Colors.white, size: 14),
-                            ),
-                          Flexible(child: _cardValue(widget.verificationStatus.label.toUpperCase())),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _cardLabel('Date of issue · Petsa ng pagbigay'),
-                      _cardValue(issued != null ? _formatDate(issued) : 'N/A'),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _cardLabel('Valid until · Balido hanggang'),
-                      _cardValue(validUntil != null ? _formatDate(validUntil) : 'N/A'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _bandText('SAVE A LIFE  ·  MAGSAVE NG BUHAY  ·  RESQ  ·  SAVE A LIFE'),
+          _bandText('SAVE A LIFE  ·  MAGSAVE NG BUHAY  ·  RESQ  ·  SAVE A LIFE  ·  MAGSAVE NG BUHAY'),
         ],
       ),
     );
   }
 
+  Widget _buildLeftColumn() {
+    return SizedBox(
+      width: 96,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 20,
+            child: Center(
+              child: RotatedBox(
+                quarterTurns: 3,
+                child: Text(
+                  'DONOR',
+                  style: TextStyle(
+                    color: ResQTheme.primaryCrimson.withValues(alpha: 0.22),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(2, 10, 8, 8),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        color: const Color(0xFFE5E0D8),
+                        width: double.infinity,
+                        child: (widget.photoUrl != null && widget.photoUrl!.isNotEmpty)
+                            ? Image.network(widget.photoUrl!, fit: BoxFit.cover)
+                            : const Icon(Icons.person_rounded, color: Color(0xFFAFA89C), size: 34),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Container(
+                    height: 22,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: ResQTheme.lightBorder),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text('Signature · Lagda', style: TextStyle(fontSize: 6.5, color: ResQTheme.textMuted)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Keep this card with you. Present at every blood donation.',
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    style: TextStyle(fontSize: 6, color: ResQTheme.textMuted, height: 1.2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFrontFields(
+    _DonorTier tier,
+    String surname,
+    String given,
+    String sex,
+    DateTime? issued,
+    DateTime? validUntil,
+  ) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: CustomPaint(painter: _RingsPainter(color: ResQTheme.primaryCrimson.withValues(alpha: 0.06))),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.water_drop_rounded, color: ResQTheme.primaryCrimson, size: 20),
+                  const SizedBox(width: 6),
+                  const Text('ResQ', style: TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.w900, fontSize: 17)),
+                ],
+              ),
+              Text(
+                'BLOOD DONOR ID CARD · PAGKAKAKILANLAN NG DONOR',
+                style: TextStyle(color: ResQTheme.textMuted, fontSize: 6.3, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _cardLabel('Surname · Apelyido'),
+                        _cardValue(surname.isNotEmpty ? surname : widget.donorName),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _cardLabel('Blood type · Uri ng dugo'),
+                        Text(widget.bloodType, style: const TextStyle(color: ResQTheme.primaryCrimson, fontWeight: FontWeight.w900, fontSize: 15)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              _cardLabel('Given names · Pangalan'),
+              _cardValue(given.isNotEmpty ? given : '—'),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _cardLabel('Birth date · Kapanganakan'),
+                        _cardValue(issuedDateOr(widget.birthDate)),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [_cardLabel('Sex · Kasarian'), _cardValue(sex)],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [_cardLabel('Donations · Donasyon'), _cardValue('${widget.completedDonations}')],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              _cardLabel('Donor ID · Numero ng donor'),
+              _cardValue(widget.donorCode.isNotEmpty ? widget.donorCode : '—'),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [_cardLabel('Issued · Petsa ng pagbigay'), _cardValue(issuedDateOr(issued))],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [_cardLabel('Valid until · Balido hanggang'), _cardValue(issuedDateOr(validUntil))],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String issuedDateOr(DateTime? date) => date != null ? _formatDate(date) : 'N/A';
+
   Widget _cardLabel(String text) => Text(
         text,
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 9),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: ResQTheme.textMuted, fontSize: 6.5),
       );
 
   Widget _cardValue(String text) => Text(
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+        style: const TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.bold, fontSize: 11.5),
       );
 
+  Widget _backLabel(String text, {Color? color}) => Text(
+        text,
+        style: TextStyle(color: color ?? ResQTheme.textMuted, fontSize: 6.5, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+      );
+
+  // Physical-ID-card-style back: coordinating hospital, a single-row
+  // donation-stamp strip, emergency contact (if the donor has set one in
+  // Settings), a corner-bracket QR (same donor-management check-in link as
+  // the Donor Profile QR pass), the real recent donation table, and a
+  // decorative MRZ-style strip built from the donor's own real fields.
   Widget _buildCardBack() {
+    final (surname, given) = _splitName(widget.donorName);
+    final hasEmergencyContact = widget.emergencyContactName.trim().isNotEmpty;
+
     return Container(
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: _cardDecoration,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
-              const Text('SCAN AT ANY RESQ PARTNER HOSPITAL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5, letterSpacing: 0.3)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-              child: widget.donorCode.isEmpty
-                  ? const SizedBox(width: 140, height: 140, child: Icon(Icons.qr_code_2_rounded, size: 80))
-                  : QrImageView(
-                      data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(widget.donorCode)}',
-                      version: QrVersions.auto,
-                      size: 140,
-                      backgroundColor: Colors.white,
-                    ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Divider(color: Colors.white24, height: 1),
-          const SizedBox(height: 12),
-          const Text('RECENT DONATION RECORD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.4)),
-          const SizedBox(height: 8),
-          if (_loadingHistory)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
-            )
-          else if (_history.isEmpty)
-            Text('No donation history yet.', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12))
-          else
-            ..._history.take(3).map((row) {
-              final dateStr = row['arrivedAt'] as String?;
-              final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-              final hospital = row['hospitalName'] as String? ?? 'ResQ Partner Hospital';
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(date != null ? _formatDate(date) : '—', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                    Flexible(
-                      child: Text(
-                        hospital,
-                        textAlign: TextAlign.right,
+          _bandText('IF FOUND · KUNG NATAGPUAN · RETURN TO ANY RESQ PARTNER BLOOD BANK', trailing: widget.donorCode),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _backLabel('REGISTERED AT · NAKATALA SA'),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Philippine Red Cross – Quezon Chapter',
+                        style: TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.w900, fontSize: 11.5),
+                      ),
+                      const SizedBox(height: 8),
+                      _backLabel('DONATION RECORD · TALA NG DONASYON'),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 3,
+                        runSpacing: 3,
+                        children: List.generate(10, (i) {
+                          final filled = i < widget.completedDonations;
+                          return Icon(
+                            filled ? Icons.water_drop_rounded : Icons.water_drop_outlined,
+                            size: 13,
+                            color: filled ? ResQTheme.primaryCrimson : ResQTheme.lightBorder,
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 8),
+                      _backLabel('EMERGENCY CONTACT · KONTAK SA EMERHENSIYA', color: ResQTheme.primaryCrimson),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasEmergencyContact
+                            ? '${widget.emergencyContactName} · ${widget.emergencyContactPhone}'
+                            : 'Not set — add one in Settings',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
+                        style: TextStyle(
+                          color: hasEmergencyContact ? ResQTheme.textDark : ResQTheme.textMuted,
+                          fontWeight: hasEmergencyContact ? FontWeight.bold : FontWeight.normal,
+                          fontStyle: hasEmergencyContact ? FontStyle.normal : FontStyle.italic,
+                          fontSize: 9.5,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            }),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    children: [
+                      _buildBracketedQr(),
+                      const SizedBox(height: 4),
+                      Text(
+                        'SCAN TO VERIFY DONOR · I-SCAN',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 6, fontWeight: FontWeight.bold, color: ResQTheme.textMuted, letterSpacing: 0.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            color: ResQTheme.lightPinkTint,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('RECENT DONATION RECORD · TALA NG DONASYON', style: TextStyle(color: ResQTheme.primaryCrimson, fontSize: 6.5, fontWeight: FontWeight.bold)),
+                Text('${widget.completedDonations} lifetime', style: const TextStyle(color: ResQTheme.primaryCrimson, fontSize: 6.5, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: _loadingHistory
+                ? const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)))
+                : _history.isEmpty
+                    ? Text('No donation history yet.', style: TextStyle(color: ResQTheme.textMuted, fontSize: 9))
+                    : Column(
+                        children: _history.take(3).toList().asMap().entries.map((entry) {
+                          final row = entry.value;
+                          final dateStr = row['arrivedAt'] as String?;
+                          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+                          final hospital = row['hospitalName'] as String? ?? 'ResQ Partner Hospital';
+                          final donNumber = widget.completedDonations - entry.key;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 62,
+                                  child: Text(
+                                    date != null ? _formatDate(date) : '—',
+                                    style: const TextStyle(fontSize: 9, fontFamily: 'monospace', color: ResQTheme.textDark),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(hospital, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9, color: ResQTheme.textDark)),
+                                ),
+                                Text(
+                                  'DON-${donNumber.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: ResQTheme.primaryCrimson),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+          ),
+          Container(
+            width: double.infinity,
+            color: const Color(0xFFF0EDE7),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(
+              _buildMrz(surname, given),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 7.5, color: Color(0xFF5B5648), height: 1.5),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildBracketedQr() {
+    const bracketSize = 72.0;
+    return SizedBox(
+      width: bracketSize,
+      height: bracketSize,
+      child: Stack(
+        children: [
+          Center(
+            child: widget.donorCode.isEmpty
+                ? const Icon(Icons.qr_code_2_rounded, size: 56)
+                : QrImageView(
+                    data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(widget.donorCode)}',
+                    version: QrVersions.auto,
+                    size: 56,
+                    backgroundColor: Colors.transparent,
+                  ),
+          ),
+          CustomPaint(size: const Size.square(bracketSize), painter: _CornerBracketsPainter()),
+        ],
+      ),
+    );
+  }
+
+  // Decorative only (not a real scannable MRZ) — built from the donor's
+  // actual name/blood type/birth date/donor code so it's at least
+  // consistent with the rest of the card, rather than fabricated digits.
+  String _buildMrz(String surname, String given) {
+    String pad(String s, int len) => s.length >= len ? s.substring(0, len) : s.padRight(len, '<');
+    final surnamePart = surname.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+    final givenPart = given.toUpperCase().replaceAll(RegExp(r'\s+'), '<');
+    final line1 = pad('RQD<PHL<$surnamePart<<$givenPart', 30);
+    final codePart = widget.donorCode.toUpperCase().replaceAll('-', '');
+    final sexLetter = widget.gender == 'female' ? 'F' : 'M';
+    String ymd(DateTime? d) => d == null
+        ? '000000'
+        : '${(d.year % 100).toString().padLeft(2, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+    final line2 = pad('RQ$codePart<0<<${ymd(widget.birthDate)}$sexLetter${ymd(widget.memberSince)}', 30);
+    return '$line1\n$line2';
   }
 
   Widget _buildDonationStamps(_DonorTier tier) {
@@ -673,4 +878,61 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       ),
     );
   }
+}
+
+/// Faint concentric-ring watermark behind the card front's identity fields —
+/// the guilloche-pattern security-print look from the physical ID design,
+/// approximated with plain circles rather than a real anti-counterfeiting
+/// pattern (this is a display-only digital card, not something printed).
+class _RingsPainter extends CustomPainter {
+  final Color color;
+  const _RingsPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final center = Offset(size.width * 0.78, size.height * 0.5);
+    for (var r = 20.0; r < size.width; r += 22) {
+      canvas.drawCircle(center, r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingsPainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// Four L-shaped corner brackets around the card back's QR — a "scanner
+/// viewfinder" frame instead of a plain white box, matching the physical ID
+/// design's back.
+class _CornerBracketsPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = ResQTheme.textDark
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    const len = 10.0;
+    final w = size.width;
+    final h = size.height;
+
+    // top-left
+    canvas.drawLine(const Offset(0, 0), const Offset(len, 0), paint);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, len), paint);
+    // top-right
+    canvas.drawLine(Offset(w, 0), Offset(w - len, 0), paint);
+    canvas.drawLine(Offset(w, 0), Offset(w, len), paint);
+    // bottom-left
+    canvas.drawLine(Offset(0, h), Offset(len, h), paint);
+    canvas.drawLine(Offset(0, h), Offset(0, h - len), paint);
+    // bottom-right
+    canvas.drawLine(Offset(w, h), Offset(w - len, h), paint);
+    canvas.drawLine(Offset(w, h), Offset(w, h - len), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerBracketsPainter oldDelegate) => false;
 }
