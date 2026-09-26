@@ -11,6 +11,7 @@ import 'package:resq/views/appointment/no_active_sched_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
+import 'package:resq/views/profile/digital_health_card_view.dart';
 import 'package:resq/views/profile/donor_profile_view.dart';
 import 'package:resq/views/settings/settings_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
@@ -77,6 +78,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   String? _photoUrl;
   VerificationStatus _verificationStatus = VerificationStatus.notStarted;
   DateTime? _lastDonationAt;
+  // When this donor account was created (donors.created_at) — the Digital
+  // Health Card's "issued" date. Not shown anywhere else, so it's only
+  // fetched/stored here rather than threaded through registration/login.
+  DateTime? _memberSince;
 
   /// What the Lifetime Impact Record / Community Impact / Lifesaving Hero
   /// cards should actually show. Two bugs reported together here (checklist
@@ -359,12 +364,15 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final verification = verificationStatusFromString(profile['verificationStatus'] as String?);
       final lastDonationAtStr = profile['lastDonationAt'] as String?;
       final lastDonationAt = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
+      final memberSinceStr = profile['memberSince'] as String?;
+      final memberSince = memberSinceStr != null ? DateTime.tryParse(memberSinceStr) : null;
       if (!mounted) return;
       setState(() {
         _completedDonations = completed;
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
         _verificationStatus = verification;
         _lastDonationAt = lastDonationAt ?? _lastDonationAt;
+        _memberSince = memberSince ?? _memberSince;
         // _isFirstTime is deliberately left alone here — it's governed by
         // the donor's own screening self-report (screensNPT.isFirstTimeDonor,
         // set at registration or retake), not silently overridden by
@@ -657,6 +665,21 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           totalDonations: _effectiveDonations,
           isVerified: _verificationStatus.isVerified,
           onSwitchToAppointmentTab: () => setState(() => _currentTabIndex = 1),
+          onOpenHealthCard: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => DigitalHealthCardView(
+                token: widget.token,
+                donorName: activeDonorName,
+                donorCode: activeDonorId,
+                bloodType: activeBloodType,
+                photoUrl: _photoUrl,
+                completedDonations: _effectiveDonations,
+                verificationStatus: _verificationStatus,
+                isEligible: _effectiveResult.isEligible,
+                memberSince: _memberSince,
+              ),
+            ),
+          ),
           onBookingCompleted: _handleBookingCompleted,
           onRefresh: _refreshBroadcastData,
           activeRequests: _activeRequests,
@@ -748,6 +771,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           onPhotoUpdated: (url) => setState(() => _photoUrl = url),
           verificationStatus: _verificationStatus,
           lastDonationAt: _lastDonationAt,
+          memberSince: _memberSince,
         );
       default:
         return const SizedBox.shrink();

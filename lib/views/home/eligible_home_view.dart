@@ -58,6 +58,11 @@ class EligibleHomeView extends StatelessWidget {
   // (an active hospital request exists) or the waiting state (none yet),
   // so this button doesn't need its own separate hospital-picker route.
   final VoidCallback? onSwitchToAppointmentTab;
+  // Opens DigitalHealthCardView — a second entry point alongside Donor
+  // Profile's own "Digitalized Health Card" tile, so a donor glancing at
+  // their impact stats on the dashboard doesn't have to go find it in
+  // Profile first.
+  final VoidCallback? onOpenHealthCard;
 
   const EligibleHomeView({
     super.key,
@@ -72,6 +77,7 @@ class EligibleHomeView extends StatelessWidget {
     this.totalDonations = 0,
     this.isVerified = false,
     this.onSwitchToAppointmentTab,
+    this.onOpenHealthCard,
   });
 
   @override
@@ -469,6 +475,33 @@ class EligibleHomeView extends StatelessWidget {
                   ),
                 ],
               ),
+              if (onOpenHealthCard != null) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: onOpenHealthCard,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.badge_outlined, color: Colors.white, size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'View Digital Health Card',
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 13),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

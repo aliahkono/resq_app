@@ -338,6 +338,14 @@ class ApiService {
     return _getList('/donor/appointments', token: token);
   }
 
+  /// GET /api/donor/donations — this donor's completed donation history
+  /// (donor_arrivals, hospital-verified), most recent first:
+  /// [{id, hospitalName, arrivedAt, requestCode, bloodType}]. Powers the
+  /// Digital Health Card's "Recent Donation Record" (card back).
+  static Future<List<dynamic>> listMyDonations(String token) {
+    return _getList('/donor/donations', token: token);
+  }
+
   /// POST /api/donor/appointments — books a real slot at `hospitalId` for
   /// `scheduledAt`. Throws ApiException with the backend's own message on
   /// failure — most commonly a 409 "this time slot is fully booked" (see
