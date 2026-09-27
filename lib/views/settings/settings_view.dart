@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
@@ -19,8 +20,17 @@ class SettingsView extends StatefulWidget {
   final String bloodType;
   final String donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
-  final void Function({required String name, required String phone, required String email})?
-      onProfileDetailsUpdated;
+  // Also carries the Digital Health Card fields (birth date, emergency
+  // contact) so HomeView — which feeds the card — updates the moment
+  // "Save changes" succeeds, not only on its next profile poll.
+  final void Function({
+    required String name,
+    required String phone,
+    required String email,
+    DateTime? birthDate,
+    String emergencyContactName,
+    String emergencyContactPhone,
+  })? onProfileDetailsUpdated;
   final String? userName;
   final String? userPhone;
   final String? userEmail;
@@ -51,6 +61,11 @@ class _SettingsViewState extends State<SettingsView> {
   // biometric/device-credential endpoint exists), so it stays local-only
   // until that's built.
   bool _biometricLogin = false;
+  final LocalAuthentication _localAuth = LocalAuthentication();
+
+  // "Push App Notifications" — on-device switch (per donor) for whether this
+  // phone registers for push and may show ResQ notifications.
+  bool _pushNotifications = false;
 
   // Alert & Notification Preferences — real donor.notify_sms /
   // donor.notify_email columns (see donorPortal.controller.js
@@ -115,6 +130,10 @@ class _SettingsViewState extends State<SettingsView> {
       setState(() => _biometricLogin = biometric);
       return;
     }
+    final pushPref = await LocalPrefs.getBool(widget.donorId, 'pushNotifications');
+    // Only shown as on while the OS actually allows notifications.
+    final pushOn = (pushPref ?? true) && await PushService.instance.areNotificationsAllowed();
+    if (mounted) setState(() => _pushNotifications = pushOn);
     final location = await LocalPrefs.getBool(widget.donorId, 'locationServices');
     final radius = await LocalPrefs.getString(widget.donorId, 'alertRadius');
     // The saved toggle can be stale if location permission was revoked in
@@ -130,6 +149,106 @@ class _SettingsViewState extends State<SettingsView> {
       _locationServices = locationOn;
       if (radius != null) _selectedRadius = radius;
     });
+  }
+
+  /// Biometric Login (Settings list) and "Fingerprint / Face unlock"
+  /// (Change Password & Security sheet) — both use this. Turning it on
+  /// checks that the phone actually has a fingerprint / face enrolled, then
+  /// asks the phone's own biometric prompt to confirm it's the owner; only
+  /// then is it saved. After that, signing out keeps the session on this
+  /// phone and the Login screen signs straight back in with a scan.
+  Future<void> _setBiometricLogin(bool enable, {VoidCallback? refresh}) async {
+    void apply(bool value) {
+      if (!mounted) return;
+      setState(() => _biometricLogin = value);
+      refresh?.call();
+      SessionStorage.setBiometricEnabled(value, donorId: widget.donorId);
+    }
+
+    if (!enable) {
+      apply(false);
+      return;
+    }
+
+    try {
+      final supported = await _localAuth.isDeviceSupported();
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final enrolled = await _localAuth.getAvailableBiometrics();
+      if (!supported || !canCheck || enrolled.isEmpty) {
+        apply(false);
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (dCtx) => AlertDialog(
+            title: const Text('No fingerprint or face set up'),
+            content: const Text(
+              "This phone doesn't have a fingerprint or face unlock set up yet. Add one in your phone's Settings (Security / Biometrics), then turn this on again.",
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('OK')),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // The phone's own fingerprint / Face ID prompt.
+      final ok = await _localAuth.authenticate(
+        localizedReason: 'Confirm your fingerprint or face to turn on biometric login for ResQ',
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+      apply(ok);
+      if (ok) {
+        _showSnack('Biometric login is on. Next time, just scan to sign in.');
+      }
+    } catch (e) {
+      debugPrint('SettingsView: biometric setup failed: $e');
+      apply(false);
+      _showSnack('Could not turn on biometric login. Please try again.');
+    }
+  }
+
+  /// "Push App Notifications". Turning it on shows the phone's "Allow ResQ
+  /// to send you notifications?" prompt and registers this device for push;
+  /// turning it off unregisters it.
+  Future<void> _setPushNotifications(bool enable) async {
+    void apply(bool value) {
+      if (!mounted) return;
+      setState(() => _pushNotifications = value);
+      if (widget.donorId.isNotEmpty) {
+        LocalPrefs.setBool(widget.donorId, 'pushNotifications', value);
+      }
+    }
+
+    if (!enable) {
+      apply(false);
+      PushService.instance.unregisterDevice(widget.token);
+      return;
+    }
+
+    final granted = await PushService.instance.requestOsPermission();
+    if (!granted) {
+      apply(false);
+      // Blocked earlier — the OS won't show the prompt again, so offer the
+      // app's settings page instead.
+      final open = await _askToOpenSettings(
+        title: 'Allow notifications',
+        message: 'Notifications for ResQ are turned off. Allow them in your phone\'s app settings to get urgent blood requests.',
+      );
+      if (open) await Geolocator.openAppSettings();
+      return;
+    }
+    apply(true);
+    PushService.instance.registerDevice(widget.token);
+    _showSnack('Push notifications are on.');
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 
   Future<bool> _hasLocationPermission() async {
@@ -323,10 +442,7 @@ class _SettingsViewState extends State<SettingsView> {
                       _buildSwitchTile(
                         title: 'Biometric Login (FaceID / Fingerprint)',
                         value: _biometricLogin,
-                        onChanged: (val) {
-                          setState(() => _biometricLogin = val);
-                          SessionStorage.setBiometricEnabled(val);
-                        },
+                        onChanged: (val) => _setBiometricLogin(val),
                       ),
                       const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildNavigationTile(
@@ -342,6 +458,13 @@ class _SettingsViewState extends State<SettingsView> {
                     _buildSectionTitle('ALERT & NOTIFICATION PREFERENCES'),
                     const SizedBox(height: 8),
                     _buildCardGroup([
+                      _buildSwitchTile(
+                        title: 'Push App Notifications',
+                        subtitle: 'Urgent requests, reminders and account updates on this phone',
+                        value: _pushNotifications,
+                        onChanged: (val) => _setPushNotifications(val),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildSwitchTile(
                         title: 'SMS Alerts (Urgent Hospital Broadcasts)',
                         value: _notifySms,
@@ -908,12 +1031,29 @@ class _SettingsViewState extends State<SettingsView> {
           _name = (updated['name'] as String?) ?? newName;
           _phone = (updated['phone'] as String?) ?? newPhone;
           _email = (updated['email'] as String?) ?? newEmail;
-          final updatedBirthDateStr = updated['birthDate'] as String?;
-          _birthDate = updatedBirthDateStr != null ? DateTime.tryParse(updatedBirthDateStr) : null;
-          _emergencyContactName = (updated['emergencyContactName'] as String?) ?? '';
-          _emergencyContactPhone = (updated['emergencyContactPhone'] as String?) ?? '';
+          // Prefer what the backend echoed back; fall back to what was
+          // just entered if the response leaves a field out.
+          if (updated.containsKey('birthDate')) {
+            final updatedBirthDateStr = updated['birthDate'] as String?;
+            _birthDate = updatedBirthDateStr != null ? DateTime.tryParse(updatedBirthDateStr) : null;
+          } else {
+            _birthDate = birthDate;
+          }
+          _emergencyContactName = updated.containsKey('emergencyContactName')
+              ? (updated['emergencyContactName'] as String?) ?? ''
+              : newEmergencyName;
+          _emergencyContactPhone = updated.containsKey('emergencyContactPhone')
+              ? (updated['emergencyContactPhone'] as String?) ?? ''
+              : newEmergencyPhone;
         });
-        widget.onProfileDetailsUpdated?.call(name: _name, phone: _phone, email: _email);
+        widget.onProfileDetailsUpdated?.call(
+          name: _name,
+          phone: _phone,
+          email: _email,
+          birthDate: _birthDate,
+          emergencyContactName: _emergencyContactName,
+          emergencyContactPhone: _emergencyContactPhone,
+        );
         if (!ctx.mounted) return;
         Navigator.pop(ctx);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1341,11 +1481,12 @@ class _SettingsViewState extends State<SettingsView> {
                     subtitle: 'Open ResQ without typing your password',
                     value: _biometricLogin,
                     showDivider: false,
-                    onChanged: (val) {
-                      setState(() => _biometricLogin = val);
-                      setModalState(() {});
-                      SessionStorage.setBiometricEnabled(val);
-                    },
+                    onChanged: (val) => _setBiometricLogin(
+                      val,
+                      refresh: () {
+                        if (ctx.mounted) setModalState(() {});
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -1530,9 +1671,16 @@ class _SettingsViewState extends State<SettingsView> {
                     // fails — no connection, token already expired — sign the
                     // donor out locally anyway; there's nothing else useful to do
                     // with a stale/unreachable token.
-                    try {
-                      await ApiService.logout(widget.token);
-                    } catch (_) {}
+                    // With biometric login on, the session is kept on this
+                    // phone (see SessionStorage.signOut) so the next
+                    // fingerprint / Face ID scan on the Login screen signs
+                    // straight back in — so don't end it server-side.
+                    final keepForBiometric = await SessionStorage.isBiometricEnabled();
+                    if (!keepForBiometric) {
+                      try {
+                        await ApiService.logout(widget.token);
+                      } catch (_) {}
+                    }
                     // Best-effort too — a device that fails to unregister
                     // just means it keeps getting pushes for the account it
                     // already signed out of locally, not a blocker to
@@ -1540,7 +1688,7 @@ class _SettingsViewState extends State<SettingsView> {
                     try {
                       await PushService.instance.unregisterDevice(widget.token);
                     } catch (_) {}
-                    await SessionStorage.clearToken();
+                    await SessionStorage.signOut();
                     navigator.pushAndRemoveUntil(
                       MaterialPageRoute(builder: (context) => const AuthLandingView()),
                           (route) => false,

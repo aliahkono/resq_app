@@ -1,6 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
@@ -99,24 +97,14 @@ class _OnboardingViewState extends State<OnboardingView>
                 return Positioned(
                   left: parallaxOffset + oscillationOffset - 80,
                   top: MediaQuery.of(context).size.height * 0.22,
-                  // Blurred into a soft colour wash so it reads as a
-                  // background glow instead of a hard shape.
-                  child: ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(
-                      sigmaX: 36,
-                      sigmaY: 36,
-                      tileMode: TileMode.decal,
-                    ),
-                    child: Opacity(
-                      opacity: 0.35,
-                      child: Image.asset(
-                        'assets/images/GradientWave.png',
-                        height: 380,
-                        fit: BoxFit.fitHeight,
-                        errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox.shrink(),
-                      ),
-                    ),
+                  // Shown sharp — only the circle frame behind each
+                  // illustration is blurred (see OnboardingPage).
+                  child: Image.asset(
+                    'assets/images/GradientWave.png',
+                    height: 380,
+                    fit: BoxFit.fitHeight,
+                    errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(),
                   ),
                 );
               },
@@ -289,7 +277,7 @@ class OnboardingPage extends StatelessWidget {
           const Spacer(),
 
           // Graphic / Asset Preview Area — the illustration sits directly on
-          // the blurred background (no circle frame behind it).
+          // the screen (no circle frame behind it); the red wave stays sharp.
           Center(
             child: SizedBox(
               width: 300,

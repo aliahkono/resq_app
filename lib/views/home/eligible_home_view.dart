@@ -476,26 +476,61 @@ class EligibleHomeView extends StatelessWidget {
     );
   }
 
+  /// "Your Impact" — same design as Profile's "Lifetime Impact Record"
+  /// card (donor_profile_view.dart _buildLifetimeImpactCard): title row,
+  /// crimson divider, then units donated | liters donated | lives impacted
+  /// (one unit = one whole-blood donation, ~450 mL).
   Widget _buildImpactCard() {
-    final n = totalDonations;
-    return _card(
+    final int donations = totalDonations;
+    final double liters = donations * 0.45;
+    final int lives = donations * 3;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const RQSectionLabel('Your impact'),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _impactStat('$n', n == 1 ? 'donation' : 'donations', RQColors.bloodText)),
-              Expanded(child: _impactStat('${(n * 0.45).toStringAsFixed(n == 0 ? 0 : 2)} L', 'blood given', RQColors.bloodText)),
-              Expanded(child: _impactStat('${n * 3}', 'lives helped', RQColors.success)),
-            ],
+          const Padding(
+            padding: EdgeInsets.only(top: 12, left: 14, right: 14, bottom: 8),
+            child: Row(
+              children: [
+                Icon(Icons.favorite_border_rounded, color: Color(0xFF9B1B20), size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Your Impact',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF2C2C2C)),
+                ),
+              ],
+            ),
           ),
-          if (n == 0) ...[
-            const SizedBox(height: 8),
-            const Text('Your stats grow each time a hospital confirms a donation.',
-                style: TextStyle(fontSize: 12, color: RQColors.muted)),
-          ],
+          const Divider(height: 1, color: Color(0xFF9B1B20)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _impactStat('$donations', 'UNITS DONATED', const Color(0xFF9B1B20)),
+                ),
+                Container(width: 1, height: 36, color: const Color(0xFFE5E7EB)),
+                Expanded(
+                  child: _impactStat(
+                    liters > 0 ? liters.toStringAsFixed(1) : '0.0',
+                    'LITERS DONATED',
+                    const Color(0xFF9B1B20),
+                  ),
+                ),
+                Container(width: 1, height: 36, color: const Color(0xFFE5E7EB)),
+                Expanded(
+                  child: _impactStat(lives.toString(), 'LIVES IMPACTED', const Color(0xFF2E7D32)),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -503,10 +538,23 @@ class EligibleHomeView extends StatelessWidget {
 
   Widget _impactStat(String value, String label, Color color) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: color)),
-        Text(label, style: const TextStyle(fontSize: 12, color: RQColors.muted)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+        ),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF6B7280), letterSpacing: 0.5),
+            ),
+          ),
+        ),
       ],
     );
   }

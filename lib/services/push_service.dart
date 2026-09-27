@@ -129,6 +129,51 @@ class PushService {
     }
   }
 
+  /// Whether the OS currently lets ResQ show notifications. Works without
+  /// Firebase (reads the platform setting through flutter_local_notifications).
+  Future<bool> areNotificationsAllowed() async {
+    try {
+      if (Platform.isAndroid) {
+        final android = _localNotifications
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        return await android?.areNotificationsEnabled() ?? false;
+      }
+      if (Platform.isIOS) {
+        final ios = _localNotifications
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+        final options = await ios?.checkPermissions();
+        return options?.isEnabled ?? false;
+      }
+    } catch (e) {
+      debugPrint('PushService: could not read notification permission: $e');
+    }
+    return false;
+  }
+
+  /// Shows the OS "Allow ResQ to send you notifications?" prompt (Android
+  /// 13+ and iOS; older Android allows notifications by default). Returns
+  /// whether notifications are allowed afterwards. Doesn't need Firebase, so
+  /// the Settings toggle works even on a build without push configured.
+  Future<bool> requestOsPermission() async {
+    try {
+      if (Platform.isAndroid) {
+        final android = _localNotifications
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        final granted = await android?.requestNotificationsPermission();
+        return granted ?? await areNotificationsAllowed();
+      }
+      if (Platform.isIOS) {
+        final ios = _localNotifications
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+        final granted = await ios?.requestPermissions(alert: true, badge: true, sound: true);
+        return granted ?? false;
+      }
+    } catch (e) {
+      debugPrint('PushService: notification permission prompt failed: $e');
+    }
+    return false;
+  }
+
   /// Requests OS notification permission — only a real prompt on Android 13+
   /// (API 33), where POST_NOTIFICATIONS is required; granted automatically
   /// on older Android. Returns whether pushes are actually allowed, or
