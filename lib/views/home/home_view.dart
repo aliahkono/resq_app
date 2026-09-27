@@ -454,10 +454,17 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         _verificationStatus = verification;
         _lastDonationAt = lastDonationAt ?? _lastDonationAt;
         _memberSince = memberSince ?? _memberSince;
-        _birthDate = birthDate ?? _birthDate;
+        // Straight from the backend (including a cleared/null value), so a
+        // birth date or emergency contact removed in Settings doesn't
+        // linger on the card.
+        if (profile.containsKey('birthDate')) _birthDate = birthDate;
         _gender = (profile['gender'] as String?) ?? _gender;
-        _emergencyContactName = (profile['emergencyContactName'] as String?) ?? _emergencyContactName;
-        _emergencyContactPhone = (profile['emergencyContactPhone'] as String?) ?? _emergencyContactPhone;
+        if (profile.containsKey('emergencyContactName')) {
+          _emergencyContactName = (profile['emergencyContactName'] as String?) ?? '';
+        }
+        if (profile.containsKey('emergencyContactPhone')) {
+          _emergencyContactPhone = (profile['emergencyContactPhone'] as String?) ?? '';
+        }
         // _isFirstTime is deliberately left alone here — it's governed by
         // the donor's own screening self-report (screensNPT.isFirstTimeDonor,
         // set at registration or retake), not silently overridden by
@@ -606,11 +613,23 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   /// updating SettingsView's own local state (which used to mean nothing
   /// else in the app noticed until a full logout/login rebuilt everything
   /// from a fresh GET /api/donor/me).
-  void _handleProfileDetailsUpdated({required String name, required String phone, required String email}) {
+  void _handleProfileDetailsUpdated({
+    required String name,
+    required String phone,
+    required String email,
+    DateTime? birthDate,
+    String emergencyContactName = '',
+    String emergencyContactPhone = '',
+  }) {
     setState(() {
       _donorName = name;
       _donorPhone = phone;
       _donorEmail = email;
+      // Digital Health Card fields — the card is built from these, so the
+      // next time it's opened it already shows what was just saved.
+      _birthDate = birthDate;
+      _emergencyContactName = emergencyContactName;
+      _emergencyContactPhone = emergencyContactPhone;
     });
   }
 

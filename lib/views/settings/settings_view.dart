@@ -20,8 +20,17 @@ class SettingsView extends StatefulWidget {
   final String bloodType;
   final String donorId;
   final Function(ScreenNPTModel updatedModel, ClassificationResult result)? onRetakeCompleted;
-  final void Function({required String name, required String phone, required String email})?
-      onProfileDetailsUpdated;
+  // Also carries the Digital Health Card fields (birth date, emergency
+  // contact) so HomeView — which feeds the card — updates the moment
+  // "Save changes" succeeds, not only on its next profile poll.
+  final void Function({
+    required String name,
+    required String phone,
+    required String email,
+    DateTime? birthDate,
+    String emergencyContactName,
+    String emergencyContactPhone,
+  })? onProfileDetailsUpdated;
   final String? userName;
   final String? userPhone;
   final String? userEmail;
@@ -1022,12 +1031,29 @@ class _SettingsViewState extends State<SettingsView> {
           _name = (updated['name'] as String?) ?? newName;
           _phone = (updated['phone'] as String?) ?? newPhone;
           _email = (updated['email'] as String?) ?? newEmail;
-          final updatedBirthDateStr = updated['birthDate'] as String?;
-          _birthDate = updatedBirthDateStr != null ? DateTime.tryParse(updatedBirthDateStr) : null;
-          _emergencyContactName = (updated['emergencyContactName'] as String?) ?? '';
-          _emergencyContactPhone = (updated['emergencyContactPhone'] as String?) ?? '';
+          // Prefer what the backend echoed back; fall back to what was
+          // just entered if the response leaves a field out.
+          if (updated.containsKey('birthDate')) {
+            final updatedBirthDateStr = updated['birthDate'] as String?;
+            _birthDate = updatedBirthDateStr != null ? DateTime.tryParse(updatedBirthDateStr) : null;
+          } else {
+            _birthDate = birthDate;
+          }
+          _emergencyContactName = updated.containsKey('emergencyContactName')
+              ? (updated['emergencyContactName'] as String?) ?? ''
+              : newEmergencyName;
+          _emergencyContactPhone = updated.containsKey('emergencyContactPhone')
+              ? (updated['emergencyContactPhone'] as String?) ?? ''
+              : newEmergencyPhone;
         });
-        widget.onProfileDetailsUpdated?.call(name: _name, phone: _phone, email: _email);
+        widget.onProfileDetailsUpdated?.call(
+          name: _name,
+          phone: _phone,
+          email: _email,
+          birthDate: _birthDate,
+          emergencyContactName: _emergencyContactName,
+          emergencyContactPhone: _emergencyContactPhone,
+        );
         if (!ctx.mounted) return;
         Navigator.pop(ctx);
         ScaffoldMessenger.of(context).showSnackBar(

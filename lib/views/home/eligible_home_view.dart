@@ -478,7 +478,8 @@ class EligibleHomeView extends StatelessWidget {
 
   /// "Your Impact" — same design as Profile's "Lifetime Impact Record"
   /// card (donor_profile_view.dart _buildLifetimeImpactCard): title row,
-  /// crimson divider, then liters donated | lives impacted.
+  /// crimson divider, then units donated | liters donated | lives impacted
+  /// (one unit = one whole-blood donation, ~450 mL).
   Widget _buildImpactCard() {
     final int donations = totalDonations;
     final double liters = donations * 0.45;
@@ -513,6 +514,10 @@ class EligibleHomeView extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
+                  child: _impactStat('$donations', 'UNITS DONATED', const Color(0xFF9B1B20)),
+                ),
+                Container(width: 1, height: 36, color: const Color(0xFFE5E7EB)),
+                Expanded(
                   child: _impactStat(
                     liters > 0 ? liters.toStringAsFixed(1) : '0.0',
                     'LITERS DONATED',
@@ -539,9 +544,16 @@ class EligibleHomeView extends StatelessWidget {
           child: Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF6B7280), letterSpacing: 0.5),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF6B7280), letterSpacing: 0.5),
+            ),
+          ),
         ),
       ],
     );

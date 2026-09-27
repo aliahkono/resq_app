@@ -91,15 +91,14 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   bool _loadingHistory = true;
   String? _signatureUrl;
 
-  // The back face (QR + donation history + MRZ) is naturally taller than
-  // the front (compact identity fields), so flipping used to visibly change
-  // the card's height. We measure the back's real rendered height via a
-  // hidden offstage copy (see build()'s Offstage widget) and lock both
-  // faces to that height, rather than guessing a fixed number that would
-  // drift out of sync whenever the back's content changes (donation
-  // history length, emergency contact set or not, etc).
-  final GlobalKey _backMeasureKey = GlobalKey();
-  double? _cardHeight;
+  // The card is drawn on a fixed design canvas with real ID-card
+  // proportions (ISO/IEC 7810 ID-1 / CR80: 85.60 × 53.98 mm, ≈ 1.586:1) and
+  // scaled uniformly to the screen width — so it's never "fat", both faces
+  // are always the same size, and nothing can overflow on small phones or
+  // with large system font sizes.
+  static const double _cardAspect = 85.60 / 53.98;
+  static const double _cardW = 340;
+  static const double _cardH = _cardW / _cardAspect; // ≈ 214
 
   @override
   void initState() {
@@ -107,22 +106,6 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     _signatureUrl = widget.signatureUrl;
     _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
     _loadHistory();
-  }
-
-  // Re-measures the hidden back-card copy after every frame and adopts its
-  // height if it changed. Cheap to call on every build: once the measured
-  // height stabilizes (typically the very next frame), this becomes a
-  // no-op since the comparison below stops triggering further setStates.
-  void _scheduleHeightMeasurement() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final box = _backMeasureKey.currentContext?.findRenderObject() as RenderBox?;
-      if (box == null || !box.hasSize) return;
-      final measured = box.size.height;
-      if (_cardHeight == null || (measured - _cardHeight!).abs() > 0.5) {
-        setState(() => _cardHeight = measured);
-      }
-    });
   }
 
   // Opens the signature pad (see signature_pad_view.dart); on a successful
@@ -247,7 +230,6 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   @override
   Widget build(BuildContext context) {
     final tier = _tierFor(widget.completedDonations);
-    _scheduleHeightMeasurement();
 
     return Scaffold(
       backgroundColor: ResQTheme.bgOffWhite,
@@ -291,14 +273,6 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                 _buildDonationStamps(tier),
                 const SizedBox(height: 16),
                 _buildPriorityAccess(tier),
-                // Invisible but still laid out (Offstage, not hidden via
-                // opacity/size-zero) — same width as the real card thanks
-                // to this shared SliverPadding, so its measured height is
-                // exactly what the real back face would render at.
-                Offstage(
-                  offstage: true,
-                  child: KeyedSubtree(key: _backMeasureKey, child: _buildCardBack()),
-                ),
               ]),
             ),
           ),
@@ -352,36 +326,40 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   Widget _buildFlipCard(_DonorTier tier) {
     return GestureDetector(
       onTap: _flip,
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        alignment: Alignment.topCenter,
-        // Locks both faces to the back's measured height (see
-        // _scheduleHeightMeasurement) so flipping never changes the card's
-        // size — null only very briefly before the first measurement
-        // resolves, during which this just falls back to natural sizing.
-        child: SizedBox(
-          height: _cardHeight,
-          child: AnimatedBuilder(
-            animation: _flipController,
-            builder: (context, child) {
-              final angle = _flipController.value * math.pi;
-              final showFront = angle < math.pi / 2;
-              final content = showFront
-                  ? RepaintBoundary(key: _frontFaceKey, child: _buildCardFront(tier))
-                  : Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.identity()..rotateY(math.pi),
-                      child: RepaintBoundary(key: _backFaceKey, child: _buildCardBack()),
-                    );
-              return Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.0012)
-                  ..rotateY(angle),
-                child: content,
-              );
-            },
+      child: AspectRatio(
+        aspectRatio: _cardAspect,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: _cardW,
+            height: _cardH,
+            // The card is a fixed-layout graphic that's already scaled to
+            // fit by the FittedBox above, so the phone's font-size setting
+            // shouldn't also enlarge (and overflow) its text.
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+              child: AnimatedBuilder(
+                animation: _flipController,
+                builder: (context, child) {
+                  final angle = _flipController.value * math.pi;
+                  final showFront = angle < math.pi / 2;
+                  final content = showFront
+                      ? RepaintBoundary(key: _frontFaceKey, child: _buildCardFront(tier))
+                      : Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..rotateY(math.pi),
+                          child: RepaintBoundary(key: _backFaceKey, child: _buildCardBack()),
+                        );
+                  return Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.0012)
+                      ..rotateY(angle),
+                    child: content,
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -390,16 +368,16 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
 
   BoxDecoration get _cardDecoration => BoxDecoration(
         color: _cardCream,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 5)),
         ],
       );
 
   Widget _bandText(String text, {String? trailing}) {
     return Container(
       color: _band,
-      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
       child: Row(
         children: [
           Expanded(
@@ -413,7 +391,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
               child: Text(
                 text,
                 maxLines: 1,
-                style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
             ),
           ),
@@ -431,7 +409,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                 child: Text(
                   trailing,
                   maxLines: 1,
-                  style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -460,20 +438,14 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     final sex = widget.gender == 'female' ? 'F' : (widget.gender == 'male' ? 'M' : '—');
 
     return Container(
-      width: double.infinity,
+      width: _cardW,
+      height: _cardH,
       clipBehavior: Clip.antiAlias,
       decoration: _cardDecoration,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        // spaceBetween rather than start: the front is naturally shorter
-        // than the back, and the card is now locked to the back's height
-        // (see _cardHeight), so any leftover space is split above/below
-        // the identity fields instead of collecting as a dead gap under
-        // the bottom band.
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ', trailing: widget.bloodType),
-          IntrinsicHeight(
+          Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -490,7 +462,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
 
   Widget _buildLeftColumn() {
     return SizedBox(
-      width: 96,
+      width: 90,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -503,7 +475,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                   'DONOR',
                   style: TextStyle(
                     color: ResQTheme.primaryCrimson.withValues(alpha: 0.22),
-                    fontSize: 20,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 2,
                   ),
@@ -513,7 +485,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(2, 10, 8, 8),
+              padding: const EdgeInsets.fromLTRB(2, 8, 6, 6),
               child: Column(
                 children: [
                   Expanded(
@@ -549,20 +521,12 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     ),
                   ),
                   const SizedBox(height: 5),
-                  // A fixed height, not Expanded/flex — this Column sits
-                  // inside an IntrinsicHeight (see _buildCardFront), which
-                  // computes a shared row height from its children's
-                  // intrinsic sizes; two competing flexible children here
-                  // (this and the photo above) threw that computation off
-                  // and caused a real overflow ("bottom overflowed by NN
-                  // pixels", the yellow/black hazard-stripe indicator).
-                  // Bigger than the original cramped 22px so a drawn
-                  // signature is actually legible, without touching the
-                  // flex/intrinsic-sizing interaction that broke last time.
+                  // Fixed height; the photo above takes whatever is left of
+                  // the card's fixed height.
                   GestureDetector(
                     onTap: _openSignaturePad,
                     child: Container(
-                      height: 42,
+                      height: 32,
                       width: double.infinity,
                       alignment: Alignment.center,
                       clipBehavior: Clip.antiAlias,
@@ -589,7 +553,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                             ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     'Keep this card with you.',
                     textAlign: TextAlign.center,
@@ -613,108 +577,99 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     DateTime? issued,
     DateTime? validUntil,
   ) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(painter: _RingsPainter(color: ResQTheme.primaryCrimson.withValues(alpha: 0.06))),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 12, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.water_drop_rounded, color: ResQTheme.primaryCrimson, size: 20),
-                  const SizedBox(width: 6),
-                  const Text('ResQ', style: TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.w900, fontSize: 17)),
-                ],
+    Widget field(String label, Widget value) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [_cardLabel(label), value],
+        );
+    const gap = SizedBox(height: 5);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const hPad = 10.0 + 10.0;
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(painter: _RingsPainter(color: ResQTheme.primaryCrimson.withValues(alpha: 0.06))),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+              // Scales the block down if it's ever taller than the space
+              // the card leaves for it — shrink, never overflow.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: constraints.maxWidth - hPad,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.water_drop_rounded, color: ResQTheme.primaryCrimson, size: 15),
+                          const SizedBox(width: 4),
+                          const Text('ResQ', style: TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.w900, fontSize: 13)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'BLOOD DONOR ID CARD · PAGKAKAKILANLAN NG DONOR',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: ResQTheme.textMuted, fontSize: 5.5, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 2, child: field('Surname · Apelyido', _cardValue(surname.isNotEmpty ? surname : widget.donorName))),
+                          Expanded(
+                            child: field(
+                              'Blood type · Uri ng dugo',
+                              Text(widget.bloodType,
+                                  maxLines: 1,
+                                  style: const TextStyle(color: ResQTheme.primaryCrimson, fontWeight: FontWeight.w900, fontSize: 12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      gap,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 2, child: field('Given names · Pangalan', _cardValue(given.isNotEmpty ? given : '—'))),
+                          Expanded(child: field('Sex · Kasarian', _cardValue(sex))),
+                        ],
+                      ),
+                      gap,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 2, child: field('Birth date · Kapanganakan', _cardValue(issuedDateOr(widget.birthDate)))),
+                          Expanded(child: field('Donations · Donasyon', _cardValue('${widget.completedDonations}'))),
+                        ],
+                      ),
+                      gap,
+                      field('Donor ID · Numero ng donor', _cardValue(widget.donorCode.isNotEmpty ? widget.donorCode : '—')),
+                      gap,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: field('Issued · Petsa ng pagbigay', _cardValue(issuedDateOr(issued)))),
+                          Expanded(child: field('Valid until · Balido hanggang', _cardValue(issuedDateOr(validUntil)))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              Text(
-                'BLOOD DONOR ID CARD · PAGKAKAKILANLAN NG DONOR',
-                style: TextStyle(color: ResQTheme.textMuted, fontSize: 6.3, fontWeight: FontWeight.bold, letterSpacing: 0.3),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _cardLabel('Surname · Apelyido'),
-                        _cardValue(surname.isNotEmpty ? surname : widget.donorName),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _cardLabel('Blood type · Uri ng dugo'),
-                        Text(widget.bloodType, style: const TextStyle(color: ResQTheme.primaryCrimson, fontWeight: FontWeight.w900, fontSize: 15)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              _cardLabel('Given names · Pangalan'),
-              _cardValue(given.isNotEmpty ? given : '—'),
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _cardLabel('Birth date · Kapanganakan'),
-                        _cardValue(issuedDateOr(widget.birthDate)),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [_cardLabel('Sex · Kasarian'), _cardValue(sex)],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [_cardLabel('Donations · Donasyon'), _cardValue('${widget.completedDonations}')],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              _cardLabel('Donor ID · Numero ng donor'),
-              _cardValue(widget.donorCode.isNotEmpty ? widget.donorCode : '—'),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [_cardLabel('Issued · Petsa ng pagbigay'), _cardValue(issuedDateOr(issued))],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [_cardLabel('Valid until · Balido hanggang'), _cardValue(issuedDateOr(validUntil))],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -724,19 +679,21 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: ResQTheme.textMuted, fontSize: 6.5),
+        style: TextStyle(color: ResQTheme.textMuted, fontSize: 5.8),
       );
 
   Widget _cardValue(String text) => Text(
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.bold, fontSize: 11.5),
+        style: const TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.bold, fontSize: 10),
       );
 
   Widget _backLabel(String text, {Color? color}) => Text(
         text,
-        style: TextStyle(color: color ?? ResQTheme.textMuted, fontSize: 6.5, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: color ?? ResQTheme.textMuted, fontSize: 5.8, fontWeight: FontWeight.bold, letterSpacing: 0.3),
       );
 
   // Physical-ID-card-style back: coordinating hospital, a single-row
@@ -749,153 +706,169 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     final hasEmergencyContact = widget.emergencyContactName.trim().isNotEmpty;
 
     return Container(
-      width: double.infinity,
+      width: _cardW,
+      height: _cardH,
       clipBehavior: Clip.antiAlias,
       decoration: _cardDecoration,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _bandText('IF FOUND · KUNG NATAGPUAN · RETURN TO ANY RESQ PARTNER BLOOD BANK', trailing: _shortDonorCode),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _backLabel('REGISTERED AT · NAKATALA SA'),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Philippine Red Cross – Quezon Chapter',
-                        style: TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.w900, fontSize: 11.5),
-                      ),
-                      const SizedBox(height: 8),
-                      _backLabel('DONATION RECORD · TALA NG DONASYON'),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 3,
-                        runSpacing: 3,
-                        children: List.generate(10, (i) {
-                          final filled = i < widget.completedDonations;
-                          return Icon(
-                            filled ? Icons.water_drop_rounded : Icons.water_drop_outlined,
-                            size: 13,
-                            color: filled ? ResQTheme.primaryCrimson : ResQTheme.lightBorder,
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 8),
-                      _backLabel('EMERGENCY CONTACT · KONTAK SA EMERHENSIYA', color: ResQTheme.primaryCrimson),
-                      const SizedBox(height: 2),
-                      Text(
-                        hasEmergencyContact
-                            ? '${widget.emergencyContactName} · ${widget.emergencyContactPhone}'
-                            : 'Not set — add one in Settings',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: hasEmergencyContact ? ResQTheme.textDark : ResQTheme.textMuted,
-                          fontWeight: hasEmergencyContact ? FontWeight.bold : FontWeight.normal,
-                          fontStyle: hasEmergencyContact ? FontStyle.normal : FontStyle.italic,
-                          fontSize: 9.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      _buildBracketedQr(),
-                      const SizedBox(height: 4),
-                      Text(
-                        'SCAN TO VERIFY DONOR · I-SCAN',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 6, fontWeight: FontWeight.bold, color: ResQTheme.textMuted, letterSpacing: 0.3),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: double.infinity,
-            color: ResQTheme.lightPinkTint,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('RECENT DONATION RECORD · TALA NG DONASYON', style: TextStyle(color: ResQTheme.primaryCrimson, fontSize: 6.5, fontWeight: FontWeight.bold)),
-                Text('${widget.completedDonations} lifetime', style: const TextStyle(color: ResQTheme.primaryCrimson, fontSize: 6.5, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: _loadingHistory
-                ? const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)))
-                : _history.isEmpty
-                    ? Text('No donation history yet.', style: TextStyle(color: ResQTheme.textMuted, fontSize: 9))
-                    : Column(
-                        children: _history.take(3).toList().asMap().entries.map((entry) {
-                          final row = entry.value;
-                          final dateStr = row['arrivedAt'] as String?;
-                          final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-                          final hospital = row['hospitalName'] as String? ?? 'ResQ Partner Hospital';
-                          final donNumber = widget.completedDonations - entry.key;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
+          // Everything between the band and the MRZ strip is scaled down if
+          // it's ever taller than the card leaves for it — shrink, never
+          // overflow.
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: _cardW,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 7, 12, 5),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(
-                                  width: 62,
-                                  child: Text(
-                                    date != null ? _formatDate(date) : '—',
-                                    style: const TextStyle(fontSize: 9, fontFamily: 'monospace', color: ResQTheme.textDark),
-                                  ),
+                                _backLabel('REGISTERED AT · NAKATALA SA'),
+                                const SizedBox(height: 1),
+                                const Text(
+                                  'Philippine Red Cross – Quezon Chapter',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: ResQTheme.textDark, fontWeight: FontWeight.w900, fontSize: 9.5),
                                 ),
-                                Expanded(
-                                  child: Text(hospital, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9, color: ResQTheme.textDark)),
+                                const SizedBox(height: 5),
+                                _backLabel('DONATION RECORD · TALA NG DONASYON'),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: List.generate(10, (i) {
+                                    final filled = i < widget.completedDonations;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 2),
+                                      child: Icon(
+                                        filled ? Icons.water_drop_rounded : Icons.water_drop_outlined,
+                                        size: 11,
+                                        color: filled ? ResQTheme.primaryCrimson : ResQTheme.lightBorder,
+                                      ),
+                                    );
+                                  }),
                                 ),
+                                const SizedBox(height: 5),
+                                _backLabel('EMERGENCY CONTACT · KONTAK SA EMERHENSIYA', color: ResQTheme.primaryCrimson),
+                                const SizedBox(height: 1),
                                 Text(
-                                  'DON-${donNumber.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: ResQTheme.primaryCrimson),
+                                  hasEmergencyContact
+                                      ? '${widget.emergencyContactName} · ${widget.emergencyContactPhone}'
+                                      : 'Not set — add one in Settings',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: hasEmergencyContact ? ResQTheme.textDark : ResQTheme.textMuted,
+                                    fontWeight: hasEmergencyContact ? FontWeight.bold : FontWeight.normal,
+                                    fontStyle: hasEmergencyContact ? FontStyle.normal : FontStyle.italic,
+                                    fontSize: 8.5,
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            children: [
+                              _buildBracketedQr(size: 64),
+                              const SizedBox(height: 2),
+                              Text(
+                                'SCAN TO VERIFY',
+                                style: TextStyle(fontSize: 5.5, fontWeight: FontWeight.bold, color: ResQTheme.textMuted, letterSpacing: 0.3),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
+                    ),
+                    Container(
+                      width: double.infinity,
+                      color: ResQTheme.lightPinkTint,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('RECENT DONATIONS · TALA NG DONASYON',
+                              style: TextStyle(color: ResQTheme.primaryCrimson, fontSize: 5.8, fontWeight: FontWeight.bold)),
+                          Text('${widget.completedDonations} lifetime',
+                              style: const TextStyle(color: ResQTheme.primaryCrimson, fontSize: 5.8, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 3, 12, 3),
+                      child: _loadingHistory
+                          ? const Center(child: SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)))
+                          : _history.isEmpty
+                              ? Text('No donation history yet.', style: TextStyle(color: ResQTheme.textMuted, fontSize: 8))
+                              // Two most recent — the full history lives in
+                              // Profile › Clinical & Donation Records.
+                              : Column(
+                                  children: _history.take(2).toList().asMap().entries.map((entry) {
+                                    final row = entry.value;
+                                    final dateStr = row['arrivedAt'] as String?;
+                                    final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+                                    final hospital = row['hospitalName'] as String? ?? 'ResQ Partner Hospital';
+                                    final donNumber = widget.completedDonations - entry.key;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 1),
+                                      child: Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 58,
+                                            child: Text(
+                                              date != null ? _formatDate(date) : '—',
+                                              style: const TextStyle(fontSize: 8, fontFamily: 'monospace', color: ResQTheme.textDark),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(hospital,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 8, color: ResQTheme.textDark)),
+                                          ),
+                                          Text(
+                                            'DON-${donNumber.toString().padLeft(2, '0')}',
+                                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: ResQTheme.primaryCrimson),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
+          // Decorative MRZ strip, pinned to the bottom edge like a real card.
           Container(
-            width: double.infinity,
             color: const Color(0xFFF0EDE7),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            // Each line is stretched to fill the full card width (rather
-            // than sitting small and left-hugging) via BoxFit.fitWidth —
-            // so it looks right regardless of how long the donor's actual
-            // name/code happen to be, instead of tuning a fixed font size
-            // that only looks right for one particular donor's data.
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: _buildMrz(surname, given)
                   .map(
-                    (line) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: FittedBox(
-                        fit: BoxFit.fitWidth,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          line,
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF5B5648), letterSpacing: 1),
-                        ),
+                    (line) => FittedBox(
+                      fit: BoxFit.fitWidth,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        line,
+                        maxLines: 1,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF5B5648), letterSpacing: 1, height: 1.15),
                       ),
                     ),
                   )
@@ -907,9 +880,9 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     );
   }
 
-  Widget _buildBracketedQr() {
-    const bracketSize = 96.0;
-    const qrSize = bracketSize; // flush with the corner brackets, no gap
+  Widget _buildBracketedQr({double size = 96}) {
+    final bracketSize = size;
+    final qrSize = bracketSize; // flush with the corner brackets, no gap
     return SizedBox(
       width: bracketSize,
       height: bracketSize,
@@ -917,7 +890,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
         children: [
           Center(
             child: widget.donorCode.isEmpty
-                ? const Icon(Icons.qr_code_2_rounded, size: qrSize)
+                ? Icon(Icons.qr_code_2_rounded, size: qrSize)
                 : QrImageView(
                     data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(widget.donorCode)}',
                     version: QrVersions.auto,
@@ -925,7 +898,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     backgroundColor: Colors.transparent,
                   ),
           ),
-          CustomPaint(size: const Size.square(bracketSize), painter: _CornerBracketsPainter()),
+          CustomPaint(size: Size.square(bracketSize), painter: _CornerBracketsPainter()),
         ],
       ),
     );
