@@ -23,6 +23,7 @@ import 'package:resq/services/notif_service.dart';
 import 'package:resq/services/push_service.dart';
 import 'package:resq/services/local_prefs.dart';
 import 'package:resq/services/realtime_service.dart';
+import 'package:resq/services/location_service.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
@@ -304,20 +305,27 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
 
   /// GET /api/donor/requests — the real "Priority Request Feed" shown on
   /// the eligible Home tab (EligibleHomeView's "Urgent Blood Requests"
-  /// section). Previously this list was hardcoded permanently empty with a
-  /// comment saying nothing populated it. No donor GPS is collected yet (no
-  /// location package wired into this app), so results come back ordered
-  /// by urgency-then-recency rather than by distance — same fallback the
-  /// backend itself uses when lat/lng aren't supplied. Silent on failure
-  /// for the same reason as _loadCurrentAppointment: background enrichment
-  /// on open, not a donor-triggered action.
+  /// section). When the donor has Location Services on in Settings and has
+  /// actually granted the OS permission, this reads a live GPS fix
+  /// (LocationService) and sends it along so results come back sorted by
+  /// real distance rather than just urgency-then-recency — the backend
+  /// falls back to that non-location ordering on its own whenever lat/lng
+  /// aren't supplied, so a denied/disabled/timed-out fix here degrades
+  /// gracefully instead of failing the whole refresh. Silent on failure for
+  /// the same reason as _loadCurrentAppointment: background enrichment on
+  /// open, not a donor-triggered action.
   Future<void> _loadOpenRequests() async {
     if (widget.token.isEmpty) {
       debugPrint('HomeView._loadOpenRequests: skipped — no session token.');
       return;
     }
     try {
-      final raw = await ApiService.listOpenRequests(widget.token);
+      final position = await LocationService.getCurrentPositionIfEnabled(widget.donorId);
+      final raw = await ApiService.listOpenRequests(
+        widget.token,
+        lat: position?.latitude,
+        lng: position?.longitude,
+      );
       debugPrint('HomeView._loadOpenRequests: got ${raw.length} row(s): $raw');
       if (!mounted) return;
       _apiRequests = raw

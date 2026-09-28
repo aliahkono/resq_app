@@ -410,15 +410,16 @@ class ApiService {
   /// GET /api/donor/requests — open hospital broadcasts matching this
   /// donor's blood type (see listOpenRequestsForDonor,
   /// donorPortal.controller.js), ranked by urgency then, if lat/lng are
-  /// supplied, proximity. This app doesn't collect donor GPS yet (no
-  /// location package wired in), so lat/lng are left out for now — the
-  /// backend just falls back to newest-first ordering, same as it does for
-  /// any caller that skips them.
+  /// supplied, proximity. [lat]/[lng] come from the donor's live GPS
+  /// position (see LocationService) when location services are enabled;
+  /// when omitted the backend falls back to newest-first ordering, same as
+  /// it does for any caller that skips them.
   /// [{requestCode, bloodType, priority, ward, unitsNeeded, unitsFulfilled,
   ///   status, secondsOpen, hospitalId, hospitalName, hospitalAddress,
   ///   latitude, longitude, distanceKm}]
-  static Future<List<dynamic>> listOpenRequests(String token) {
-    return _getList('/donor/requests', token: token);
+  static Future<List<dynamic>> listOpenRequests(String token, {double? lat, double? lng}) {
+    final query = (lat != null && lng != null) ? '?lat=$lat&lng=$lng' : '';
+    return _getList('/donor/requests$query', token: token);
   }
 
   /// GET /api/donor/notifications — {notifications: [...], unreadCount: n}.
