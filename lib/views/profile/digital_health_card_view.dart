@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -256,6 +257,25 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     }
   }
 
+  // "View fullscreen in landscape" — for handing the phone to hospital
+  // staff or a scanner: just the card, as big as the screen allows, rotated
+  // to landscape regardless of whether the donor has device auto-rotate
+  // turned on (most people don't leave it on, and fumbling with the
+  // system rotation lock isn't something you want to do mid-checkin).
+  // Reuses _buildFlipCard's own widget (tap-to-flip animation included) —
+  // safe to render it a second time in a different route because its
+  // AspectRatio/FittedBox sizing comes from whatever layout constraints
+  // its *actual* parent in the tree hands it, not from where the method
+  // was called from, so it fills this new fullscreen route correctly.
+  void _openFullscreenCard(_DonorTier tier) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _CardFullscreenView(card: _buildFlipCard(tier)),
+      ),
+    );
+  }
+
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -292,6 +312,11 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
             foregroundColor: Colors.white,
             title: const Text('Digitalized Health Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
             actions: [
+              IconButton(
+                onPressed: () => _openFullscreenCard(tier),
+                tooltip: 'View fullscreen in landscape',
+                icon: const Icon(Icons.open_in_full_rounded),
+              ),
               IconButton(
                 onPressed: _saving ? null : _downloadCard,
                 tooltip: 'Download card',
@@ -1174,6 +1199,82 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Fullscreen "show this to staff" presentation of just the card (no
+/// donation stamps / priority access sections) — pushed by
+/// _openFullscreenCard above. Forces landscape and hides the system status/
+/// nav bars for the widest, least-distracted view of the card, then
+/// restores both the moment this route is left (back gesture, close
+/// button, or system back), so the rest of the app isn't stuck sideways.
+class _CardFullscreenView extends StatefulWidget {
+  final Widget card;
+
+  const _CardFullscreenView({required this.card});
+
+  @override
+  State<_CardFullscreenView> createState() => _CardFullscreenViewState();
+}
+
+class _CardFullscreenViewState extends State<_CardFullscreenView> {
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void dispose() {
+    // Back to whatever the rest of the app allows (portrait included) and
+    // the normal status/nav bar chrome.
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // No PopScope needed: this route doesn't block back navigation, and
+    // dispose() above already restores orientation/system UI regardless of
+    // how the route is popped (back gesture, the close button below, or a
+    // system back press) — every path removes this State from the tree the
+    // same way.
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                child: widget.card,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                tooltip: 'Close',
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+              ),
+            ),
+            Positioned(
+              bottom: 10,
+              left: 0,
+              right: 0,
+              child: Text(
+                'Tap the card to flip · Tap × to exit',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
