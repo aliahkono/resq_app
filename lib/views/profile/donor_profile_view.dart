@@ -362,7 +362,30 @@ class DonorProfileView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          // Sits above the QR pass button so the health card — the thing a
+          // donor actually shows hospital staff at checkin, not just a
+          // quick QR scan — is the more prominent of the two actions on
+          // this card, not buried further down in Clinical & Donation
+          // Records where _openHealthCard was previously the only way in.
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: () => _openHealthCard(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF9B1B20),
+                side: const BorderSide(color: Color(0xFF9B1B20), width: 1.3),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.badge_outlined, size: 18),
+              label: const Text(
+                'View Digitalized Health Card',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             height: 44,
