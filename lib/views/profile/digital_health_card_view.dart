@@ -843,7 +843,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                           const SizedBox(width: 10),
                           Column(
                             children: [
-                              _buildBracketedQr(size: 64),
+                              _buildBracketedQr(size: 78),
                               const SizedBox(height: 2),
                               Text(
                                 'SCAN TO VERIFY',
@@ -957,6 +957,14 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     version: QrVersions.auto,
                     size: qrSize,
                     backgroundColor: Colors.transparent,
+                    // QrImageView defaults to a 10px built-in quiet-zone
+                    // padding on every side — with the brackets painted
+                    // flush at 0/w/h (see _CornerBracketsPainter), that
+                    // default padding was what actually made the QR look
+                    // small inside its own corner guides, not the box size
+                    // itself. Zeroing it lets the QR modules fill the same
+                    // area the brackets frame, edge to edge.
+                    padding: EdgeInsets.zero,
                   ),
           ),
           CustomPaint(size: Size.square(bracketSize), painter: _CornerBracketsPainter()),
