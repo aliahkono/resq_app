@@ -31,6 +31,7 @@ class DonorProfileView extends StatelessWidget {
   final String? photoUrl;
   final String? signatureUrl;
   final ValueChanged<String>? onPhotoUpdated;
+  final ValueChanged<String>? onSignatureUpdated;
   final VerificationStatus verificationStatus;
   final DateTime? lastDonationAt;
   // Digital Health Card fields (migration 018) — optional, edited from
@@ -56,6 +57,7 @@ class DonorProfileView extends StatelessWidget {
     this.photoUrl,
     this.signatureUrl,
     this.onPhotoUpdated,
+    this.onSignatureUpdated,
     this.verificationStatus = VerificationStatus.notStarted,
     this.memberSince,
     this.birthDate,
@@ -1162,6 +1164,7 @@ class DonorProfileView extends StatelessWidget {
           bloodType: bloodType.isNotEmpty ? bloodType : 'A+',
           photoUrl: photoUrl,
           signatureUrl: signatureUrl,
+          onSignatureUpdated: onSignatureUpdated,
           completedDonations: completedDonations,
           verificationStatus: verificationStatus,
           isEligible: isEligible,

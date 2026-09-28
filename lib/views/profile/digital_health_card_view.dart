@@ -53,6 +53,13 @@ class DigitalHealthCardView extends StatefulWidget {
   final String bloodType;
   final String? photoUrl;
   final String? signatureUrl;
+  // Bubbles a newly-saved signature's URL up to whoever constructed this
+  // screen (HomeView) so ITS OWN state updates too — without this, saving a
+  // signature only updated this screen instance's local state, so leaving
+  // and re-opening the card (a fresh DigitalHealthCardView, built again
+  // from HomeView's now-stale signatureUrl) looked like the signature was
+  // never saved at all. Same pattern as DonorProfileView's onPhotoUpdated.
+  final ValueChanged<String>? onSignatureUpdated;
   final int completedDonations;
   final VerificationStatus verificationStatus;
   final bool isEligible;
@@ -70,6 +77,7 @@ class DigitalHealthCardView extends StatefulWidget {
     required this.bloodType,
     this.photoUrl,
     this.signatureUrl,
+    this.onSignatureUpdated,
     required this.completedDonations,
     required this.verificationStatus,
     required this.isEligible,
@@ -117,6 +125,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     );
     if (result != null && result.isNotEmpty && mounted) {
       setState(() => _signatureUrl = result);
+      widget.onSignatureUpdated?.call(result);
     }
   }
 
