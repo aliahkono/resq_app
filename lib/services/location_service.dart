@@ -37,4 +37,14 @@ class LocationService {
       return null;
     }
   }
+
+  /// The donor's saved "Urgent Alert Radius" (Settings), in km — stored as
+  /// e.g. "15 km" (settings_view.dart's own _radiusKm parses the same way).
+  /// Only meaningful alongside a real position, so callers should only send
+  /// this to the backend when getCurrentPositionIfEnabled returned one.
+  static Future<int?> getAlertRadiusKm(String donorId) async {
+    final raw = await LocalPrefs.getString(donorId, 'alertRadius');
+    if (raw == null) return null;
+    return int.tryParse(raw.split(' ').first);
+  }
 }

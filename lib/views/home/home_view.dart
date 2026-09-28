@@ -311,9 +311,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   /// real distance rather than just urgency-then-recency — the backend
   /// falls back to that non-location ordering on its own whenever lat/lng
   /// aren't supplied, so a denied/disabled/timed-out fix here degrades
-  /// gracefully instead of failing the whole refresh. Silent on failure for
-  /// the same reason as _loadCurrentAppointment: background enrichment on
-  /// open, not a donor-triggered action.
+  /// gracefully instead of failing the whole refresh. The saved "Urgent
+  /// Alert Radius" goes along too whenever a position was actually read —
+  /// the backend treats it as a hard cutoff, excluding hospitals farther
+  /// away entirely rather than just sorting them lower. Silent on failure
+  /// for the same reason as _loadCurrentAppointment: background enrichment
+  /// on open, not a donor-triggered action.
   Future<void> _loadOpenRequests() async {
     if (widget.token.isEmpty) {
       debugPrint('HomeView._loadOpenRequests: skipped — no session token.');
@@ -321,10 +324,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     }
     try {
       final position = await LocationService.getCurrentPositionIfEnabled(widget.donorId);
+      final radiusKm = position == null ? null : await LocationService.getAlertRadiusKm(widget.donorId);
       final raw = await ApiService.listOpenRequests(
         widget.token,
         lat: position?.latitude,
         lng: position?.longitude,
+        radiusKm: radiusKm,
       );
       debugPrint('HomeView._loadOpenRequests: got ${raw.length} row(s): $raw');
       if (!mounted) return;

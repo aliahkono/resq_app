@@ -413,12 +413,21 @@ class ApiService {
   /// supplied, proximity. [lat]/[lng] come from the donor's live GPS
   /// position (see LocationService) when location services are enabled;
   /// when omitted the backend falls back to newest-first ordering, same as
-  /// it does for any caller that skips them.
+  /// it does for any caller that skips them. [radiusKm], when also sent
+  /// alongside lat/lng, is a hard cutoff on the backend (the Settings
+  /// "Urgent Alert Radius" picker) — hospitals farther than that are
+  /// excluded entirely, not just sorted lower.
   /// [{requestCode, bloodType, priority, ward, unitsNeeded, unitsFulfilled,
   ///   status, secondsOpen, hospitalId, hospitalName, hospitalAddress,
   ///   latitude, longitude, distanceKm}]
-  static Future<List<dynamic>> listOpenRequests(String token, {double? lat, double? lng}) {
-    final query = (lat != null && lng != null) ? '?lat=$lat&lng=$lng' : '';
+  static Future<List<dynamic>> listOpenRequests(String token, {double? lat, double? lng, int? radiusKm}) {
+    final params = <String>[];
+    if (lat != null && lng != null) {
+      params.add('lat=$lat');
+      params.add('lng=$lng');
+      if (radiusKm != null) params.add('radiusKm=$radiusKm');
+    }
+    final query = params.isEmpty ? '' : '?${params.join('&')}';
     return _getList('/donor/requests$query', token: token);
   }
 

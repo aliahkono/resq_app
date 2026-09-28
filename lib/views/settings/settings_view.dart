@@ -99,12 +99,11 @@ class _SettingsViewState extends State<SettingsView> {
   String _formatBirthDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  // _locationServices actually gates a live GPS read now (LocationService,
-  // used by HomeView._loadOpenRequests) that sorts nearby broadcasts by
-  // real distance. _selectedRadius stays local-only, though — there's no
-  // hard radius cutoff anywhere server-side, only proximity sorting, so
-  // this doesn't filter anything out. Kept as a stored preference in case
-  // a real radius filter gets added to the backend later.
+  // _locationServices gates a live GPS read (LocationService, used by
+  // HomeView._loadOpenRequests) that sorts nearby broadcasts by real
+  // distance; _selectedRadius (saved as 'alertRadius') is sent alongside
+  // it as a real hard cutoff on the backend — hospitals farther than this
+  // are excluded from the feed entirely, not just sorted lower.
   bool _locationServices = false;
   String _selectedRadius = '15 km';
 
