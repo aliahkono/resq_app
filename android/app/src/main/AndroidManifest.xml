@@ -71,6 +71,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/launcher_icon" />
+
+        <!-- Required by the image_cropper plugin's Android backend (uCrop) —
+             the crop screen shown after picking a profile photo. Without this
+             activity declaration, launching the cropper throws an
+             ActivityNotFoundException. -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

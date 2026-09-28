@@ -1,12 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:resq/services/api_service.dart';
 
 /// Tappable circular avatar that lets the donor pick a new photo from the
-/// camera or gallery.
+/// camera or gallery, crop it to a square, and use that as their profile
+/// picture.
 ///
-/// In "upload mode" (`token` provided — the Profile screen), a picked
+/// In "upload mode" (`token` provided — the Profile screen), the cropped
 /// photo is uploaded immediately via [ApiService.uploadProfilePhoto] and
 /// [onUploaded] fires with the new URL once it succeeds.
 ///
@@ -80,19 +82,48 @@ class _EditableAvatarState extends State<EditableAvatar> {
     final picked = await picker.pickImage(source: source, maxWidth: 800, imageQuality: 85);
     if (picked == null || !mounted) return;
 
-    setState(() => _localPreviewPath = picked.path);
+    // Let the donor frame/crop their photo to a square before it becomes
+    // their profile picture — picked.path is whatever raw photo/frame the
+    // camera or gallery gave us, not necessarily square or well-centered.
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 85,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Photo',
+          toolbarColor: const Color(0xFF9B1B20),
+          toolbarWidgetColor: Colors.white,
+          statusBarColor: const Color(0xFF9B1B20),
+          initAspectRatio: CropAspectRatioPreset.square,
+          aspectRatioPresets: const [CropAspectRatioPreset.square],
+          lockAspectRatio: true,
+          hideBottomControls: false,
+        ),
+        IOSUiSettings(
+          title: 'Crop Photo',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          aspectRatioPickerButtonHidden: true,
+        ),
+      ],
+    );
+    if (cropped == null || !mounted) return;
+    final finalPath = cropped.path;
+
+    setState(() => _localPreviewPath = finalPath);
 
     final token = widget.token;
     if (token == null || token.isEmpty) {
       // Registration flow — no session token yet, just hand the local path
       // up; the actual upload happens once account creation succeeds.
-      widget.onLocalFilePicked?.call(picked.path);
+      widget.onLocalFilePicked?.call(finalPath);
       return;
     }
 
     setState(() => _uploading = true);
     try {
-      final url = await ApiService.uploadProfilePhoto(token, picked.path);
+      final url = await ApiService.uploadProfilePhoto(token, finalPath);
       if (!mounted) return;
       widget.onUploaded?.call(url);
     } on ApiException catch (e) {
