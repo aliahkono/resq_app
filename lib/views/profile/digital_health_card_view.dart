@@ -53,6 +53,13 @@ class DigitalHealthCardView extends StatefulWidget {
   final String bloodType;
   final String? photoUrl;
   final String? signatureUrl;
+  // Null means the donor is free to (re)draw their signature right now.
+  // A non-null value in the future means it's locked until that date — see
+  // donorPortal.controller.js's SIGNATURE_COOLDOWN_DAYS comment for why a
+  // signature isn't freely re-editable (RA 8792 wants it to be a stable,
+  // sole-control identifier) but also isn't locked forever (RA 10173 gives
+  // donors the right to correct their own data on a reasonable cadence).
+  final DateTime? signatureEditableAt;
   // Bubbles a newly-saved signature's URL up to whoever constructed this
   // screen (HomeView) so ITS OWN state updates too — without this, saving a
   // signature only updated this screen instance's local state, so leaving
@@ -77,6 +84,7 @@ class DigitalHealthCardView extends StatefulWidget {
     required this.bloodType,
     this.photoUrl,
     this.signatureUrl,
+    this.signatureEditableAt,
     this.onSignatureUpdated,
     required this.completedDonations,
     required this.verificationStatus,
@@ -98,6 +106,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   List<Map<String, dynamic>> _history = [];
   bool _loadingHistory = true;
   String? _signatureUrl;
+  DateTime? _signatureEditableAt;
 
   // The card is drawn on a fixed design canvas with real ID-card
   // proportions (ISO/IEC 7810 ID-1 / CR80: 85.60 × 53.98 mm, ≈ 1.586:1) and
@@ -112,6 +121,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   void initState() {
     super.initState();
     _signatureUrl = widget.signatureUrl;
+    _signatureEditableAt = widget.signatureEditableAt;
     _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
     _loadHistory();
   }
@@ -119,12 +129,43 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // Opens the signature pad (see signature_pad_view.dart); on a successful
   // save it returns the new hosted signature URL, which we show on the
   // card immediately without needing to reload the whole profile.
+  //
+  // Gated by _signatureEditableAt (mirrors donorPortal.controller.js's
+  // SIGNATURE_COOLDOWN_DAYS): a signature is a stable, sole-control
+  // identifier once set (RA 8792), not something redrawn on a whim, so a
+  // donor who already has one can't just tap through to redo it — they see
+  // the date it unlocks instead. The server enforces this for real; this
+  // check just avoids sending them to draw a signature it'll reject.
   Future<void> _openSignaturePad() async {
+    final lockedUntil = _signatureEditableAt;
+    if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Signature Locked'),
+          content: Text(
+            'Your signature is already on file and can\'t be redrawn yet — '
+            'it can be updated again on ${_formatDate(lockedUntil)}. This '
+            'keeps your Digital Health Card signature stable and trustworthy '
+            'between updates.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Got it')),
+          ],
+        ),
+      );
+      return;
+    }
+
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (context) => SignaturePadView(token: widget.token)),
     );
     if (result != null && result.isNotEmpty && mounted) {
-      setState(() => _signatureUrl = result);
+      setState(() {
+        _signatureUrl = result;
+        _signatureEditableAt = DateTime.now().add(const Duration(days: 180));
+      });
       widget.onSignatureUpdated?.call(result);
     }
   }
@@ -563,11 +604,22 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    'Keep this card with you.',
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    style: TextStyle(fontSize: 6, color: ResQTheme.textMuted, height: 1.2),
+                  // The photo above is Expanded (takes whatever's left of
+                  // the card's fixed height), so on a tight layout this
+                  // fixed-size caption was the thing that ran out of room
+                  // and got silently clipped by the card's ClipRRect —
+                  // not truncated with an ellipsis, just gone. FittedBox
+                  // shrinks it to whatever space is actually left instead,
+                  // so it's always visible, just occasionally a hair
+                  // smaller than its 6pt default.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Keep this card with you.',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: TextStyle(fontSize: 6, color: ResQTheme.textMuted, height: 1.2),
+                    ),
                   ),
                 ],
               ),

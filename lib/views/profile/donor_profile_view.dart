@@ -30,6 +30,7 @@ class DonorProfileView extends StatelessWidget {
   final int completedDonations;
   final String? photoUrl;
   final String? signatureUrl;
+  final DateTime? signatureEditableAt;
   final ValueChanged<String>? onPhotoUpdated;
   final ValueChanged<String>? onSignatureUpdated;
   final VerificationStatus verificationStatus;
@@ -56,6 +57,7 @@ class DonorProfileView extends StatelessWidget {
     this.completedDonations = 0,
     this.photoUrl,
     this.signatureUrl,
+    this.signatureEditableAt,
     this.onPhotoUpdated,
     this.onSignatureUpdated,
     this.verificationStatus = VerificationStatus.notStarted,
@@ -1164,6 +1166,7 @@ class DonorProfileView extends StatelessWidget {
           bloodType: bloodType.isNotEmpty ? bloodType : 'A+',
           photoUrl: photoUrl,
           signatureUrl: signatureUrl,
+          signatureEditableAt: signatureEditableAt,
           onSignatureUpdated: onSignatureUpdated,
           completedDonations: completedDonations,
           verificationStatus: verificationStatus,

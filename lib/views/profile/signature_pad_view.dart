@@ -61,6 +61,13 @@ class _SignaturePadViewState extends State<SignaturePadView> {
       final url = await ApiService.uploadSignature(widget.token, pngBytes);
       if (!mounted) return;
       Navigator.of(context).pop(url);
+    } on ApiException catch (e) {
+      // A 403 here means the cooldown lapsed between opening this screen and
+      // saving (DigitalHealthCardView already checks before letting the
+      // donor in) — e.message is already the donor-facing "you can update
+      // it again on <date>" text from the server, no need to prefix it.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

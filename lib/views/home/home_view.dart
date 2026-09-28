@@ -81,6 +81,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   int _completedDonations = 0;
   String? _photoUrl;
   String? _signatureUrl;
+  // Null means the donor can redo their signature right now (never set one,
+  // or the cooldown already passed) — see donorPortal.controller.js's
+  // SIGNATURE_COOLDOWN_DAYS for the server-side rule this mirrors.
+  DateTime? _signatureEditableAt;
   VerificationStatus _verificationStatus = VerificationStatus.notStarted;
   DateTime? _lastDonationAt;
   // When this donor account was created (donors.created_at) — the Digital
@@ -452,6 +456,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final completed = raw is num ? raw.toInt() : 0;
       final photoUrl = profile['photoUrl'] as String?;
       final signatureUrl = profile['signatureUrl'] as String?;
+      final signatureEditableAtStr = profile['signatureEditableAt'] as String?;
+      final signatureEditableAt = signatureEditableAtStr != null ? DateTime.tryParse(signatureEditableAtStr) : null;
       final verification = verificationStatusFromString(profile['verificationStatus'] as String?);
       final lastDonationAtStr = profile['lastDonationAt'] as String?;
       final lastDonationAt = lastDonationAtStr != null ? DateTime.tryParse(lastDonationAtStr) : null;
@@ -464,6 +470,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         _completedDonations = completed;
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
         _signatureUrl = (signatureUrl != null && signatureUrl.isNotEmpty) ? signatureUrl : _signatureUrl;
+        // Straight from the backend each fetch (including reverting to
+        // null once the cooldown passes), not "sticky" like the URL above.
+        _signatureEditableAt = signatureEditableAt;
         _verificationStatus = verification;
         _lastDonationAt = lastDonationAt ?? _lastDonationAt;
         _memberSince = memberSince ?? _memberSince;
@@ -791,7 +800,11 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 bloodType: activeBloodType,
                 photoUrl: _photoUrl,
                 signatureUrl: _signatureUrl,
-                onSignatureUpdated: (url) => setState(() => _signatureUrl = url),
+                signatureEditableAt: _signatureEditableAt,
+                onSignatureUpdated: (url) => setState(() {
+                  _signatureUrl = url;
+                  _signatureEditableAt = DateTime.now().add(const Duration(days: 180));
+                }),
                 completedDonations: _effectiveDonations,
                 verificationStatus: _verificationStatus,
                 isEligible: _effectiveResult.isEligible,
@@ -891,8 +904,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           completedDonations: _effectiveDonations,
           photoUrl: _photoUrl,
           signatureUrl: _signatureUrl,
+          signatureEditableAt: _signatureEditableAt,
           onPhotoUpdated: (url) => setState(() => _photoUrl = url),
-          onSignatureUpdated: (url) => setState(() => _signatureUrl = url),
+          onSignatureUpdated: (url) => setState(() {
+            _signatureUrl = url;
+            _signatureEditableAt = DateTime.now().add(const Duration(days: 180));
+          }),
           verificationStatus: _verificationStatus,
           lastDonationAt: _lastDonationAt,
           memberSince: _memberSince,
