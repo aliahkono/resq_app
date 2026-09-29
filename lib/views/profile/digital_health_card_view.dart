@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -265,11 +264,13 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     }
   }
 
-  // "View fullscreen in landscape" — for handing the phone to hospital
-  // staff or a scanner: just the card, as big as the screen allows, rotated
-  // to landscape regardless of whether the donor has device auto-rotate
-  // turned on (most people don't leave it on, and fumbling with the
-  // system rotation lock isn't something you want to do mid-checkin).
+  // "View card enlarged" — for handing the phone to hospital staff or a
+  // scanner: just the card, rotated to fill the screen edge-to-edge the way
+  // a landscape card would, but WITHOUT actually rotating the device/app —
+  // the status bar, nav bar, and everything else stay upright and in
+  // portrait, matching how the Philippine national ID app's own "enlarge"
+  // view behaves (plain white background, card rotated in place, plain
+  // buttons below it — not a full black fullscreen takeover).
   // Reuses _buildFlipCard's own widget (tap-to-flip animation included),
   // but with FRESH GlobalKeys: the on-screen DigitalHealthCardView stays
   // mounted underneath this pushed route (MaterialPageRoute doesn't
@@ -284,6 +285,8 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
         fullscreenDialog: true,
         builder: (_) => _CardFullscreenView(
           card: _buildFlipCard(tier, frontKey: GlobalKey(), backKey: GlobalKey()),
+          cardAspect: _cardAspect,
+          onFlip: _flip,
         ),
       ),
     );
@@ -323,7 +326,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     // entry point). Only one _buildFlipCard call exists in the tree here,
     // so it's safe to use the default (singleton) front/back keys.
     if (widget.cardOnly) {
-      return _CardFullscreenView(card: _buildFlipCard(tier));
+      return _CardFullscreenView(card: _buildFlipCard(tier), cardAspect: _cardAspect, onFlip: _flip);
     }
 
     return Scaffold(
@@ -339,7 +342,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
             actions: [
               IconButton(
                 onPressed: () => _openFullscreenCard(tier),
-                tooltip: 'View fullscreen in landscape',
+                tooltip: 'Enlarge card',
                 icon: const Icon(Icons.open_in_full_rounded),
               ),
               IconButton(
@@ -1298,73 +1301,86 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   }
 }
 
-/// Fullscreen "show this to staff" presentation of just the card (no
-/// donation stamps / priority access sections) — pushed by
-/// _openFullscreenCard above. Forces landscape and hides the system status/
-/// nav bars for the widest, least-distracted view of the card, then
-/// restores both the moment this route is left (back gesture, close
-/// button, or system back), so the rest of the app isn't stuck sideways.
-class _CardFullscreenView extends StatefulWidget {
+/// "Enlarge card" presentation — pushed by _openFullscreenCard, or shown
+/// directly by cardOnly. Matches how the Philippine national ID app's own
+/// "enlarge" view behaves: the screen and its status/nav bars stay upright
+/// and in portrait (no SystemChrome orientation lock, no black takeover) —
+/// only the card itself is rotated 90° in place to read like a landscape
+/// card, on a plain light background with a couple of clean buttons below.
+class _CardFullscreenView extends StatelessWidget {
   final Widget card;
+  final double cardAspect;
+  final VoidCallback onFlip;
 
-  const _CardFullscreenView({required this.card});
-
-  @override
-  State<_CardFullscreenView> createState() => _CardFullscreenViewState();
-}
-
-class _CardFullscreenViewState extends State<_CardFullscreenView> {
-  @override
-  void initState() {
-    super.initState();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  }
-
-  @override
-  void dispose() {
-    // Back to whatever the rest of the app allows (portrait included) and
-    // the normal status/nav bar chrome.
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    super.dispose();
-  }
+  const _CardFullscreenView({required this.card, required this.cardAspect, required this.onFlip});
 
   @override
   Widget build(BuildContext context) {
-    // No PopScope needed: this route doesn't block back navigation, and
-    // dispose() above already restores orientation/system UI regardless of
-    // how the route is popped (back gesture, the close button below, or a
-    // system back press) — every path removes this State from the tree the
-    // same way.
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: ResQTheme.bgOffWhite,
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Center(
+            Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                child: widget.card,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // The card's own AspectRatio/FittedBox sizing means it
+                    // just needs a box of the right aspect ratio to fill —
+                    // give RotatedBox a pre-rotation box whose dimensions
+                    // are swapped so the box it reports back (post-rotation)
+                    // fits the available portrait space without letterboxing.
+                    var occupiedW = constraints.maxWidth;
+                    var occupiedH = occupiedW * cardAspect;
+                    if (occupiedH > constraints.maxHeight) {
+                      occupiedH = constraints.maxHeight;
+                      occupiedW = occupiedH / cardAspect;
+                    }
+                    return Center(
+                      child: RotatedBox(
+                        quarterTurns: 1,
+                        child: SizedBox(width: occupiedH, height: occupiedW, child: card),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-            Positioned(
-              top: 8,
-              left: 8,
-              child: IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                tooltip: 'Close',
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
-              ),
-            ),
-            Positioned(
-              bottom: 10,
-              left: 0,
-              right: 0,
-              child: Text(
-                'Tap the card to flip · Tap × to exit',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onFlip,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ResQTheme.primaryCrimson,
+                        backgroundColor: ResQTheme.lightPinkTint,
+                        side: BorderSide.none,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                      icon: const Icon(Icons.flip_camera_android_rounded, size: 18),
+                      label: const Text('Flip Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ResQTheme.textMuted,
+                        side: BorderSide(color: ResQTheme.lightBorder),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
