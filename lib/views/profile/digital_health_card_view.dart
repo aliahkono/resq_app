@@ -270,16 +270,21 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // to landscape regardless of whether the donor has device auto-rotate
   // turned on (most people don't leave it on, and fumbling with the
   // system rotation lock isn't something you want to do mid-checkin).
-  // Reuses _buildFlipCard's own widget (tap-to-flip animation included) —
-  // safe to render it a second time in a different route because its
-  // AspectRatio/FittedBox sizing comes from whatever layout constraints
-  // its *actual* parent in the tree hands it, not from where the method
-  // was called from, so it fills this new fullscreen route correctly.
+  // Reuses _buildFlipCard's own widget (tap-to-flip animation included),
+  // but with FRESH GlobalKeys: the on-screen DigitalHealthCardView stays
+  // mounted underneath this pushed route (MaterialPageRoute doesn't
+  // dispose the route below it), so its own _buildFlipCard call is still
+  // using _frontFaceKey/_backFaceKey at the same time — reusing those same
+  // keys here would mean two simultaneously-mounted widgets sharing one
+  // GlobalKey, which Flutter disallows and previously rendered as a black
+  // screen.
   void _openFullscreenCard(_DonorTier tier) {
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => _CardFullscreenView(card: _buildFlipCard(tier)),
+        builder: (_) => _CardFullscreenView(
+          card: _buildFlipCard(tier, frontKey: GlobalKey(), backKey: GlobalKey()),
+        ),
       ),
     );
   }
@@ -308,6 +313,18 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   @override
   Widget build(BuildContext context) {
     final tier = _tierFor(widget.completedDonations);
+
+    // cardOnly (the Profile page's "View Digitalized Health Card" button)
+    // is meant to be handed over at checkin as-is — already in landscape,
+    // no extra tap on a separate fullscreen icon required. So this whole
+    // screen IS the landscape presentation from the moment it opens,
+    // rather than the normal portrait Scaffold below (which still needs
+    // its own manual "open in full" step for the other, stamps-inclusive
+    // entry point). Only one _buildFlipCard call exists in the tree here,
+    // so it's safe to use the default (singleton) front/back keys.
+    if (widget.cardOnly) {
+      return _CardFullscreenView(card: _buildFlipCard(tier));
+    }
 
     return Scaffold(
       backgroundColor: ResQTheme.bgOffWhite,
@@ -414,7 +431,16 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   static const Color _cardCream = Color(0xFFFBF6EF);
   static const Color _band = ResQTheme.primaryCrimson;
 
-  Widget _buildFlipCard(_DonorTier tier) {
+  // frontKey/backKey default to the instance-level _frontFaceKey/
+  // _backFaceKey (used by the on-screen copy that "Download" captures from).
+  // The fullscreen route below builds a *second*, simultaneously-mounted
+  // copy of this same widget tree while the on-screen one stays mounted
+  // underneath it in the Navigator stack — reusing the same GlobalKeys for
+  // both would violate Flutter's one-GlobalKey-per-tree rule and crash to a
+  // black screen, so that call site passes fresh keys instead.
+  Widget _buildFlipCard(_DonorTier tier, {GlobalKey? frontKey, GlobalKey? backKey}) {
+    final effectiveFrontKey = frontKey ?? _frontFaceKey;
+    final effectiveBackKey = backKey ?? _backFaceKey;
     return GestureDetector(
       onTap: _flip,
       child: AspectRatio(
@@ -435,11 +461,11 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                   final angle = _flipController.value * math.pi;
                   final showFront = angle < math.pi / 2;
                   final content = showFront
-                      ? RepaintBoundary(key: _frontFaceKey, child: _buildCardFront(tier))
+                      ? RepaintBoundary(key: effectiveFrontKey, child: _buildCardFront(tier))
                       : Transform(
                           alignment: Alignment.center,
                           transform: Matrix4.identity()..rotateY(math.pi),
-                          child: RepaintBoundary(key: _backFaceKey, child: _buildCardBack()),
+                          child: RepaintBoundary(key: effectiveBackKey, child: _buildCardBack()),
                         );
                   return Transform(
                     alignment: Alignment.center,
