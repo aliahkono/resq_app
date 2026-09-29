@@ -525,11 +525,12 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // Two decorative layers sandwiched around the card's real content
   // (unchanged) to read as security-printed card stock instead of a flat
   // background: a faint engraved wave-line texture (like the fine guilloché
-  // printing on IDs/banknotes), and a soft diagonal holographic-foil sweep
-  // — the subtle rainbow shimmer real ID/passport laminates catch under
-  // light — instead of a plain white streak. Both are IgnorePointer'd and
-  // low-opacity so they never compete with the actual fields, photo, or
-  // text.
+  // printing on IDs/banknotes), and a cool brushed-metal sheen — the
+  // silvery, multi-band light/shadow streak a platinum/titanium card
+  // catches under light, in grays and whites rather than color — plus a
+  // very fine brushed-line texture underneath it for the metallic grain.
+  // Both are IgnorePointer'd and low-opacity so they never compete with
+  // the actual fields, photo, or text.
   Widget _cardBackdrop() {
     return IgnorePointer(
       child: Stack(
@@ -539,21 +540,27 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
           ),
           Positioned.fill(
             child: Opacity(
-              opacity: 0.4,
+              opacity: 0.5,
+              child: CustomPaint(painter: _BrushedMetalPainter()),
+            ),
+          ),
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.5,
               child: ShaderMask(
                 shaderCallback: (rect) => const LinearGradient(
                   begin: Alignment(-1.2, -1.3),
                   end: Alignment(1.2, 1.3),
                   colors: [
                     Colors.transparent,
-                    Color(0xFFFF9ECF), // pink
-                    Color(0xFFFFCE8F), // gold
-                    Color(0xFFAAF0C4), // mint
-                    Color(0xFF9AD6FF), // sky blue
-                    Color(0xFFC7A6FF), // violet
+                    Color(0xFFB7BEC7), // steel shadow
+                    Color(0xFFF4F6F8), // pale silver
+                    Colors.white, // bright highlight
+                    Color(0xFFF4F6F8), // pale silver
+                    Color(0xFFB7BEC7), // steel shadow
                     Colors.transparent,
                   ],
-                  stops: [0.28, 0.38, 0.45, 0.52, 0.59, 0.66, 0.76],
+                  stops: [0.22, 0.36, 0.44, 0.50, 0.56, 0.64, 0.78],
                 ).createShader(rect),
                 blendMode: BlendMode.srcIn,
                 child: Container(color: Colors.white),
@@ -1505,6 +1512,32 @@ class _SecurityWeavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SecurityWeavePainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// Very fine, closely-spaced diagonal lines alternating light/dark gray —
+/// the brushed grain a platinum/titanium card's metal (or metal-look)
+/// surface has, underneath the broader light/shadow sheen painted on top
+/// of it in _cardBackdrop. Purely decorative, never drawn over content.
+class _BrushedMetalPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const spacing = 2.2;
+    final light = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.5)
+      ..strokeWidth = 0.5;
+    final dark = Paint()
+      ..color = const Color(0xFF8B93A0).withValues(alpha: 0.25)
+      ..strokeWidth = 0.5;
+    final diagonal = size.width + size.height;
+    var toggle = false;
+    for (var d = -size.height; d < diagonal; d += spacing) {
+      canvas.drawLine(Offset(d, 0), Offset(d - size.height, size.height), toggle ? light : dark);
+      toggle = !toggle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrushedMetalPainter oldDelegate) => false;
 }
 
 class _RingsPainter extends CustomPainter {
