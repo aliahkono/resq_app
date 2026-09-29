@@ -483,13 +483,55 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     );
   }
 
+  // A flat fill read as a printout; real government/bank-style ID cards are
+  // laminated card stock, so this is a soft diagonal sheen (light catching
+  // the surface) plus a slightly deeper edge, instead of one flat color.
   BoxDecoration get _cardDecoration => BoxDecoration(
-        color: _cardCream,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFDF9), _cardCream, Color(0xFFF3ECE0)],
+          stops: [0.0, 0.55, 1.0],
+        ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 5)),
         ],
       );
+
+  // Two decorative layers sandwiched around the card's real content
+  // (unchanged) to read as security-printed card stock instead of a flat
+  // background: a faint engraved wave-line texture (like the fine guilloché
+  // printing on IDs/banknotes), and a soft diagonal glass-like highlight
+  // sweeping across the laminate, as if catching light. Both are
+  // IgnorePointer'd and low-opacity so they never compete with the actual
+  // fields, photo, or text.
+  Widget _cardBackdrop() {
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(painter: _SecurityWeavePainter(color: _band.withValues(alpha: 0.05))),
+          ),
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.55,
+              child: ShaderMask(
+                shaderCallback: (rect) => const LinearGradient(
+                  begin: Alignment(-1.0, -1.0),
+                  end: Alignment(1.0, 1.0),
+                  colors: [Colors.transparent, Colors.white, Colors.transparent],
+                  stops: [0.30, 0.46, 0.62],
+                ).createShader(rect),
+                blendMode: BlendMode.srcIn,
+                child: Container(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _bandText(String text, {String? trailing}) {
     return Container(
@@ -559,19 +601,24 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       height: _cardH,
       clipBehavior: Clip.antiAlias,
       decoration: _cardDecoration,
-      child: Column(
+      child: Stack(
         children: [
-          _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ', trailing: widget.bloodType),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildLeftColumn(),
-                Expanded(child: _buildFrontFields(tier, surname, given, sex, issued, validUntil)),
-              ],
-            ),
+          Positioned.fill(child: _cardBackdrop()),
+          Column(
+            children: [
+              _bandText('BLOOD DONOR  ·  DONOR NG DUGO  ·  RESQ', trailing: widget.bloodType),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildLeftColumn(),
+                    Expanded(child: _buildFrontFields(tier, surname, given, sex, issued, validUntil)),
+                  ],
+                ),
+              ),
+              _bandText('OFFICIAL BLOOD DONOR IDENTIFICATION  ·  NON-TRANSFERABLE  ·  RESQ NETWORK'),
+            ],
           ),
-          _bandText('OFFICIAL BLOOD DONOR IDENTIFICATION  ·  NON-TRANSFERABLE  ·  RESQ NETWORK'),
         ],
       ),
     );
@@ -838,7 +885,10 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       height: _cardH,
       clipBehavior: Clip.antiAlias,
       decoration: _cardDecoration,
-      child: Column(
+      child: Stack(
+        children: [
+          Positioned.fill(child: _cardBackdrop()),
+          Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _bandText('IF FOUND · KUNG NATAGPUAN · RETURN TO ANY RESQ PARTNER BLOOD BANK', trailing: _shortDonorCode),
@@ -1003,6 +1053,8 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                   .toList(),
             ),
           ),
+        ],
+      ),
         ],
       ),
     );
@@ -1326,6 +1378,34 @@ class _CardFullscreenViewState extends State<_CardFullscreenView> {
 /// the guilloche-pattern security-print look from the physical ID design,
 /// approximated with plain circles rather than a real anti-counterfeiting
 /// pattern (this is a display-only digital card, not something printed).
+/// Faint engraved wave-line texture across the whole card — the kind of
+/// fine, repeating guilloché pattern printed as an anti-counterfeit base
+/// layer on real IDs/banknotes, rather than a flat color. Purely
+/// decorative background (see _cardBackdrop) — never drawn over content.
+class _SecurityWeavePainter extends CustomPainter {
+  final Color color;
+  const _SecurityWeavePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6;
+    const spacing = 6.0;
+    for (var y = -size.width.toDouble(); y < size.height + size.width; y += spacing) {
+      final path = Path()..moveTo(0, y);
+      for (double x = 0; x <= size.width; x += 10) {
+        path.quadraticBezierTo(x + 5, y - 5 + x / size.width * 5, x + 10, y);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SecurityWeavePainter oldDelegate) => oldDelegate.color != color;
+}
+
 class _RingsPainter extends CustomPainter {
   final Color color;
   const _RingsPainter({required this.color});
