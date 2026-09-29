@@ -525,10 +525,11 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // Two decorative layers sandwiched around the card's real content
   // (unchanged) to read as security-printed card stock instead of a flat
   // background: a faint engraved wave-line texture (like the fine guilloché
-  // printing on IDs/banknotes), and a soft diagonal glass-like highlight
-  // sweeping across the laminate, as if catching light. Both are
-  // IgnorePointer'd and low-opacity so they never compete with the actual
-  // fields, photo, or text.
+  // printing on IDs/banknotes), and a soft diagonal holographic-foil sweep
+  // — the subtle rainbow shimmer real ID/passport laminates catch under
+  // light — instead of a plain white streak. Both are IgnorePointer'd and
+  // low-opacity so they never compete with the actual fields, photo, or
+  // text.
   Widget _cardBackdrop() {
     return IgnorePointer(
       child: Stack(
@@ -538,13 +539,21 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
           ),
           Positioned.fill(
             child: Opacity(
-              opacity: 0.55,
+              opacity: 0.4,
               child: ShaderMask(
                 shaderCallback: (rect) => const LinearGradient(
-                  begin: Alignment(-1.0, -1.0),
-                  end: Alignment(1.0, 1.0),
-                  colors: [Colors.transparent, Colors.white, Colors.transparent],
-                  stops: [0.30, 0.46, 0.62],
+                  begin: Alignment(-1.2, -1.3),
+                  end: Alignment(1.2, 1.3),
+                  colors: [
+                    Colors.transparent,
+                    Color(0xFFFF9ECF), // pink
+                    Color(0xFFFFCE8F), // gold
+                    Color(0xFFAAF0C4), // mint
+                    Color(0xFF9AD6FF), // sky blue
+                    Color(0xFFC7A6FF), // violet
+                    Colors.transparent,
+                  ],
+                  stops: [0.28, 0.38, 0.45, 0.52, 0.59, 0.66, 0.76],
                 ).createShader(rect),
                 blendMode: BlendMode.srcIn,
                 child: Container(color: Colors.white),
