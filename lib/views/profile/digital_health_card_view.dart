@@ -271,22 +271,24 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // portrait, matching how the Philippine national ID app's own "enlarge"
   // view behaves (plain white background, card rotated in place, plain
   // buttons below it — not a full black fullscreen takeover).
-  // Reuses _buildFlipCard's own widget (tap-to-flip animation included),
-  // but with FRESH GlobalKeys: the on-screen DigitalHealthCardView stays
-  // mounted underneath this pushed route (MaterialPageRoute doesn't
-  // dispose the route below it), so its own _buildFlipCard call is still
-  // using _frontFaceKey/_backFaceKey at the same time — reusing those same
-  // keys here would mean two simultaneously-mounted widgets sharing one
-  // GlobalKey, which Flutter disallows and previously rendered as a black
-  // screen.
+  // Passes the raw front/back content (not a pre-built _buildFlipCard()
+  // widget) so _CardFullscreenView can drive its own flip animation with
+  // its own AnimationController — it used to reuse this screen's
+  // _flipController, but that controller's ticker gets muted the instant
+  // this pushed route covers the screen that owns it (see
+  // _CardFullscreenView's doc comment), so the flip silently never
+  // animated. No RepaintBoundary/GlobalKeys needed here either — this view
+  // has no Download button, so there's nothing to capture an image of.
   void _openFullscreenCard(_DonorTier tier) {
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => _CardFullscreenView(
-          card: _buildFlipCard(tier, frontKey: GlobalKey(), backKey: GlobalKey()),
+          front: _buildCardFront(tier),
+          back: _buildCardBack(),
           cardAspect: _cardAspect,
-          onFlip: _flip,
+          cardWidth: _cardW,
+          cardHeight: _cardH,
           onEnlargeQr: () => _openEnlargedQr(context),
         ),
       ),
@@ -338,13 +340,15 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     // screen IS the landscape presentation from the moment it opens,
     // rather than the normal portrait Scaffold below (which still needs
     // its own manual "open in full" step for the other, stamps-inclusive
-    // entry point). Only one _buildFlipCard call exists in the tree here,
-    // so it's safe to use the default (singleton) front/back keys.
+    // entry point). See _openFullscreenCard for why this passes raw
+    // front/back content rather than a pre-built _buildFlipCard() widget.
     if (widget.cardOnly) {
       return _CardFullscreenView(
-        card: _buildFlipCard(tier),
+        front: _buildCardFront(tier),
+        back: _buildCardBack(),
         cardAspect: _cardAspect,
-        onFlip: _flip,
+        cardWidth: _cardW,
+        cardHeight: _cardH,
         onEnlargeQr: () => _openEnlargedQr(context),
       );
     }
@@ -454,16 +458,12 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   static const Color _cardCream = Color(0xFFFBF6EF);
   static const Color _band = ResQTheme.primaryCrimson;
 
-  // frontKey/backKey default to the instance-level _frontFaceKey/
-  // _backFaceKey (used by the on-screen copy that "Download" captures from).
-  // The fullscreen route below builds a *second*, simultaneously-mounted
-  // copy of this same widget tree while the on-screen one stays mounted
-  // underneath it in the Navigator stack — reusing the same GlobalKeys for
-  // both would violate Flutter's one-GlobalKey-per-tree rule and crash to a
-  // black screen, so that call site passes fresh keys instead.
-  Widget _buildFlipCard(_DonorTier tier, {GlobalKey? frontKey, GlobalKey? backKey}) {
-    final effectiveFrontKey = frontKey ?? _frontFaceKey;
-    final effectiveBackKey = backKey ?? _backFaceKey;
+  // Only used by the normal portrait screen's inline card now — the
+  // enlarge view builds its own independent flip animation (see
+  // _CardFullscreenView) instead of reusing this one, so there's no longer
+  // a second simultaneous copy of _frontFaceKey/_backFaceKey to collide
+  // with.
+  Widget _buildFlipCard(_DonorTier tier) {
     return GestureDetector(
       onTap: _flip,
       child: AspectRatio(
@@ -484,11 +484,11 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                   final angle = _flipController.value * math.pi;
                   final showFront = angle < math.pi / 2;
                   final content = showFront
-                      ? RepaintBoundary(key: effectiveFrontKey, child: _buildCardFront(tier))
+                      ? RepaintBoundary(key: _frontFaceKey, child: _buildCardFront(tier))
                       : Transform(
                           alignment: Alignment.center,
                           transform: Matrix4.identity()..rotateY(math.pi),
-                          child: RepaintBoundary(key: effectiveBackKey, child: _buildCardBack()),
+                          child: RepaintBoundary(key: _backFaceKey, child: _buildCardBack()),
                         );
                   return Transform(
                     alignment: Alignment.center,
@@ -1343,18 +1343,104 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
 /// and in portrait (no SystemChrome orientation lock, no black takeover) —
 /// only the card itself is rotated 90° in place to read like a landscape
 /// card, on a plain light background with a couple of clean buttons below.
-class _CardFullscreenView extends StatelessWidget {
-  final Widget card;
+///
+/// Owns its OWN flip animation (front/back builders passed in, not a
+/// pre-built card widget) rather than reusing DigitalHealthCardView's
+/// _flipController. That used to be the bug when this was pushed as a new
+/// route from the AppBar's "Enlarge card" icon: Flutter mutes a State's
+/// AnimationController ticker once that State's route is fully covered by
+/// another route (see TickerMode) — and _flipController belongs to
+/// _DigitalHealthCardViewState, whose own route *is* what gets covered
+/// when this one is pushed on top of it. Tapping "Flip Card" still called
+/// .forward()/.reverse() and toggled state correctly, but the muted ticker
+/// never actually advanced the animation's value, so nothing visibly
+/// happened. A controller created here, in this route's own State, always
+/// has an active ticker because this route is never the one being covered.
+class _CardFullscreenView extends StatefulWidget {
+  final Widget front;
+  final Widget back;
   final double cardAspect;
-  final VoidCallback onFlip;
+  final double cardWidth;
+  final double cardHeight;
   final VoidCallback onEnlargeQr;
 
   const _CardFullscreenView({
-    required this.card,
+    required this.front,
+    required this.back,
     required this.cardAspect,
-    required this.onFlip,
+    required this.cardWidth,
+    required this.cardHeight,
     required this.onEnlargeQr,
   });
+
+  @override
+  State<_CardFullscreenView> createState() => _CardFullscreenViewState();
+}
+
+class _CardFullscreenViewState extends State<_CardFullscreenView> with SingleTickerProviderStateMixin {
+  late final AnimationController _flipController;
+  bool _showingBack = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  }
+
+  @override
+  void dispose() {
+    _flipController.dispose();
+    super.dispose();
+  }
+
+  void _flip() {
+    if (_showingBack) {
+      _flipController.reverse();
+    } else {
+      _flipController.forward();
+    }
+    setState(() => _showingBack = !_showingBack);
+  }
+
+  Widget _buildRotatingCard() {
+    return GestureDetector(
+      onTap: _flip,
+      child: AspectRatio(
+        aspectRatio: widget.cardAspect,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: widget.cardWidth,
+            height: widget.cardHeight,
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+              child: AnimatedBuilder(
+                animation: _flipController,
+                builder: (context, child) {
+                  final angle = _flipController.value * math.pi;
+                  final showFront = angle < math.pi / 2;
+                  final content = showFront
+                      ? widget.front
+                      : Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..rotateY(math.pi),
+                          child: widget.back,
+                        );
+                  return Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.0012)
+                      ..rotateY(angle),
+                    child: content,
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1374,15 +1460,15 @@ class _CardFullscreenView extends StatelessWidget {
                     // are swapped so the box it reports back (post-rotation)
                     // fits the available portrait space without letterboxing.
                     var occupiedW = constraints.maxWidth;
-                    var occupiedH = occupiedW * cardAspect;
+                    var occupiedH = occupiedW * widget.cardAspect;
                     if (occupiedH > constraints.maxHeight) {
                       occupiedH = constraints.maxHeight;
-                      occupiedW = occupiedH / cardAspect;
+                      occupiedW = occupiedH / widget.cardAspect;
                     }
                     return Center(
                       child: RotatedBox(
                         quarterTurns: 1,
-                        child: SizedBox(width: occupiedH, height: occupiedW, child: card),
+                        child: SizedBox(width: occupiedH, height: occupiedW, child: _buildRotatingCard()),
                       ),
                     );
                   },
@@ -1395,7 +1481,7 @@ class _CardFullscreenView extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: onFlip,
+                      onPressed: _flip,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ResQTheme.primaryCrimson,
                         backgroundColor: ResQTheme.lightPinkTint,
@@ -1410,7 +1496,7 @@ class _CardFullscreenView extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: onEnlargeQr,
+                      onPressed: widget.onEnlargeQr,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ResQTheme.primaryCrimson,
                         backgroundColor: ResQTheme.lightPinkTint,
