@@ -372,7 +372,7 @@ class DonorProfileView extends StatelessWidget {
             width: double.infinity,
             height: 44,
             child: OutlinedButton.icon(
-              onPressed: () => _openHealthCard(context),
+              onPressed: () => _openHealthCardOnly(context),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF9B1B20),
                 side: const BorderSide(color: Color(0xFF9B1B20), width: 1.3),
@@ -1176,9 +1176,19 @@ class DonorProfileView extends StatelessWidget {
     );
   }
 
-  /// "Digitalized Health Card" tile — opens the full Digital Health Card
-  /// screen (ID card front/back, donation stamps, priority access).
-  void _openHealthCard(BuildContext context) {
+  /// "Digitalized Health Card" tile (Clinical & Donation Records) — opens
+  /// the full screen: ID card front/back, Donation Stamps, Priority Access.
+  void _openHealthCard(BuildContext context) => _pushHealthCard(context, cardOnly: false);
+
+  /// The Main Profile Card's "View Digitalized Health Card" button — just
+  /// the card itself (front/back, tap to flip, fullscreen-landscape action),
+  /// nothing below it. That's the thing a donor actually shows hospital
+  /// staff at checkin; the stamps/tier sections are a separate, unrelated
+  /// "progress toward the next tier" concept that doesn't belong in a
+  /// show-this-to-someone view.
+  void _openHealthCardOnly(BuildContext context) => _pushHealthCard(context, cardOnly: true);
+
+  void _pushHealthCard(BuildContext context, {required bool cardOnly}) {
     final bool isEligible = classificationResult?.isEligible ?? true;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1199,6 +1209,7 @@ class DonorProfileView extends StatelessWidget {
           gender: gender,
           emergencyContactName: emergencyContactName,
           emergencyContactPhone: emergencyContactPhone,
+          cardOnly: cardOnly,
         ),
       ),
     );

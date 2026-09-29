@@ -76,6 +76,13 @@ class DigitalHealthCardView extends StatefulWidget {
   final String? gender;
   final String emergencyContactName;
   final String emergencyContactPhone;
+  // True for the "View Digitalized Health Card" button on the Profile
+  // page's top card — shows just the flip card (still with the tap-to-flip
+  // and "view fullscreen in landscape" actions), not the Donation Stamps /
+  // Priority Blood Access sections below it. Those stay the default (false)
+  // for the Clinical & Donation Records tile, which still opens the full
+  // screen.
+  final bool cardOnly;
 
   const DigitalHealthCardView({
     super.key,
@@ -95,6 +102,7 @@ class DigitalHealthCardView extends StatefulWidget {
     this.gender,
     this.emergencyContactName = '',
     this.emergencyContactPhone = '',
+    this.cardOnly = false,
   });
 
   @override
@@ -344,10 +352,18 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     style: TextStyle(fontSize: 12, color: ResQTheme.textMuted, fontStyle: FontStyle.italic),
                   ),
                 ),
-                const SizedBox(height: 20),
-                _buildDonationStamps(tier),
-                const SizedBox(height: 16),
-                _buildPriorityAccess(tier),
+                // cardOnly (the Profile page's "View Digitalized Health
+                // Card" button) stops here — just the card someone can show
+                // at checkin, not the Donation Stamps / Priority Blood
+                // Access sections, which are their own separate concept
+                // (progress toward donation tiers) unrelated to what a
+                // donor is actually handing over to be scanned.
+                if (!widget.cardOnly) ...[
+                  const SizedBox(height: 20),
+                  _buildDonationStamps(tier),
+                  const SizedBox(height: 16),
+                  _buildPriorityAccess(tier),
+                ],
               ]),
             ),
           ),
