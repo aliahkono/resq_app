@@ -287,7 +287,22 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
           card: _buildFlipCard(tier, frontKey: GlobalKey(), backKey: GlobalKey()),
           cardAspect: _cardAspect,
           onFlip: _flip,
+          onEnlargeQr: () => _openEnlargedQr(context),
         ),
+      ),
+    );
+  }
+
+  // A big, easy-to-scan QR on its own plain screen — for the moment a donor
+  // is actually handing the phone to staff or a scanner and the small
+  // corner-bracketed QR on the card back isn't the easiest target. _buildBracketedQr
+  // has no GlobalKey of its own (unlike _buildFlipCard's faces), so calling
+  // it again here for a second, larger copy is always safe.
+  void _openEnlargedQr(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _QrEnlargedView(qr: _buildBracketedQr(size: 260), donorCode: widget.donorCode),
       ),
     );
   }
@@ -326,7 +341,12 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     // entry point). Only one _buildFlipCard call exists in the tree here,
     // so it's safe to use the default (singleton) front/back keys.
     if (widget.cardOnly) {
-      return _CardFullscreenView(card: _buildFlipCard(tier), cardAspect: _cardAspect, onFlip: _flip);
+      return _CardFullscreenView(
+        card: _buildFlipCard(tier),
+        cardAspect: _cardAspect,
+        onFlip: _flip,
+        onEnlargeQr: () => _openEnlargedQr(context),
+      );
     }
 
     return Scaffold(
@@ -1311,8 +1331,14 @@ class _CardFullscreenView extends StatelessWidget {
   final Widget card;
   final double cardAspect;
   final VoidCallback onFlip;
+  final VoidCallback onEnlargeQr;
 
-  const _CardFullscreenView({required this.card, required this.cardAspect, required this.onFlip});
+  const _CardFullscreenView({
+    required this.card,
+    required this.cardAspect,
+    required this.onFlip,
+    required this.onEnlargeQr,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1348,9 +1374,8 @@ class _CardFullscreenView extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
@@ -1369,18 +1394,69 @@ class _CardFullscreenView extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: onEnlargeQr,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: ResQTheme.textMuted,
-                        side: BorderSide(color: ResQTheme.lightBorder),
+                        foregroundColor: ResQTheme.primaryCrimson,
+                        backgroundColor: ResQTheme.lightPinkTint,
+                        side: BorderSide.none,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                      label: const Text('Enlarge QR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).maybePop(),
+                style: TextButton.styleFrom(foregroundColor: ResQTheme.textMuted),
+                icon: const Icon(Icons.close_rounded, size: 18),
+                label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Just the QR, as big as the screen allows — opened from "Enlarge QR" on
+/// the enlarge-card view, for the moment a scanner needs an easier target
+/// than the small corner-bracketed one on the card back.
+class _QrEnlargedView extends StatelessWidget {
+  final Widget qr;
+  final String donorCode;
+
+  const _QrEnlargedView({required this.qr, required this.donorCode});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ResQTheme.bgOffWhite,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(28), child: qr))),
+            if (donorCode.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  donorCode.toUpperCase(),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.2, color: ResQTheme.textDark),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).maybePop(),
+                style: TextButton.styleFrom(foregroundColor: ResQTheme.textMuted),
+                icon: const Icon(Icons.close_rounded, size: 18),
+                label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
           ],
