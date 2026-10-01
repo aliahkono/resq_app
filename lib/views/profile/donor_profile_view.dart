@@ -363,29 +363,6 @@ class DonorProfileView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // Sits above the QR pass button so the health card — the thing a
-          // donor actually shows hospital staff at checkin, not just a
-          // quick QR scan — is the more prominent of the two actions on
-          // this card, not buried further down in Clinical & Donation
-          // Records where _openHealthCard was previously the only way in.
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: () => _openHealthCardOnly(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF9B1B20),
-                side: const BorderSide(color: Color(0xFF9B1B20), width: 1.3),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.badge_outlined, size: 18),
-              label: const Text(
-                'View Digitalized Health Card',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -1178,17 +1155,7 @@ class DonorProfileView extends StatelessWidget {
 
   /// "Digitalized Health Card" tile (Clinical & Donation Records) — opens
   /// the full screen: ID card front/back, Donation Stamps, Priority Access.
-  void _openHealthCard(BuildContext context) => _pushHealthCard(context, cardOnly: false);
-
-  /// The Main Profile Card's "View Digitalized Health Card" button — just
-  /// the card itself (front/back, tap to flip, fullscreen-landscape action),
-  /// nothing below it. That's the thing a donor actually shows hospital
-  /// staff at checkin; the stamps/tier sections are a separate, unrelated
-  /// "progress toward the next tier" concept that doesn't belong in a
-  /// show-this-to-someone view.
-  void _openHealthCardOnly(BuildContext context) => _pushHealthCard(context, cardOnly: true);
-
-  void _pushHealthCard(BuildContext context, {required bool cardOnly}) {
+  void _openHealthCard(BuildContext context) {
     final bool isEligible = classificationResult?.isEligible ?? true;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1209,7 +1176,6 @@ class DonorProfileView extends StatelessWidget {
           gender: gender,
           emergencyContactName: emergencyContactName,
           emergencyContactPhone: emergencyContactPhone,
-          cardOnly: cardOnly,
         ),
       ),
     );
