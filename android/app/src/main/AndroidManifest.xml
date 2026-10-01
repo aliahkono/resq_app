@@ -22,6 +22,18 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- "Notify me near a hospital with an open request" (Settings) —
+         background location so the app can still report position while
+         closed/backgrounded (see LocationService.startProximityMonitoring).
+         Android 10+ requires ACCESS_BACKGROUND_LOCATION as a *separate*
+         runtime grant from the foreground one above, requested only after
+         the donor has already granted foreground access. Android 14+ also
+         requires naming the foreground-service type that justifies keeping
+         a location fix alive while backgrounded. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
     <!-- Saving the Digital Health Card to the gallery (gal). Only needed on
          Android 9 and below; newer versions save without a permission. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"

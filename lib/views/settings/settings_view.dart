@@ -11,6 +11,7 @@ import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
 import 'package:resq/services/local_prefs.dart';
 import 'package:resq/services/push_service.dart';
+import 'package:resq/services/location_service.dart';
 import 'package:resq/views/settings/delete_acc_otp_view.dart';
 import 'package:resq/widgets/resq_ui.dart';
 
@@ -107,6 +108,13 @@ class _SettingsViewState extends State<SettingsView> {
   bool _locationServices = false;
   String _selectedRadius = '15 km';
 
+  // Gates LocationService.startProximityMonitoring — a background position
+  // stream that reports to PATCH /api/donor/location so the donor can get a
+  // reminder push for a still-open request near the hospital even while the
+  // app is closed. Needs "always" (background) permission, a stricter tier
+  // than _locationServices above, which only needs "while in use".
+  bool _nearbyAlerts = false;
+
   final List<String> _radiusOptions = ['5 km', '10 km', '15 km', '25 km', '50 km'];
 
   @override
@@ -145,12 +153,70 @@ class _SettingsViewState extends State<SettingsView> {
       locationOn = false;
       LocalPrefs.setBool(widget.donorId, 'locationServices', false);
     }
+    final nearbyPref = await LocalPrefs.getBool(widget.donorId, 'nearbyAlerts');
+    // Same staleness check as locationOn above, but against the stricter
+    // "always" tier — background monitoring only ever restarts if that
+    // specific permission is still actually granted.
+    var nearbyOn = nearbyPref ?? false;
+    if (nearbyOn && await Geolocator.checkPermission() != LocationPermission.always) {
+      nearbyOn = false;
+      LocalPrefs.setBool(widget.donorId, 'nearbyAlerts', false);
+    }
     if (!mounted) return;
     setState(() {
       _biometricLogin = biometric;
       _locationServices = locationOn;
+      _nearbyAlerts = nearbyOn;
       if (radius != null) _selectedRadius = radius;
     });
+    if (nearbyOn && widget.token.isNotEmpty) {
+      LocationService.startProximityMonitoring(donorId: widget.donorId, token: widget.token);
+    }
+  }
+
+  /// "Notify Me Near a Hospital" toggle. Requires Location Services Access
+  /// (above) to already be on, then asks for the stricter "always"
+  /// (background) permission tier and, if granted, starts
+  /// LocationService's background position stream so a reminder push can
+  /// fire even while the app is closed.
+  Future<void> _setNearbyAlerts(bool enable) async {
+    if (!mounted) return;
+
+    if (!enable) {
+      setState(() => _nearbyAlerts = false);
+      LocalPrefs.setBool(widget.donorId, 'nearbyAlerts', false);
+      await LocationService.stopProximityMonitoring();
+      return;
+    }
+
+    if (!_locationServices) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Turn on Location Services Access first.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final granted = await LocationService.requestBackgroundPermission();
+    if (!granted) {
+      if (!mounted) return;
+      final open = await _askToOpenSettings(
+        title: 'Background location needed',
+        message:
+            'To notify you about open requests near a hospital even when the app is closed, allow ResQ to access location "All the time" in your phone\'s app settings.',
+      );
+      if (open) await Geolocator.openAppSettings();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _nearbyAlerts = true);
+    LocalPrefs.setBool(widget.donorId, 'nearbyAlerts', true);
+    if (widget.token.isNotEmpty) {
+      await LocationService.startProximityMonitoring(donorId: widget.donorId, token: widget.token);
+    }
   }
 
   /// Biometric Login (Settings list) and "Fingerprint / Face unlock"
@@ -500,6 +566,14 @@ class _SettingsViewState extends State<SettingsView> {
                         title: 'Location Services Access',
                         value: _locationServices,
                         onChanged: (val) => _setLocationServices(val),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF0F0F2)),
+                      _buildSwitchTile(
+                        title: 'Notify Me Near a Hospital',
+                        subtitle: 'Get a reminder when you\'re near a hospital with an open request, even if the app is closed',
+                        value: _nearbyAlerts,
+                        enabled: _locationServices,
+                        onChanged: (val) => _setNearbyAlerts(val),
                       ),
                       const Divider(height: 1, color: Color(0xFFF0F0F2)),
                       _buildRadiusSelectorTile(context),
@@ -1690,6 +1764,7 @@ class _SettingsViewState extends State<SettingsView> {
                     try {
                       await PushService.instance.unregisterDevice(widget.token);
                     } catch (_) {}
+                    await LocationService.stopProximityMonitoring();
                     await SessionStorage.signOut();
                     navigator.pushAndRemoveUntil(
                       MaterialPageRoute(builder: (context) => const AuthLandingView()),

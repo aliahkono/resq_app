@@ -431,6 +431,44 @@ class ApiService {
     return _getList('/donor/requests$query', token: token);
   }
 
+  /// GET /api/donor/requests/nearby — read-only "is there something open
+  /// near me right now" check against the one coordinating hospital (see
+  /// checkNearbyRequest, donorPortal.controller.js). Returns
+  /// {match: {requestCode, bloodType, priority, ward, hospitalId,
+  /// hospitalName, distanceKm} | null} — never sends a push or writes any
+  /// dedup record; that only happens via updateMyLocation below.
+  static Future<Map<String, dynamic>> checkNearbyRequest(
+    String token, {
+    required double lat,
+    required double lng,
+    int? radiusKm,
+  }) {
+    final params = ['lat=$lat', 'lng=$lng'];
+    if (radiusKm != null) params.add('radiusKm=$radiusKm');
+    return _get('/donor/requests/nearby?${params.join('&')}', token: token);
+  }
+
+  /// PATCH /api/donor/location — reports the donor's current position for
+  /// (1) persisting donors.last_lat/lng so a *future* broadcast's initial
+  /// push has something to measure proximity from, and (2) an immediate
+  /// reminder push if this position already puts the donor within range of
+  /// a still-open, blood-type-matching request they haven't been reminded
+  /// about yet (deduped server-side). Called from LocationService's
+  /// background position stream, not from the one-shot read used by
+  /// listOpenRequests above. Returns {ok: true, reminded: bool}.
+  static Future<Map<String, dynamic>> updateMyLocation(
+    String token, {
+    required double lat,
+    required double lng,
+    int? radiusKm,
+  }) {
+    return _patch(
+      '/donor/location',
+      {'lat': lat, 'lng': lng, if (radiusKm != null) 'radiusKm': radiusKm},
+      token: token,
+    );
+  }
+
   /// GET /api/donor/notifications — {notifications: [...], unreadCount: n}.
   /// One row per broadcast the donor was actually sent (see
   /// listMyNotifications, donorPortal.controller.js).
