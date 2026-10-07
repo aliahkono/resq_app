@@ -115,6 +115,14 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   bool _loadingHistory = true;
   String? _signatureUrl;
   DateTime? _signatureEditableAt;
+  // The donor's donor_code ("D-1234") — what Donor Management's check-in
+  // search actually matches on. Every caller passes the raw internal id as
+  // `donorCode` (it's the only id threaded through login/Home), so a QR
+  // built from that opened the dashboard but never found the donor. Fetched
+  // fresh from GET /api/donor/me, same as the QR pass does (see
+  // DonorProfileView); falls back to what was passed in until it arrives.
+  String? _fetchedDonorCode;
+  String get _donorCode => _fetchedDonorCode ?? widget.donorCode;
 
   // The card is drawn on a fixed design canvas with real ID-card
   // proportions (ISO/IEC 7810 ID-1 / CR80: 85.60 × 53.98 mm, ≈ 1.586:1) and
@@ -132,6 +140,20 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     _signatureEditableAt = widget.signatureEditableAt;
     _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
     _loadHistory();
+    _loadDonorCode();
+  }
+
+  Future<void> _loadDonorCode() async {
+    if (widget.token.isEmpty) return;
+    try {
+      final profile = await ApiService.getMyProfile(widget.token);
+      final code = profile['donorCode'] as String?;
+      if (!mounted || code == null || code.isEmpty) return;
+      setState(() => _fetchedDonorCode = code);
+    } catch (_) {
+      // Keeps the passed-in id — the card still renders, the QR just won't
+      // resolve on the dashboard until the next successful load.
+    }
   }
 
   // Opens the signature pad (see signature_pad_view.dart); on a successful
@@ -304,7 +326,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => _QrEnlargedView(qr: _buildBracketedQr(size: 260), donorCode: widget.donorCode),
+        builder: (_) => _QrEnlargedView(qr: _buildBracketedQr(size: 260), donorCode: _donorCode),
       ),
     );
   }
@@ -622,7 +644,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
   // still shown in full on the front ("Donor ID") and in the MRZ strip
   // below; this is just a compact tag, not a separate identifier.
   String get _shortDonorCode {
-    final stripped = widget.donorCode.toUpperCase().replaceAll('-', '');
+    final stripped = _donorCode.toUpperCase().replaceAll('-', '');
     return stripped.length > 10 ? stripped.substring(0, 10) : stripped;
   }
 
@@ -867,7 +889,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                         ],
                       ),
                       gap,
-                      field('Donor ID · Numero ng donor', _cardValue(widget.donorCode.isNotEmpty ? widget.donorCode : '—')),
+                      field('Donor ID · Numero ng donor', _cardValue(_donorCode.isNotEmpty ? _donorCode : '—')),
                       gap,
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1108,10 +1130,10 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
       child: Stack(
         children: [
           Center(
-            child: widget.donorCode.isEmpty
+            child: _donorCode.isEmpty
                 ? Icon(Icons.qr_code_2_rounded, size: qrSize)
                 : QrImageView(
-                    data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(widget.donorCode)}',
+                    data: 'https://resq-admin.me/donor-management?checkin=${Uri.encodeQueryComponent(_donorCode)}',
                     version: QrVersions.auto,
                     size: qrSize,
                     backgroundColor: Colors.transparent,
@@ -1148,7 +1170,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     final surnamePart = surname.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
     final givenPart = given.toUpperCase().replaceAll(RegExp(r'\s+'), '<');
     final line1 = minPad('RQD<PHL<$surnamePart<<$givenPart', 34);
-    final codePart = widget.donorCode.toUpperCase().replaceAll('-', '');
+    final codePart = _donorCode.toUpperCase().replaceAll('-', '');
     final sexLetter = widget.gender == 'female' ? 'F' : 'M';
     String ymd(DateTime? d) => d == null
         ? '000000'
@@ -1543,7 +1565,19 @@ class _QrEnlargedView extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(28), child: qr))),
+            // White card with a real quiet zone around the code: the QR
+            // itself is drawn transparent with zero padding (so it fills its
+            // corner brackets on the card back), which leaves scanners
+            // nothing but the gray page to find its edges against.
+            Expanded(
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  child: qr,
+                ),
+              ),
+            ),
             if (donorCode.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
