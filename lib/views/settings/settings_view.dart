@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
@@ -885,6 +887,9 @@ class _SettingsViewState extends State<SettingsView> {
 
   void _showRadiusPicker(BuildContext context) {
     String pending = _selectedRadius;
+    // Started once per sheet open (not per rebuild), so dragging the slider
+    // doesn't re-request a GPS fix on every frame.
+    final positionFuture = LocationService.getCurrentPositionIfEnabled(widget.donorId);
 
     showResQSheet(
       context: context,
@@ -909,7 +914,10 @@ class _SettingsViewState extends State<SettingsView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Radius preview: rings for each option, the chosen one filled.
+                // Radius preview: a real map centered on the donor's current
+                // position with the chosen radius drawn to scale. Falls back
+                // to the illustrated rings while the fix is loading, or when
+                // location is off/denied (nothing real to center on).
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -920,12 +928,49 @@ class _SettingsViewState extends State<SettingsView> {
                       tween: Tween(end: km.toDouble()),
                       duration: const Duration(milliseconds: 250),
                       curve: Curves.easeOut,
-                      builder: (context, value, _) => CustomPaint(
-                        painter: _RadiusPainter(
-                          selectedKm: value,
-                          maxKm: maxKm.toDouble(),
-                          ringsKm: _radiusOptions.map(_radiusKm).toList(),
-                        ),
+                      builder: (context, value, _) => FutureBuilder<Position?>(
+                        future: positionFuture,
+                        builder: (context, snapshot) {
+                          final position = snapshot.data;
+                          if (position != null) {
+                            return _RadiusMap(
+                              center: LatLng(position.latitude, position.longitude),
+                              radiusKm: value,
+                            );
+                          }
+                          final loading = snapshot.connectionState != ConnectionState.done;
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              CustomPaint(
+                                painter: _RadiusPainter(
+                                  selectedKm: value,
+                                  maxKm: maxKm.toDouble(),
+                                  ringsKm: _radiusOptions.map(_radiusKm).toList(),
+                                ),
+                              ),
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Container(
+                                  margin: const EdgeInsets.all(10),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    loading
+                                        ? 'Finding your location…'
+                                        : _locationServices
+                                            ? 'Couldn\'t get your location'
+                                            : 'Turn on Location Services to see your area',
+                                    style: const TextStyle(fontSize: 11.5, color: RQColors.muted),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -1782,7 +1827,99 @@ class _SettingsViewState extends State<SettingsView> {
   }
 }
 
-/// Preview for the alert-radius sheet: faint rings for every option and the
+/// Live preview for the alert-radius sheet: OpenStreetMap tiles centered on
+/// the donor's current position, the chosen radius drawn as a real-distance
+/// circle, and the camera re-fit to that circle whenever the radius changes.
+/// Non-interactive — it sits inside a bottom sheet next to a slider, where
+/// map panning would fight the sheet's own drag gesture.
+class _RadiusMap extends StatefulWidget {
+  final LatLng center;
+  final double radiusKm;
+
+  const _RadiusMap({required this.center, required this.radiusKm});
+
+  @override
+  State<_RadiusMap> createState() => _RadiusMapState();
+}
+
+class _RadiusMapState extends State<_RadiusMap> {
+  final _controller = MapController();
+  bool _ready = false;
+
+  CameraFit get _fit {
+    const distance = Distance();
+    final meters = widget.radiusKm * 1000;
+    return CameraFit.coordinates(
+      coordinates: [0.0, 90.0, 180.0, 270.0].map((bearing) => distance.offset(widget.center, meters, bearing)).toList(),
+      padding: const EdgeInsets.all(16),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_RadiusMap old) {
+    super.didUpdateWidget(old);
+    if (_ready && (old.radiusKm != widget.radiusKm || old.center != widget.center)) {
+      _controller.fitCamera(_fit);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FlutterMap(
+      mapController: _controller,
+      options: MapOptions(
+        initialCameraFit: _fit,
+        interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+        onMapReady: () => _ready = true,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.resq',
+        ),
+        CircleLayer(
+          circles: [
+            CircleMarker(
+              point: widget.center,
+              radius: widget.radiusKm * 1000,
+              useRadiusInMeter: true,
+              color: RQColors.blood.withValues(alpha: 0.14),
+              borderColor: RQColors.blood,
+              borderStrokeWidth: 2,
+            ),
+          ],
+        ),
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: widget.center,
+              width: 26,
+              height: 26,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: RQColors.navy,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: [BoxShadow(color: RQColors.navy.withValues(alpha: 0.3), blurRadius: 6)],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+      ],
+    );
+  }
+}
+
+/// Fallback preview for the alert-radius sheet (no position available yet,
+/// or location is off): faint rings for every option and the
 /// chosen radius filled, with "you" in the middle. Uses a square-root scale
 /// so the 5 km ring is still visible next to the 50 km one.
 class _RadiusPainter extends CustomPainter {
