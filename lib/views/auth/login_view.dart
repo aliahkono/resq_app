@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
+import 'package:resq/views/auth/forgot_password_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/home_view.dart';
 import 'package:resq/services/api_service.dart';
@@ -292,6 +293,28 @@ class _LoginViewState extends State<LoginView> {
       return 'Password must be at least 8 characters long';
     }
     return null;
+  }
+
+  /// Opens the reset flow pre-filled with whatever is already typed here,
+  /// and on success pre-fills the identifier back so the donor only has to
+  /// type their new password.
+  Future<void> _openForgotPassword() async {
+    final identifier = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ForgotPasswordView(
+          initialIdentifier: _identifierController.text.trim(),
+          initialIsEmail: _isEmailMode,
+        ),
+      ),
+    );
+    if (identifier == null || !mounted) return;
+    setState(() {
+      _isEmailMode = identifier.contains('@');
+      _identifierController.text = identifier;
+      _passwordController.clear();
+      _errorMessage = null;
+    });
   }
 
   // ===========================================================================
@@ -784,14 +807,7 @@ class _LoginViewState extends State<LoginView> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Password reset instructions sent to your email/phone.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
+                      onPressed: _isLoading ? null : _openForgotPassword,
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,

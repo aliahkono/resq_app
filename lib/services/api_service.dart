@@ -211,6 +211,34 @@ class ApiService {
     );
   }
 
+  /// POST /api/donor-auth/forgot-password — { identifier } -> { ok, channel, destination }
+  /// Step 1 of the Forgot Password flow (see ForgotPasswordView). Looks up
+  /// the donor by email or phone (same "@" rule as loginWithPassword) and
+  /// sends a 6-digit reset code — to that email when `identifier` is an
+  /// email, otherwise by SMS to the donor's registered phone. `destination`
+  /// is the masked address the code went to (e.g. "•••••••4567"), shown on
+  /// the next step so the donor knows where to look.
+  static Future<Map<String, dynamic>> requestPasswordReset(String identifier) {
+    return _post('/donor-auth/forgot-password', {'identifier': identifier});
+  }
+
+  /// POST /api/donor-auth/reset-password — { identifier, code, newPassword } -> { ok }
+  /// Step 2: the backend verifies the code and sets the new password in
+  /// this single call (same verify-and-act pattern as deleteMyAccount),
+  /// and ends every existing session for that donor so a stolen device's
+  /// saved token stops working once the password has been changed.
+  static Future<Map<String, dynamic>> resetPassword({
+    required String identifier,
+    required String code,
+    required String newPassword,
+  }) {
+    return _post('/donor-auth/reset-password', {
+      'identifier': identifier,
+      'code': code,
+      'newPassword': newPassword,
+    });
+  }
+
   // --- Donor portal (requires the session token from login) --------------
 
   /// GET /api/donor/me
