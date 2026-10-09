@@ -18,7 +18,13 @@ class SessionStorage {
   static const _tokenKey = 'resq_donor_token';
   static const _biometricKey = 'resq_biometric_enabled';
   static const _biometricDonorKey = 'resq_biometric_donor_id';
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+  // macOS: the data-protection keychain (the plugin default) needs a
+  // keychain-access-groups entitlement, which ad-hoc signed builds can't
+  // carry — every read/write fails with -34018. The login keychain needs
+  // no entitlement.
+  static const FlutterSecureStorage _storage = FlutterSecureStorage(
+    mOptions: MacOsOptions(useDataProtectionKeyChain: false),
+  );
 
   /// Saves the token from a fresh sign-in. [donorId] is the account that
   /// just signed in — if biometric login was set up for a different
