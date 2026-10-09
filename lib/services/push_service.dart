@@ -74,8 +74,21 @@ class PushService {
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(_channel);
 
+    // iOS/macOS settings are required on those platforms — without them
+    // initialize() throws and none of the listeners below get wired. The
+    // permission prompt is left to FCM's requestPermission in
+    // registerDevice, so it isn't shown here at app launch.
+    const darwinSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     await _localNotifications.initialize(
-      const InitializationSettings(android: AndroidInitializationSettings('@mipmap/launcher_icon')),
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+        iOS: darwinSettings,
+        macOS: darwinSettings,
+      ),
       onDidReceiveNotificationResponse: (response) => _handleTapPayload(response.payload),
     );
 
@@ -94,6 +107,7 @@ class PushService {
             importance: Importance.high,
             priority: Priority.high,
           ),
+          iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
         ),
         payload: jsonEncode(message.data),
       );
