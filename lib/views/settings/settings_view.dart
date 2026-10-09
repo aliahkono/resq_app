@@ -1912,7 +1912,20 @@ class _RadiusMapState extends State<_RadiusMap> {
             ),
           ],
         ),
-        const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+        // OSM's tile policy requires this credit, but not flutter_map's own
+        // full-size "flutter_map | ©" bar (SimpleAttributionWidget), which
+        // took over the bottom of a 190px preview — a small corner tag instead.
+        Align(
+          alignment: Alignment.bottomRight,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            color: Colors.white.withValues(alpha: 0.7),
+            child: const Text(
+              '© OpenStreetMap contributors',
+              style: TextStyle(fontSize: 8, color: RQColors.muted),
+            ),
+          ),
+        ),
       ],
     );
   }
