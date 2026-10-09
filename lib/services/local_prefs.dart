@@ -7,7 +7,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// a new dependency (see SessionStorage); nothing stored here is actually
 /// sensitive, this is just the storage already wired into the app.
 class LocalPrefs {
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+  // See SessionStorage: macOS data-protection keychain needs an
+  // entitlement ad-hoc builds can't carry (-34018).
+  static const FlutterSecureStorage _storage = FlutterSecureStorage(
+    mOptions: MacOsOptions(useDataProtectionKeyChain: false),
+  );
 
   static String _key(String donorId, String name) => 'resq_pref_${donorId}_$name';
 
