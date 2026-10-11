@@ -15,6 +15,7 @@ import 'package:resq/services/local_prefs.dart';
 import 'package:resq/services/push_service.dart';
 import 'package:resq/services/location_service.dart';
 import 'package:resq/views/settings/delete_acc_otp_view.dart';
+import 'package:resq/widgets/password_strength.dart';
 import 'package:resq/widgets/resq_ui.dart';
 
 class SettingsView extends StatefulWidget {
@@ -1433,37 +1434,14 @@ class _SettingsViewState extends State<SettingsView> {
           onPressed: onTap,
         );
 
-    Widget rule(bool ok, String text) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(ok ? Icons.check_rounded : Icons.circle_outlined,
-                size: 15, color: ok ? RQColors.success : const Color(0xFF9CA3AF)),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(text, style: TextStyle(fontSize: 12, color: ok ? RQColors.ink : RQColors.muted)),
-            ),
-          ],
-        );
-
     showResQSheet(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
           final pw = newPw.text;
-          final bool hasLen = pw.length >= 8;
-          final bool hasUpper = pw.contains(RegExp(r'[A-Z]'));
-          final bool hasNum = pw.contains(RegExp(r'[0-9]'));
-          final bool hasSym = pw.contains(RegExp(r'[^A-Za-z0-9]'));
-          final int score = [hasLen, hasUpper, hasNum, hasSym].where((b) => b).length;
+          final bool hasLen = PasswordStrengthHints.meetsMinLength(pw);
           final bool matches = confirmPw.text.isNotEmpty && confirmPw.text == pw;
           final bool canSave = hasLen && matches && !saving;
-
-          const labels = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
-          final Color strengthColor = score >= 3
-              ? RQColors.success
-              : score == 2
-                  ? RQColors.warning
-                  : const Color(0xFFB91C1C);
 
           Future<void> submit() async {
             setModalState(() {
@@ -1529,42 +1507,7 @@ class _SettingsViewState extends State<SettingsView> {
                   onChanged: (_) => setModalState(() {}),
                   suffix: eye(obscureNew, () => setModalState(() => obscureNew = !obscureNew)),
                 ),
-                if (pw.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      for (int i = 0; i < 4; i++) ...[
-                        if (i > 0) const SizedBox(width: 4),
-                        Expanded(
-                          child: Container(
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: i < score ? strengthColor : RQColors.hairline,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(width: 10),
-                      Text(labels[score],
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: strengthColor)),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: rule(hasLen, '8+ characters')),
-                    Expanded(child: rule(hasUpper, 'Uppercase letter')),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(child: rule(hasNum, 'A number')),
-                    Expanded(child: rule(hasSym, 'A symbol (!@#)')),
-                  ],
-                ),
+                PasswordStrengthHints(password: pw),
                 const SizedBox(height: 12),
                 RQTextField(
                   controller: confirmPw,

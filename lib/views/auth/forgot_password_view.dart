@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/widgets/password_strength.dart';
 
 /// Forgot Password flow, opened from LoginView's "Forgot my password?":
 /// Enter email/phone -> Code sent -> Enter code + new password -> Reset.
@@ -372,9 +373,10 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
+            onChanged: (_) => setState(() {}),
             validator: (value) {
               if (value == null || value.isEmpty) return 'Please enter a new password';
-              if (value.length < 8) return 'Password must be at least 8 characters';
+              if (!PasswordStrengthHints.meetsMinLength(value)) return 'Password must be at least 8 characters';
               return null;
             },
             decoration: _fieldDecoration(
@@ -391,6 +393,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
               ),
             ),
           ),
+          PasswordStrengthHints(password: _passwordController.text),
           const SizedBox(height: 14),
           _label('Confirm New Password'),
           TextFormField(
