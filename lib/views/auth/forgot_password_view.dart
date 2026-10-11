@@ -27,6 +27,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
   final _identifierFormKey = GlobalKey<FormState>();
   final _resetFormKey = GlobalKey<FormState>();
   late final TextEditingController _identifierController;
+  final _identifierFocus = FocusNode();
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -50,10 +51,22 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
   @override
   void dispose() {
     _identifierController.dispose();
+    _identifierFocus.dispose();
     _codeController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // iOS only reads keyboardType when a field gains focus, so switching
+  // Email <-> Phone No. while the field is focused left the old keyboard up.
+  // Drop focus and take it back next frame to load the right one.
+  void _refreshIdentifierKeyboard() {
+    if (!_identifierFocus.hasFocus) return;
+    _identifierFocus.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _identifierFocus.requestFocus();
+    });
   }
 
   String get _identifier => _identifierController.text.trim().toLowerCase();
@@ -269,6 +282,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
               _identifierController.clear();
               _error = null;
             });
+            _refreshIdentifierKeyboard();
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
@@ -319,6 +333,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           _label(_isEmailMode ? 'Email' : 'Phone Number'),
           TextFormField(
             controller: _identifierController,
+            focusNode: _identifierFocus,
             keyboardType: _isEmailMode ? TextInputType.emailAddress : TextInputType.phone,
             autocorrect: false,
             validator: _validateIdentifier,
