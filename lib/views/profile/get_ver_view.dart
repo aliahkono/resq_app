@@ -185,6 +185,28 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
               ),
+              // Didit's selfie step shows a blurry live preview on iOS
+              // Safari, but the photo it actually captures is sharp — say so
+              // up front so donors don't think their camera is broken.
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(12)),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Color(0xFF6B7280), size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'The camera preview may look blurry during the selfie step. '
+                        "That's normal — your photo is still captured clearly.",
+                        style: TextStyle(color: Color(0xFF6B7280), fontSize: 12, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Container(
