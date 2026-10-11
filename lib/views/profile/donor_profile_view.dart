@@ -1231,17 +1231,18 @@ class DonorProfileView extends StatelessWidget {
             ],
           ),
         ),
+        // 'pending' just means a Didit session was opened and not finished
+        // yet, so the donor still needs a way back into it.
         if (verificationStatus != VerificationStatus.verified &&
-            verificationStatus != VerificationStatus.pending &&
             verificationStatus != VerificationStatus.inReview) ...[
           const SizedBox(width: 8),
           GestureDetector(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (context) => GetVerifiedView(token: token)),
             ),
-            child: const Text(
-              'Get Verified',
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20), decoration: TextDecoration.underline),
+            child: Text(
+              verificationStatus == VerificationStatus.pending ? 'Continue Verification' : 'Get Verified',
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20), decoration: TextDecoration.underline),
             ),
           ),
         ],
