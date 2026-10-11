@@ -166,6 +166,7 @@ class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _identifierFocus = FocusNode();
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   // Interface instance for database calls
@@ -262,7 +263,19 @@ class _LoginViewState extends State<LoginView> {
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _identifierFocus.dispose();
     super.dispose();
+  }
+
+  // iOS only reads keyboardType when a field gains focus, so switching
+  // Email <-> Phone No. while the field is focused left the old keyboard up.
+  // Drop focus and take it back next frame to load the right one.
+  void _refreshIdentifierKeyboard() {
+    if (!_identifierFocus.hasFocus) return;
+    _identifierFocus.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _identifierFocus.requestFocus();
+    });
   }
 
   // --- Validation Helpers (Keep existing local validation) ---
@@ -618,6 +631,7 @@ class _LoginViewState extends State<LoginView> {
                                   _passwordController.clear();
                                   _errorMessage = null;
                                 });
+                                _refreshIdentifierKeyboard();
                               }
                             },
                             child: AnimatedContainer(
@@ -658,6 +672,7 @@ class _LoginViewState extends State<LoginView> {
                                   _passwordController.clear();
                                   _errorMessage = null;
                                 });
+                                _refreshIdentifierKeyboard();
                               }
                             },
                             child: AnimatedContainer(
@@ -726,6 +741,7 @@ class _LoginViewState extends State<LoginView> {
                   // Identifier Input Field (Email / Phone)
                   TextFormField(
                     controller: _identifierController,
+                    focusNode: _identifierFocus,
                     keyboardType: _isEmailMode ? TextInputType.emailAddress : TextInputType.phone,
                     style: const TextStyle(fontSize: 13.5),
                     decoration: InputDecoration(
