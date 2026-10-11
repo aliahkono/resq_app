@@ -118,11 +118,20 @@ class PushService {
     FirebaseMessaging.onMessageOpenedApp.listen((message) => _handleTapPayload(jsonEncode(message.data)));
 
     // App was fully terminated and the tap that opened it was a
-    // notification tap — only checked once, right after init.
-    final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleTapPayload(jsonEncode(initialMessage.data));
-    }
+    // notification tap — only checked once, right after init. Not awaited:
+    // init() runs before runApp(), and on iOS with the UIScene lifecycle
+    // getInitialMessage() can never complete, which left the app stuck on
+    // a white screen. The timeout just stops the future from lingering.
+    unawaited(_messaging
+        .getInitialMessage()
+        .timeout(const Duration(seconds: 5), onTimeout: () => null)
+        .then((initialMessage) {
+      if (initialMessage != null) {
+        _handleTapPayload(jsonEncode(initialMessage.data));
+      }
+    }).catchError((Object e) {
+      debugPrint('PushService: getInitialMessage failed: $e');
+    }));
   }
 
   void _handleTapPayload(String? payload) {
