@@ -25,6 +25,9 @@ dependencies:
   geolocator: ^14.0.2
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
+  # 1.5.x skips kotlin-android on AGP 9, but gradle.properties has
+  # android.builtInKotlin=false, so its plugin never compiles on Android.
+  screen_protector: ">=1.4.13 <1.5.0"
 
 dev_dependencies:
   flutter_test:

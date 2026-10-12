@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/services/screen_privacy.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/profile/signature_pad_view.dart';
 
@@ -139,6 +140,10 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
     _signatureUrl = widget.signatureUrl;
     _signatureEditableAt = widget.signatureEditableAt;
     _flipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+    // The card shows blood type, donation history and the check-in QR.
+    // "Save to Photos" still works — it renders the card itself, not a
+    // screenshot.
+    ScreenPrivacy.protect();
     _loadHistory();
     _loadDonorCode();
   }
@@ -202,6 +207,7 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
 
   @override
   void dispose() {
+    ScreenPrivacy.unprotect();
     _flipController.dispose();
     super.dispose();
   }

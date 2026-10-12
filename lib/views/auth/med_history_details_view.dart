@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resq/services/screen_privacy.dart';
 import 'package:resq/widgets/resq_ui.dart';
 
 /// Result handed back to RegistrationWizView once the donor finishes this
@@ -65,10 +66,12 @@ class _MedicalHistoryDetailsViewState extends State<MedicalHistoryDetailsView> {
     _travelController = TextEditingController(text: widget.initialTravelDesc ?? '');
     _transfusionDate = widget.initialTransfusionDate;
     _travelDate = widget.initialTravelDate;
+    ScreenPrivacy.protect();
   }
 
   @override
   void dispose() {
+    ScreenPrivacy.unprotect();
     _majorMedicalController.dispose();
     _transfusionController.dispose();
     _travelController.dispose();
