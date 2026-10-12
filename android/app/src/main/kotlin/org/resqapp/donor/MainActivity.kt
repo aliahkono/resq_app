@@ -1,4 +1,4 @@
-package com.example.resq
+package org.resqapp.donor
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
