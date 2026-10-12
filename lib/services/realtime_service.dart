@@ -36,7 +36,10 @@ class RealtimeService {
   /// the server mounts the WebSocket upgrade handler at the bare root (see
   /// index.js's attachRealtime call, alongside app.js's express app, not
   /// under the "/api" router).
-  Uri _wsUri(String token) {
+  ///
+  /// The token goes in the Authorization header (see [_connectNow]), not a
+  /// ?token= query param — URLs end up in server/proxy access logs.
+  Uri _wsUri() {
     final apiUri = Uri.parse(kApiBaseUrl);
     final scheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
     return Uri(
@@ -44,7 +47,6 @@ class RealtimeService {
       host: apiUri.host,
       port: apiUri.hasPort ? apiUri.port : null,
       path: '/ws',
-      queryParameters: {'token': token},
     );
   }
 
@@ -58,7 +60,10 @@ class RealtimeService {
   Future<void> _connectNow() async {
     if (_disposed || _token.isEmpty) return;
     try {
-      final socket = await WebSocket.connect(_wsUri(_token).toString());
+      final socket = await WebSocket.connect(
+        _wsUri().toString(),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
       if (_disposed) {
         socket.close();
         return;
