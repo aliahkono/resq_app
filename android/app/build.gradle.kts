@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.resq"
+    namespace = "org.resqapp.donor"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.resq"
+        applicationId = "org.resqapp.donor"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -30,6 +30,14 @@ android {
         release {
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// Match compileOptions above. Without this Kotlin targets whatever JDK runs
+// Gradle (e.g. 25 from Android Studio) and the build fails on the mismatch.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
