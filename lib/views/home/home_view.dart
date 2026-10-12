@@ -214,6 +214,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   void _handleRealtimeEvent(Map<String, dynamic> event) {
     switch (event['type']) {
       case 'blood_request_created':
+      case 'blood_request_updated':
         _loadOpenRequests();
         NotificationService().refresh(widget.token);
         break;
@@ -246,11 +247,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   // Belt-and-suspenders alongside the WebSocket push above: re-checks on
   // every foreground too, in case the socket was disconnected (backgrounded
   // long enough to get killed, flaky network) at the moment a check-in or
-  // broadcast actually happened. Also covers a hospital staffer completing
-  // this donor's appointment by scanning their QR pass (donors.controller.js's
-  // completeAppointment), which isn't one of the four push trigger types
-  // (see push_service.dart) and has no real-time channel of its own on the
-  // donor side (the realtime hub only pushes to the *admin* dashboard).
+  // broadcast actually happened (realtime events aren't replayed after a
+  // reconnect).
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {

@@ -68,6 +68,9 @@ class RealtimeService {
         socket.close();
         return;
       }
+      // Keeps an otherwise-idle connection from being dropped by the
+      // hosting proxy between events.
+      socket.pingInterval = const Duration(seconds: 25);
       _socket = socket;
       _subscription = socket.listen(
         (raw) {
