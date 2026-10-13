@@ -13,6 +13,7 @@ import 'package:resq/views/appointment/no_active_sched_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/eligible_home_view.dart';
 import 'package:resq/views/home/ineligible_home_view.dart';
+import 'package:resq/views/notifications/broadcast_view.dart';
 import 'package:resq/views/profile/digital_health_card_view.dart';
 import 'package:resq/views/profile/donor_profile_view.dart';
 import 'package:resq/views/settings/settings_view.dart';
@@ -172,7 +173,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
 
     _loadCurrentAppointment();
     _loadOpenRequests();
-    _loadDonorProfile();
+    // The notifications page is only opened from a push tap once the
+    // profile has loaded, so it gets the real verification status rather
+    // than the not-yet-fetched default.
+    _loadDonorProfile().whenComplete(() {
+      if (mounted) PushService.instance.setNotificationsOpener(_openNotificationsPage);
+    });
     NotificationService().addListener(_rebuildActiveRequests);
     NotificationService().refresh(widget.token);
     _registerPushIfEnabled();
@@ -193,8 +199,25 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     PushService.instance.registerDevice(widget.token);
   }
 
+  /// Opens the notifications page (same as the bell) — used when the donor
+  /// taps a push notification.
+  void _openNotificationsPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BroadcastsView(
+          isEligible: _effectiveResult.isEligible,
+          donorBloodType: widget.bloodType,
+          token: widget.token,
+          isVerified: _verificationStatus.isVerified,
+          onBookingCompleted: _handleBookingCompleted,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    PushService.instance.clearNotificationsOpener(_openNotificationsPage);
     _pollTimer?.cancel();
     NotificationService().removeListener(_rebuildActiveRequests);
     _realtime.dispose();

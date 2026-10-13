@@ -59,6 +59,33 @@ class PushService {
   StreamSubscription<String>? _tokenRefreshSub;
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  // Opens the notifications page (BroadcastsView). Only HomeView has the
+  // donor details that page needs, so HomeView supplies this while it's
+  // mounted (see setNotificationsOpener).
+  VoidCallback? _openNotifications;
+
+  // A tap that arrived before any donor was on Home — e.g. the app was
+  // launched from a killed state by the tap and is still on splash/login.
+  // Consumed as soon as HomeView registers its opener.
+  bool _pendingOpenNotifications = false;
+
+  /// Called by HomeView once it's ready. If a notification was tapped
+  /// before Home existed, opens it right away.
+  void setNotificationsOpener(VoidCallback opener) {
+    _openNotifications = opener;
+    if (_pendingOpenNotifications) {
+      _pendingOpenNotifications = false;
+      opener();
+    }
+  }
+
+  /// Called by HomeView on dispose. Only clears [opener] if it's still the
+  /// current one, so an old HomeView being torn down after a re-login
+  /// doesn't remove the new one's.
+  void clearNotificationsOpener(VoidCallback opener) {
+    if (_openNotifications == opener) _openNotifications = null;
+  }
+
   /// One-time app-wide setup: creates the Android notification channel,
   /// wires foreground-message display (Android doesn't show a system
   /// notification for foreground FCM messages on its own), and wires
@@ -138,15 +165,18 @@ class PushService {
     if (payload == null || payload.isEmpty) return;
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
-      // Every push type currently just brings the donor back to HomeView —
-      // it already re-fetches appointments/requests/profile in initState,
-      // so whatever changed (a new match, a status flip) is fresh the
-      // moment they land there. Routing each `type` to a specific
-      // sub-screen (e.g. straight into the appointment tab for a reminder)
-      // is a reasonable follow-up, not required for the notification to be
-      // useful today.
+      // Every push type opens the notifications page, on top of HomeView
+      // (always the root route once a donor is signed in — login pushes it
+      // with pushAndRemoveUntil). If Home isn't up yet, the tap is held
+      // until it is.
       debugPrint('Push notification tapped: ${data['type']}');
+      final opener = _openNotifications;
+      if (opener == null) {
+        _pendingOpenNotifications = true;
+        return;
+      }
       _navigatorKey?.currentState?.popUntil((route) => route.isFirst);
+      opener();
     } catch (e) {
       debugPrint('PushService: could not parse notification payload: $e');
     }
