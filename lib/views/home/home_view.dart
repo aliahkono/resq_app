@@ -612,6 +612,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           donorId: widget.donorId,
           token: widget.token,
           onRetakeCompleted: _handleRetakeCompleted,
+          lockLastDonation: !_effectiveResult.isEligible,
         ),
       ),
     );
@@ -720,6 +721,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => SettingsView(
+                              isDeferred: !_effectiveResult.isEligible,
                               userName: _donorName,
                               userPhone: _donorPhone,
                               userEmail: _donorEmail,

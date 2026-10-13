@@ -784,6 +784,8 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           donorId: widget.donorId,
           token: widget.token,
           onRetakeCompleted: widget.onRetakeCompleted,
+          // This screen is only ever shown to a deferred donor.
+          lockLastDonation: true,
         ),
       ),
     );

@@ -22,6 +22,13 @@ class RegistrationWizView extends StatefulWidget {
   // very first registration pass happens before a donor has a session
   // token at all, so this stays empty for that path.
   final String token;
+  // Retake only: true while the donor is deferred. Locks the donation
+  // history answers (last donation date / first-time) so a deferred donor
+  // can't make themselves eligible by changing their last donation date —
+  // the backend decides eligibility from its own recorded last donation
+  // (donor_eligibility, schema.sql), so the app would say "eligible" while
+  // pushes and booking still treat them as deferred.
+  final bool lockLastDonation;
 
   const RegistrationWizView({
     super.key,
@@ -32,6 +39,7 @@ class RegistrationWizView extends StatefulWidget {
     this.donorId,
     this.onRetakeCompleted,
     this.token = '',
+    this.lockLastDonation = false,
   });
 
   @override
@@ -1283,17 +1291,37 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
             children: [
               _cardTitle('Donation history'),
               const SizedBox(height: 10),
+              if (widget.lockLastDonation) ...[
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 15, color: RQColors.muted),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        "Your last donation date can't be changed while you're deferred.",
+                        style: TextStyle(fontSize: 12, color: RQColors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
               _optionCard(
                 label: "I've donated before",
                 selected: !_isFirstTimeDonor,
-                onTap: () => setState(() => _isFirstTimeDonor = false),
+                onTap: widget.lockLastDonation
+                    ? _showDonationLockedNotice
+                    : () => setState(() => _isFirstTimeDonor = false),
                 expanded: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _dateField(
                       label: 'Last donation',
                       value: _lastDonationDate,
-                      onTap: () async {
+                      onTap: widget.lockLastDonation
+                          ? _showDonationLockedNotice
+                          : () async {
                         await _pickDate(
                           context: context,
                           initialDate: _lastDonationDate ?? DateTime.now().subtract(const Duration(days: 90)),
@@ -1348,10 +1376,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               _optionCard(
                 label: 'This is my first time',
                 selected: _isFirstTimeDonor,
-                onTap: () => setState(() {
-                  _isFirstTimeDonor = true;
-                  _lastDonationDate = null;
-                }),
+                onTap: widget.lockLastDonation
+                    ? _showDonationLockedNotice
+                    : () => setState(() {
+                          _isFirstTimeDonor = true;
+                          _lastDonationDate = null;
+                        }),
               ),
             ],
           ),
@@ -2047,6 +2077,17 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
   }
 
   /// Radio-style option card; [expanded] shows under the label when chosen.
+  void _showDonationLockedNotice() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text("You can't change your last donation date while you're deferred."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
   Widget _optionCard({
     required String label,
     required bool selected,

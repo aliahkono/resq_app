@@ -950,6 +950,7 @@ class DonorProfileView extends StatelessWidget {
                         donorId: donorId,
                         token: token,
                         onRetakeCompleted: onProfileUpdated,
+                        lockLastDonation: !(classificationResult?.isEligible ?? true),
                       ),
                     ),
                   );

@@ -41,6 +41,9 @@ class SettingsView extends StatefulWidget {
   // Session token (see HomeView.token) — required for every real call this
   // screen makes (GET/PATCH /api/donor/me, POST /donor-auth/logout).
   final String token;
+  // Locks the last donation date in the screening retake (see
+  // RegistrationWizView.lockLastDonation).
+  final bool isDeferred;
 
   const SettingsView({
     super.key,
@@ -54,6 +57,7 @@ class SettingsView extends StatefulWidget {
     this.userPhone,
     this.userEmail,
     this.token = '',
+    this.isDeferred = false,
   });
 
   @override
@@ -1375,6 +1379,7 @@ class _SettingsViewState extends State<SettingsView> {
                               donorId: widget.donorId,
                               token: widget.token,
                               onRetakeCompleted: widget.onRetakeCompleted,
+                              lockLastDonation: widget.isDeferred,
                             ),
                           ),
                         );
