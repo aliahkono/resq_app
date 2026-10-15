@@ -114,6 +114,7 @@ class LocationService {
           radiusKm: radiusKm,
         ).catchError((e) {
           debugPrint('LocationService.startProximityMonitoring: location update failed: $e');
+          return <String, dynamic>{};
         });
       },
       onError: (e) {
