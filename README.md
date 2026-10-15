@@ -1,5 +1,7 @@
 # 🩸 ResQ — Donor Mobile Application
 
+[![CI](https://github.com/aliahkono/resq_app/actions/workflows/ci.yml/badge.svg)](https://github.com/aliahkono/resq_app/actions/workflows/ci.yml)
+
 **ResQ** is a blood donation management app that connects voluntary blood donors with blood banks and hospitals in real time. Hospitals post urgent blood requests from the ResQ web dashboard. Donors get alerted, check their eligibility, book a donation slot, and carry a digital donor ID card.
 
 The app ranks emergency requests with a **Min-Heap priority queue** and decides donor eligibility with a **decision tree model**.
