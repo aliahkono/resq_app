@@ -99,25 +99,13 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   String _emergencyContactName = '';
   String _emergencyContactPhone = '';
 
-  /// What the Lifetime Impact Record / Community Impact / Lifesaving Hero
-  /// cards should actually show. Two bugs reported together here (checklist
-  /// item 2):
-  ///  - Scenario 1: retaking screening and toggling "First-time donating"
-  ///    should zero these cards out and flip the dashboard back to the
-  ///    first-time layout, not keep showing a previous donor's numbers.
-  ///  - Scenario 2: a donor who sets a last-donation-date + a donation count
-  ///    during retake (e.g. donated elsewhere before ever using ResQ) should
-  ///    see THAT reflected here too, not just whatever the hospital's own
-  ///    donor_arrivals count happens to be (which starts at 0 for anyone who
-  ///    hasn't yet donated through a partner hospital tracked by this app).
-  /// _completedDonations (hospital-verified, from GET /api/donor/me) stays
-  /// the floor — it can only ever grow, and a self-report can never make it
-  /// go down, so use whichever of the two is larger, and force it to 0 the
-  /// instant the donor explicitly says "first-time" again.
-  int get _effectiveDonations {
+  /// Donations the donor reported from before ResQ (registration/retake).
+  /// Shown on the profile as history only — stamps, tiers and impact count
+  /// _completedDonations alone, since a self-report can't be verified and
+  /// tiers grant priority blood access.
+  int get _selfReportedDonations {
     if (_isFirstTime) return 0;
-    final selfReported = _currentScreeningModel?.screensNPT.totalDonations ?? 0;
-    return _completedDonations > selfReported ? _completedDonations : selfReported;
+    return _currentScreeningModel?.screensNPT.totalDonations ?? 0;
   }
 
   ClinicalVitalsRecord? _clinicalVitalsRecord;
@@ -803,15 +791,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           donorName: activeDonorName,
           bloodType: activeBloodType,
           token: widget.token,
-          // 0 for a first-time donor (they haven't actually donated yet,
-          // so the Community Impact card shouldn't show someone else's
-          // stats) — otherwise the same totalDonations the "Lifetime
-          // Impact Record" card on DonorProfileView already uses, so both
-          // screens report the same numbers instead of one being a
-          // hardcoded placeholder.
-          // max(hospital-verified count, self-reported total), zeroed out
-          // for a first-time donor — see _effectiveDonations' own comment.
-          totalDonations: _effectiveDonations,
+          // Hospital-verified only — see _completedDonations.
+          totalDonations: _completedDonations,
           isVerified: _verificationStatus.isVerified,
           onSwitchToAppointmentTab: () => setState(() => _currentTabIndex = 1),
           onOpenHealthCard: () => Navigator.of(context).push(
@@ -828,7 +809,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   _signatureUrl = url;
                   _signatureEditableAt = DateTime.now().add(const Duration(days: 180));
                 }),
-                completedDonations: _effectiveDonations,
+                completedDonations: _completedDonations,
                 verificationStatus: _verificationStatus,
                 isEligible: _effectiveResult.isEligible,
                 memberSince: _memberSince,
@@ -873,7 +854,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           screeningModel: _currentScreeningModel,
           token: widget.token,
           onRetakeCompleted: _handleRetakeCompleted,
-          completedDonations: _effectiveDonations,
+          completedDonations: _completedDonations,
         );
       case 1:
         if (_effectiveResult.isEligible) {
@@ -924,7 +905,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           token: widget.token,
           onProfileUpdated: _handleRetakeCompleted,
           clinicalVitals: _clinicalVitalsRecord,
-          completedDonations: _effectiveDonations,
+          completedDonations: _completedDonations,
+          selfReportedDonations: _selfReportedDonations,
           photoUrl: _photoUrl,
           signatureUrl: _signatureUrl,
           signatureEditableAt: _signatureEditableAt,

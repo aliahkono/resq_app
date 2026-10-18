@@ -28,6 +28,9 @@ class DonorProfileView extends StatelessWidget {
   // Starts at 0 for a first-time donor and only grows when a hospital
   // admin actually marks an appointment completed.
   final int completedDonations;
+  // Donations reported from before ResQ — shown as history under the
+  // Lifetime Impact card, never counted toward stamps or tiers.
+  final int selfReportedDonations;
   final String? photoUrl;
   final String? signatureUrl;
   final DateTime? signatureEditableAt;
@@ -55,6 +58,7 @@ class DonorProfileView extends StatelessWidget {
     this.onProfileUpdated,
     this.token = '',
     this.completedDonations = 0,
+    this.selfReportedDonations = 0,
     this.photoUrl,
     this.signatureUrl,
     this.signatureEditableAt,
@@ -584,6 +588,17 @@ class DonorProfileView extends StatelessWidget {
               ],
             ),
           ),
+          if (selfReportedDonations > 0) ...[
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Text(
+                '+ $selfReportedDonations ${selfReportedDonations == 1 ? 'donation' : 'donations'} before ResQ (self-reported). '
+                'Stamps and tiers count donations recorded by a partner hospital.',
+                style: const TextStyle(fontSize: 11.5, height: 1.4, color: Color(0xFF6B7280)),
+              ),
+            ),
+          ],
         ],
       ),
     );
