@@ -919,11 +919,27 @@ class DonorProfileView extends StatelessWidget {
 
     final bool travelDeferred = hasTravelFlag && travelAssessment.verdict == KeywordVerdict.deferred;
     final bool medicalDeferred = hasMedicalFlag && medicalAssessment.verdict == KeywordVerdict.deferred;
+    // A "Yes" only counts as flagged while it still defers — same windows as
+    // DecisionTreeClassifier (a missing date can't be verified, so it flags).
+    bool withinWindow(DateTime? date, int days) => date == null || DateTime.now().difference(date).inDays < days;
     final bool surgery = s?.hasTransfusionOrSurgery ?? false;
+    final bool surgeryDeferred =
+        surgery && withinWindow(s?.transfusionOrSurgeryDate, DecisionTreeClassifier.transfusionSurgeryDefDays);
     final bool tattoo = s?.hasTattsOrPierce ?? false;
+    final bool tattooDeferred = tattoo && withinWindow(s?.tattooDate, DecisionTreeClassifier.tattooDeferralWindowDays);
     final bool recentMeds = s?.recentMedProcedures.isNotEmpty ?? false;
+    final bool recentMedsDeferred = recentMeds &&
+        s!.recentMedProcedures.any((option) =>
+            withinWindow(s.medProcedureDetails[option]?.date, DecisionTreeClassifier.recentProcedureDefDays));
     final bool alcohol = s?.hasAlcoholPast24hr ?? false;
-    final int flagged = [travelDeferred, medicalDeferred, surgery, tattoo, recentMeds, alcohol].where((f) => f).length;
+    final List<String> flaggedNames = [
+      if (travelDeferred) 'Travel / needle-stick',
+      if (medicalDeferred) 'Major medical condition',
+      if (recentMedsDeferred) 'Recent medication or procedure',
+      if (surgeryDeferred) 'Transfusion or surgery',
+      if (tattooDeferred) 'Tattoo or piercing',
+      if (alcohol) 'Alcohol in the last 24 hours',
+    ];
 
     showResQSheet(
       context: context,
@@ -973,7 +989,7 @@ class DonorProfileView extends StatelessWidget {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _screeningBanner(flagged),
+                  _screeningBanner(flaggedNames),
                   const SizedBox(height: 14),
                   _screeningCard(
                     icon: Icons.person_outline_rounded,
@@ -1015,11 +1031,11 @@ class DonorProfileView extends StatelessWidget {
                       _answerRow(
                         'Medication or minor procedure in the last 4 weeks?',
                         yes: recentMeds,
-                        flagged: recentMeds,
+                        flagged: recentMedsDeferred,
                         detail: recentMeds ? _chipList(s.recentMedProcedures) : null,
                       ),
-                      _answerRow('Transfusion or surgery in the last 12 months?', yes: surgery, flagged: surgery),
-                      _answerRow('Tattoo or piercing?', yes: tattoo, flagged: tattoo),
+                      _answerRow('Transfusion or surgery in the last 12 months?', yes: surgery, flagged: surgeryDeferred),
+                      _answerRow('Tattoo or piercing?', yes: tattoo, flagged: tattooDeferred),
                       _answerRow('Alcohol in the last 24 hours?', yes: alcohol, flagged: alcohol, last: true),
                     ],
                   ),
@@ -1029,7 +1045,8 @@ class DonorProfileView extends StatelessWidget {
     );
   }
 
-  Widget _screeningBanner(int flagged) {
+  Widget _screeningBanner(List<String> flaggedNames) {
+    final int flagged = flaggedNames.length;
     final bool ok = flagged == 0;
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1052,7 +1069,9 @@ class DonorProfileView extends StatelessWidget {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RQColors.ink),
                 ),
                 Text(
-                  ok ? 'Nothing here is stopping you from donating.' : 'These can defer you for a while. Staff may check them before you donate.',
+                  ok
+                      ? 'Nothing here is stopping you from donating.'
+                      : '${flaggedNames.join(', ')}. This can defer you for a while. Staff may check it before you donate.',
                   style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF555555)),
                 ),
               ],
