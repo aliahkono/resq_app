@@ -252,6 +252,9 @@ class PushService {
   /// guards itself, but Firebase being unconfigured can surface at any of
   /// these calls depending on platform, and push registration should never
   /// be able to break sign-in.
+  // Stored on the backend's donor_devices.platform (which defaults to android).
+  String get _platformName => Platform.isIOS ? 'ios' : 'android';
+
   Future<void> registerDevice(String donorAuthToken) async {
     if (donorAuthToken.isEmpty || !_firebaseReady) return;
 
@@ -289,7 +292,7 @@ class PushService {
 
       final fcmToken = await _messaging.getToken();
       if (fcmToken != null) {
-        await ApiService.registerDeviceToken(donorAuthToken, fcmToken);
+        await ApiService.registerDeviceToken(donorAuthToken, fcmToken, platform: _platformName);
       }
 
       // Firebase can rotate a device's token (token expiry, app data
@@ -298,7 +301,7 @@ class PushService {
       // that happens.
       _tokenRefreshSub?.cancel();
       _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
-        ApiService.registerDeviceToken(donorAuthToken, newToken).catchError((_) {});
+        ApiService.registerDeviceToken(donorAuthToken, newToken, platform: _platformName).catchError((_) {});
       });
     } catch (e) {
       // Firebase not configured for this build, or a network hiccup — push
