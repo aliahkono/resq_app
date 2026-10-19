@@ -1,7 +1,7 @@
 name: resq
 description: "A blood donation management and emergency response app."
 publish_to: 'none' # Prevents accidental publishing to pub.dev
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '^3.7.0'
@@ -45,5 +45,7 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
+  # Opaque, cropped to the card — the App Store rejects icons with transparency.
+  image_path_ios: "assets/images/appicon_ios.png"
   image_path: "assets/images/appicon.png"
   min_sdk_android: 21

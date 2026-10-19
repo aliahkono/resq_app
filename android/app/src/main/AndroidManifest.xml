@@ -40,7 +40,7 @@
         android:maxSdkVersion="29" />
 
     <application
-        android:label="resq"
+        android:label="ResQ"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:allowBackup="false"
