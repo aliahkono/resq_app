@@ -52,7 +52,7 @@ class EligibilityRules {
       case EligibleStats.deferredTransfusionSurgery:
         return "Recent Transfusion or Surgery";
       case EligibleStats.deferredTravelNeedle:
-        return "Recent Travel or Needle Exposure";
+        return "Malaria or Needle Exposure";
       case EligibleStats.deferredMaternal:
         return "Maternal Health Deferral";
       case EligibleStats.deferredMensCycle:
@@ -94,7 +94,7 @@ class EligibilityRules {
       case EligibleStats.deferredTransfusionSurgery:
         return "Blood transfusions or surgeries within the last 12 months ($transfusionSurgeryDefDays days) require a waiting period to ensure donor and recipient safety.";
       case EligibleStats.deferredTravelNeedle:
-        return "International travel or accidental needle-stick exposure within the last 12 months ($travelNeedleDefDays days) requires a waiting period per blood safety protocols.";
+        return "Malaria exposure or an accidental needle-stick requires a waiting period per blood safety protocols: 3 months after visiting a malaria area, 3 years after living in one or finishing malaria treatment, and 12 months ($travelNeedleDefDays days) after a needle-stick exposure.";
       case EligibleStats.deferredMaternal:
         return "Pregnancy and breastfeeding temporarily defer donation to protect both mother and child iron levels.";
       case EligibleStats.deferredMensCycle:

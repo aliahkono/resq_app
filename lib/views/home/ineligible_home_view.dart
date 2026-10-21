@@ -147,9 +147,14 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
         standard = DecisionTreeClassifier.transfusionSurgeryDefDays;
         break;
       case EligibleStats.deferredTravelNeedle:
-        standard = remaining > DecisionTreeClassifier.malariaEndemicTravelDefDays
-            ? DecisionTreeClassifier.travelNeedleDefDays
-            : DecisionTreeClassifier.malariaEndemicTravelDefDays;
+        // The smallest window that still fits what's left: a 3-month
+        // malaria visit, 12 months for needle-stick, or 3 years for living
+        // in a malaria area or past malaria.
+        standard = [
+          DecisionTreeClassifier.malariaVisitDefDays,
+          DecisionTreeClassifier.travelNeedleDefDays,
+          DecisionTreeClassifier.malariaResidentDefDays,
+        ].firstWhere((w) => w >= remaining, orElse: () => remaining);
         break;
       default:
         standard = 30;

@@ -151,11 +151,24 @@ class DecisionTreeClassifier {
   /// matches EligibilityRules.travelNeedleDefDays.
   static const int travelNeedleDefDays = 365;
 
-  /// 6-month window specifically for travel to a local malaria-endemic
-  /// area (e.g. rural Palawan, Mindoro, Romblon) — shorter than the
-  /// general 12-month travel/needle-stick window per the Philippine
-  /// eligibility guidance table.
-  static const int malariaEndemicTravelDefDays = 180;
+  /// Malaria waiting periods, counted from the date the donor gives:
+  /// 3 months after visiting a malaria area (e.g. rural Palawan, Mindoro,
+  /// Romblon), 3 years after leaving one they lived in, and 3 years after
+  /// finishing malaria treatment.
+  static const int malariaVisitDefDays = 90;
+  static const int malariaResidentDefDays = 1095;
+  static const int malariaTreatedDefDays = 1095;
+
+  static int malariaWindowDays(MalariaExposure exposure) {
+    switch (exposure) {
+      case MalariaExposure.visited:
+        return malariaVisitDefDays;
+      case MalariaExposure.lived:
+        return malariaResidentDefDays;
+      case MalariaExposure.treated:
+        return malariaTreatedDefDays;
+    }
+  }
 
   /// Evaluates donor parameters through rule-based decision tree nodes
   ClassificationResult classify(DonorScreensNPT npt) {
@@ -287,14 +300,16 @@ class DecisionTreeClassifier {
     // Node 11: Travel or Needle Stick Check — assessed against the free-text
     // description (see medical_keyword_rules.dart) rather than a flat
     // toggle: travel to a non-endemic city is eligible per the guidance
-    // table, while malaria-endemic travel (6-month window), needle-stick
-    // exposure, or a commercial tattoo/piercing disclosed here (12-month
-    // window) are not.
+    // table; malaria defers 3 months after a visit or 3 years after living
+    // there or finishing treatment; needle-stick exposure or a commercial
+    // tattoo/piercing disclosed here defers 12 months.
     if (npt.hasTravelOrNeedleStick) {
       final assessment = MedicalKeywordRules.assessTravelOrNeedleStick(npt.travelOrNeedleDesc);
       if (assessment.verdict == KeywordVerdict.deferred) {
         final isMalariaEndemic = assessment.matches.any((m) => m.conditionLabel == 'Malaria-Endemic Travel');
-        final windowDays = isMalariaEndemic ? malariaEndemicTravelDefDays : travelNeedleDefDays;
+        final windowDays = isMalariaEndemic
+            ? malariaWindowDays(MedicalKeywordRules.malariaExposureOf(npt.travelOrNeedleDesc))
+            : travelNeedleDefDays;
         if (npt.travelOrNeedleDate != null) {
           final daysSince = DateTime.now().difference(npt.travelOrNeedleDate!).inDays;
           if (daysSince >= windowDays) {

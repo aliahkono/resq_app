@@ -158,12 +158,17 @@ class _MedicalHistoryDetailsViewState extends State<MedicalHistoryDetailsView> {
         isRequired: true,
         children: [
           _dateField(
-            label: 'When did it happen?',
+            // The malaria waiting period counts from a different date for
+            // each case (DecisionTreeClassifier.malariaWindowDays).
+            label: 'When did it happen? (trip: return date · lived there: date you left · had malaria: end of treatment)',
             value: _travelDate,
             onTap: () => _pickDate((d) => setState(() => _travelDate = d), _travelDate),
           ),
           const SizedBox(height: 12),
-          RQTextField(controller: _travelController, label: 'Where did you go, or what happened?'),
+          RQTextField(
+            controller: _travelController,
+            label: 'Where did you go, or what happened? Say if you lived there or had malaria.',
+          ),
         ],
       ));
     }

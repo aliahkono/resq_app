@@ -20,6 +20,11 @@ library;
 
 enum KeywordVerdict { eligible, deferred }
 
+/// How a donor was exposed to malaria, read from a travel description that
+/// already matched 'Malaria-Endemic Travel' — each has its own waiting
+/// period (see DecisionTreeClassifier.malariaWindowDays).
+enum MalariaExposure { visited, lived, treated }
+
 class KeywordMatch {
   final String keyword;
   final int start;
@@ -164,6 +169,44 @@ class MedicalKeywordRules {
       defaultWhenNoTriggerMatches: KeywordVerdict.eligible,
       defaultNote: 'No malaria-endemic area, needle-stick, or tattoo/piercing exposure mentioned — treated as low-risk travel.',
     );
+  }
+
+  // Had the disease itself (the date asked for is when treatment finished).
+  static const List<String> _malariaTreatedKeywords = [
+    'had malaria',
+    'treated',
+    'treatment',
+    'recovered',
+    'diagnosed',
+    'infected',
+    'got malaria',
+    'nagka-malaria',
+    'nagkamalaria',
+  ];
+
+  // Lived in a malaria area (the date asked for is when they left).
+  static const List<String> _malariaLivedKeywords = [
+    'lived',
+    'live in',
+    'living',
+    'resident',
+    'reside',
+    'grew up',
+    'moved from',
+    'nakatira',
+    'tumira',
+  ];
+
+  /// Which malaria waiting period applies to [description]. Treatment is
+  /// checked first, then living there; anything else is a visit. Only
+  /// meaningful when the description matched 'Malaria-Endemic Travel'.
+  static MalariaExposure malariaExposureOf(String? description) {
+    final lower = (description ?? '').toLowerCase();
+    if (lower.contains('malaria') && _malariaTreatedKeywords.any(lower.contains)) {
+      return MalariaExposure.treated;
+    }
+    if (_malariaLivedKeywords.any(lower.contains)) return MalariaExposure.lived;
+    return MalariaExposure.visited;
   }
 
   static MedicalAssessment _assess(
