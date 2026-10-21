@@ -119,9 +119,16 @@ class PushService {
       onDidReceiveNotificationResponse: (response) => _handleTapPayload(response.payload),
     );
 
+    // iOS drops a push that arrives while the app is open unless told to
+    // show it, so iOS shows the banner itself (and handles its tap through
+    // onMessageOpenedApp below). Android never shows one for an open app,
+    // so there the push is re-shown as a local notification instead —
+    // doing that on iOS as well would show every banner twice.
+    await _messaging.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
+
     FirebaseMessaging.onMessage.listen((message) {
       final notification = message.notification;
-      if (notification == null) return;
+      if (notification == null || Platform.isIOS) return;
       _localNotifications.show(
         notification.hashCode,
         notification.title,
