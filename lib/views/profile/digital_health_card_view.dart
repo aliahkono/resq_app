@@ -1278,6 +1278,22 @@ class _DigitalHealthCardViewState extends State<DigitalHealthCardView> with Sing
                     '${_tierFor(nextThreshold).label} and Priority Level ${_tierFor(nextThreshold).level}.',
             style: const TextStyle(fontSize: 12.5, color: ResQTheme.textDark, height: 1.4),
           ),
+          const SizedBox(height: 8),
+          // A tester entered 5 past donations in their profile and expected
+          // stamps for them — only check-ins recorded through ResQ count.
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline_rounded, size: 14, color: ResQTheme.textMuted),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Only donations recorded by a hospital through ResQ count toward stamps and priority level. Past donations you added to your profile are kept as history but not counted.',
+                  style: TextStyle(fontSize: 11, color: ResQTheme.textMuted, height: 1.4),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

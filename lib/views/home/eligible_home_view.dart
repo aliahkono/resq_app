@@ -273,7 +273,7 @@ class EligibleHomeView extends StatelessWidget {
           children: [
             Expanded(child: _expectTile(Icons.schedule_rounded, 'Under 45 min', 'Includes sign-in and a mini-physical')),
             const SizedBox(width: 10),
-            Expanded(child: _expectTile(Icons.water_drop_outlined, '8–10 min draw', 'Just a quick pinch')),
+            Expanded(child: _expectTile(Icons.water_drop_outlined, '10–15 min draw', 'Just a quick pinch')),
             const SizedBox(width: 10),
             Expanded(child: _expectTile(Icons.local_cafe_outlined, 'Snacks after', 'Rest and refreshments')),
           ],
@@ -746,7 +746,7 @@ class EligibleHomeView extends StatelessWidget {
     const steps = [
       ['Registration', 'Quick ID check and a short intake form.'],
       ['Mini-physical', 'Blood pressure, pulse and a hemoglobin finger-prick.'],
-      ['The donation', '8–10 minutes resting comfortably while 1 unit is drawn.'],
+      ['The donation', '10–15 minutes resting comfortably while 1 unit is drawn.'],
       ['Recovery', 'Free snacks and drinks, then a short rest before heading home.'],
     ];
     showResQSheet(

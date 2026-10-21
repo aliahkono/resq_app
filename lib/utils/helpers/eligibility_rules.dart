@@ -15,7 +15,7 @@ class EligibilityRules {
 
   // Deferral & Rest Windows (in Days/Hours)
   static const int wholeBloodRestPeriodDays = 90; // Mandatory 90-day NVBSP recovery gap
-  static const int tattsPierceDefDays = 180;      // Mandatory 6-month deferral window
+  static const int tattsPierceDefDays = 365;      // Mandatory 12-month deferral window
   static const int alcoholDefHours = 24;          // Minimum 24-hour sobriety period
   static const int mensRestDays = 7;              // Days deferred after recent heavy cycle
   static const int recentProcedureDefDays = 28;   // 4-week window for minor meds/procedures
@@ -84,7 +84,7 @@ class EligibilityRules {
       case EligibleStats.deferredInterval:
         return "NVBSP guidelines require a mandatory $wholeBloodRestPeriodDays-day recovery interval between whole blood donations. ${result.daysRemaining} days remaining.";
       case EligibleStats.deferredTattsPierce:
-        return "Tattoos, body piercings, or permanent makeup require a mandatory 6-month ($tattsPierceDefDays days) waiting period from the date performed.";
+        return "Tattoos, body piercings, or permanent makeup require a mandatory 12-month ($tattsPierceDefDays days) waiting period from the date performed.";
       case EligibleStats.deferredAlcohol:
         return "Alcohol intake within $alcoholDefHours hours affects blood volume and donor recovery. Please rest and re-evaluate tomorrow.";
       case EligibleStats.deferredRecentProcedure:

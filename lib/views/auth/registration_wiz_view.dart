@@ -797,7 +797,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          // Kept compact — a tester found the original header took up half
+          // the screen height, leaving little room for the questions.
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
           child: ResponsiveContentArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,7 +817,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                       },
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(0x29FFFFFF),
-                        fixedSize: const Size(44, 44),
+                        fixedSize: const Size(40, 40),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
@@ -833,16 +835,18 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 _buildStepper(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 Text(
                   titles[_currentStep] ?? '',
-                  style: const TextStyle(fontSize: 22, height: 1.35, fontWeight: FontWeight.w600, color: Colors.white),
+                  style: const TextStyle(fontSize: 18, height: 1.3, fontWeight: FontWeight.w600, color: Colors.white),
                 ),
                 Text(
                   subtitles[_currentStep] ?? '',
-                  style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xE6FFFFFF)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xE6FFFFFF)),
                 ),
               ],
             ),
@@ -861,7 +865,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         final double span = c.maxWidth - colW;
         final double progress = ((_currentStep - 1) / (_totalSteps - 1)).clamp(0.0, 1.0);
         return SizedBox(
-          height: 48,
+          height: 46, // 24 dot + 6 gap + ~15 label line
           child: Stack(
             children: [
               Positioned(
@@ -1423,7 +1427,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               const SizedBox(height: 10),
               if (_hasTattoosOrPiercings) ...[
                 _noteBox(Icons.info_outline_rounded,
-                    'A 6–12 month wait usually applies. Add the date of your most recent one.'),
+                    'A 12-month wait applies. Add the date of your most recent one.'),
                 const SizedBox(height: 10),
                 _dateField(
                   label: 'Date of last tattoo or piercing',
@@ -1437,7 +1441,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                   ),
                 ),
               ] else
-                const Text("If yes, we'll ask for the date. A 6–12 month wait usually applies.",
+                const Text("If yes, we'll ask for the date. A 12-month wait applies.",
                     style: TextStyle(fontSize: 12, height: 1.4, color: RQColors.muted)),
             ],
           ),

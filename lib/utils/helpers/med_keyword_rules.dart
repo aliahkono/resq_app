@@ -180,7 +180,10 @@ class MedicalKeywordRules {
 
     final lower = description.toLowerCase();
     final matches = <KeywordMatch>[];
-    KeywordVerdict overallVerdict = defaultWhenNoTriggerMatches;
+    // Starts unset so a controlled condition can still clear it — seeding it
+    // with defaultWhenNoTriggerMatches (deferred for major medical history)
+    // made every eligible match below a no-op.
+    KeywordVerdict? overallVerdict;
     String? note = defaultNote;
     bool anyTriggerFound = false;
 
@@ -263,6 +266,6 @@ class MedicalKeywordRules {
       }
     }
 
-    return MedicalAssessment(verdict: overallVerdict, note: note, matches: deduped);
+    return MedicalAssessment(verdict: overallVerdict ?? defaultWhenNoTriggerMatches, note: note, matches: deduped);
   }
 }

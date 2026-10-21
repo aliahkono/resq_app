@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:resq/services/local_prefs.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
+import 'package:resq/views/auth/auth_landing_view.dart';
 import 'package:resq/views/onboarding/onboarding_view.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -86,11 +88,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       ),
     );
 
-    _controller.forward().then((_) {
+    // Read while the splash animation plays. Returning users skip the
+    // intro slides and land on sign-in directly.
+    final onboardingSeen = LocalPrefs.getOnboardingSeen().catchError((_) => false);
+
+    _controller.forward().then((_) async {
+      final seen = await onboardingSeen;
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const OnboardingView(),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                seen ? const AuthLandingView() : const OnboardingView(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },

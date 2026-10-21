@@ -39,4 +39,13 @@ class LocalPrefs {
 
   static Future<bool> getTermsAgreed() async =>
       (await _storage.read(key: _termsAgreedKey)) == 'true';
+
+  // Set once the intro slides have been finished or skipped, so later
+  // launches go straight from the splash screen to sign-in.
+  static const _onboardingSeenKey = 'resq_device_onboarding_seen';
+
+  static Future<void> setOnboardingSeen() => _storage.write(key: _onboardingSeenKey, value: 'true');
+
+  static Future<bool> getOnboardingSeen() async =>
+      (await _storage.read(key: _onboardingSeenKey)) == 'true';
 }

@@ -1,28 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/services/location_service.dart';
 import 'package:resq/views/profile/get_ver_view.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/widgets/resq_ui.dart';
 
 /// Parsed from GET /api/donor/hospitals — real hospitals from the admin
-/// dashboard's database, not a hardcoded list. No distance/rating fields:
-/// the backend doesn't compute those for this endpoint (only
-/// listOpenRequestsForDonor does, using the donor's GPS position), so
-/// showing them here would just be more fabricated data.
+/// dashboard's database, not a hardcoded list. No rating field, and no
+/// distance from the backend for this endpoint: distance is computed here
+/// from the hospital's stored coordinates and the donor's own GPS position
+/// (only when they've allowed location), so it's never a made-up figure.
 class _Hospital {
   final String id;
   final String name;
   final String address;
   final String city;
+  // Null when the hospital has no coordinates on file — it's then left off
+  // the map and shows no distance.
+  final LatLng? location;
 
-  _Hospital({required this.id, required this.name, required this.address, required this.city});
+  _Hospital({required this.id, required this.name, required this.address, required this.city, this.location});
 
   factory _Hospital.fromJson(Map<String, dynamic> json) {
+    // Postgres NUMERIC columns arrive as JSON strings, not numbers.
+    double? coord(Object? raw) => raw is num ? raw.toDouble() : double.tryParse('${raw ?? ''}');
+    final lat = coord(json['latitude']);
+    final lng = coord(json['longitude']);
     return _Hospital(
       id: json['id'] as String,
       name: json['name'] as String,
       address: (json['address'] as String?) ?? '',
       city: (json['city'] as String?) ?? '',
+      location: lat != null && lng != null ? LatLng(lat, lng) : null,
     );
   }
 }
@@ -48,6 +60,10 @@ class EligibleAppointView extends StatefulWidget {
   // bell's "accept slot") is protected in one place, instead of needing
   // the same check duplicated at each call site.
   final bool isVerified;
+  // Used to read the donor's position for the map and distances, if they
+  // allowed location (LocationService checks their Settings choice). Left
+  // empty, the map still shows every hospital — just without "you".
+  final String donorId;
 
   const EligibleAppointView({
     super.key,
@@ -56,6 +72,7 @@ class EligibleAppointView extends StatefulWidget {
     required this.onBookingCompleted,
     this.preselectedHospitalId,
     this.isVerified = false,
+    this.donorId = '',
   });
 
   @override
@@ -66,6 +83,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
   List<_Hospital> _hospitals = [];
   bool _loadingHospitals = true;
   String? _loadError;
+  LatLng? _donorPosition;
 
   String? _selectedHospitalId;
   DateTime? _selectedDate;
@@ -105,6 +123,39 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
     );
     _selectedDate = _dateOptions.first;
     _loadHospitals();
+    _loadDonorPosition();
+  }
+
+  Future<void> _loadDonorPosition() async {
+    if (widget.donorId.isEmpty) return;
+    final position = await LocationService.getCurrentPositionIfEnabled(widget.donorId);
+    if (!mounted || position == null) return;
+    setState(() => _donorPosition = LatLng(position.latitude, position.longitude));
+  }
+
+  /// Km from the donor to [hospital], or null when either position is unknown.
+  double? _distanceKm(_Hospital hospital) {
+    final from = _donorPosition;
+    final to = hospital.location;
+    if (from == null || to == null) return null;
+    return Geolocator.distanceBetween(from.latitude, from.longitude, to.latitude, to.longitude) / 1000;
+  }
+
+  /// Nearest first once the donor's position is known; otherwise the
+  /// backend's alphabetical order. Hospitals with no coordinates go last.
+  List<_Hospital> get _sortedHospitals {
+    if (_donorPosition == null) return _hospitals;
+    final sorted = [..._hospitals];
+    sorted.sort((a, b) => (_distanceKm(a) ?? double.infinity).compareTo(_distanceKm(b) ?? double.infinity));
+    return sorted;
+  }
+
+  void _selectHospital(String id) {
+    setState(() {
+      _selectedHospitalId = id;
+      _selectedTime = null;
+      _bookingError = null;
+    });
   }
 
   Future<void> _loadHospitals() async {
@@ -548,15 +599,118 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
       // Locked to whichever hospital's active request the donor is
       // responding to — no picker, so there's no way to accidentally book
       // against a different hospital that has no open request at all.
-      return _buildClinicCard(
-        _hospitals.firstWhere(
-          (h) => h.id == widget.preselectedHospitalId,
-          orElse: () => _hospitals.first,
-        ),
-        locked: true,
+      final hospital = _hospitals.firstWhere(
+        (h) => h.id == widget.preselectedHospitalId,
+        orElse: () => _hospitals.first,
+      );
+      return Column(
+        children: [
+          if (hospital.location != null) ...[
+            _buildHospitalMap([hospital], locked: true),
+            const SizedBox(height: 12),
+          ],
+          _buildClinicCard(hospital, locked: true),
+        ],
       );
     }
-    return Column(children: _hospitals.map((h) => _buildClinicCard(h)).toList());
+    final hospitals = _sortedHospitals;
+    return Column(
+      children: [
+        if (hospitals.any((h) => h.location != null)) ...[
+          _buildHospitalMap(hospitals),
+          const SizedBox(height: 12),
+        ],
+        ...hospitals.map((h) => _buildClinicCard(h)),
+      ],
+    );
+  }
+
+  /// Hospitals as pins (tap one to select it) plus the donor's own position
+  /// when known, on OpenStreetMap tiles — same tile setup as the alert
+  /// radius preview in settings_view.dart.
+  Widget _buildHospitalMap(List<_Hospital> hospitals, {bool locked = false}) {
+    final pinned = hospitals.where((h) => h.location != null).toList();
+    final points = [
+      ...pinned.map((h) => h.location!),
+      if (_donorPosition != null) _donorPosition!,
+    ];
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 220,
+        child: FlutterMap(
+          // Re-fits the camera once the donor's position arrives.
+          key: ValueKey(_donorPosition),
+          options: MapOptions(
+            initialCameraFit: CameraFit.coordinates(
+              coordinates: points,
+              padding: const EdgeInsets.all(36),
+              maxZoom: 15,
+            ),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'org.resqapp.donor',
+            ),
+            MarkerLayer(
+              markers: [
+                if (_donorPosition != null)
+                  Marker(
+                    point: _donorPosition!,
+                    width: 22,
+                    height: 22,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: RQColors.navy,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [BoxShadow(color: RQColors.navy.withValues(alpha: 0.3), blurRadius: 6)],
+                      ),
+                    ),
+                  ),
+                for (final h in pinned)
+                  Marker(
+                    point: h.location!,
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.topCenter, // pin tip on the spot
+                    child: GestureDetector(
+                      onTap: locked ? null : () => _selectHospital(h.id),
+                      child: Tooltip(
+                        message: h.name,
+                        child: Icon(
+                          Icons.location_on_rounded,
+                          size: (locked || _selectedHospitalId == h.id) ? 40 : 32,
+                          color: (locked || _selectedHospitalId == null || _selectedHospitalId == h.id)
+                              ? RQColors.blood
+                              : RQColors.blood.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // OSM's tile policy requires this credit — same small corner tag
+            // as the alert radius preview.
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                color: Colors.white.withValues(alpha: 0.7),
+                child: const Text(
+                  '© OpenStreetMap contributors',
+                  style: TextStyle(fontSize: 8, color: RQColors.muted),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildLoadErrorCard() {
@@ -620,13 +774,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: locked
-              ? null
-              : () => setState(() {
-                    _selectedHospitalId = hospital.id;
-                    _selectedTime = null;
-                    _bookingError = null;
-                  }),
+          onTap: locked ? null : () => _selectHospital(hospital.id),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -653,6 +801,13 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
                               child: Text(address, style: const TextStyle(fontSize: 12, color: RQColors.muted, height: 1.35)),
                             ),
                           ],
+                        ),
+                      ],
+                      if (_distanceKm(hospital) != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          '${_distanceKm(hospital)!.toStringAsFixed(1)} km away',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: RQColors.navy),
                         ),
                       ],
                     ],

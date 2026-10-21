@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:resq/services/local_prefs.dart';
 import 'package:resq/utils/constants/theme_constants.dart';
 import 'package:resq/views/auth/auth_landing_view.dart';
 
@@ -217,6 +218,7 @@ class _OnboardingViewState extends State<OnboardingView>
   }
 
   void _navigateToRegistration() {
+    LocalPrefs.setOnboardingSeen();
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>

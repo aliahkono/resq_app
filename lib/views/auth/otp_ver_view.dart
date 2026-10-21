@@ -87,6 +87,13 @@ class _OtpVerViewState extends State<OtpVerView> {
   int _secondsUntilExpiry = 300;
   bool _codeExpired = false;
 
+  // Which channel the current code went out on. Every request-otp issues a
+  // fresh code and invalidates the previous one (otp.js), so switching tabs
+  // no longer sends automatically — a late-arriving SMS code would
+  // otherwise already be dead by the time the donor typed it in. Null until
+  // the first send succeeds.
+  OtpVerificationMode? _lastSentMode;
+
   @override
   void initState() {
     super.initState();
@@ -112,6 +119,7 @@ class _OtpVerViewState extends State<OtpVerView> {
         email: byEmail ? _email : null,
       );
       if (!mounted) return true;
+      _lastSentMode = byEmail ? OtpVerificationMode.email : OtpVerificationMode.phone;
       // Falls back to 300s (5 min) only if an older backend build doesn't
       // send expiresIn back — the real backend always does.
       _startExpiryTimer((response['expiresIn'] as int?) ?? 300);
@@ -215,11 +223,9 @@ class _OtpVerViewState extends State<OtpVerView> {
         _verificationMode = mode;
       });
       _clearOtpInputs();
-      _startResendTimer();
-      // Switching tabs means the donor wants the code somewhere else —
-      // send a fresh one on the newly-selected channel right away, same as
-      // the initial send in initState.
-      _sendOtp(showSnackBarOnSuccess: false);
+      // No automatic send here (see _lastSentMode) — the code already sent
+      // still works on either tab, and the donor taps "Send code" below to
+      // get one on this channel instead.
     }
   }
 
@@ -764,9 +770,13 @@ class _OtpVerViewState extends State<OtpVerView> {
                   ),
                   children: [
                     TextSpan(
-                      text: _verificationMode == OtpVerificationMode.phone
-                          ? 'Enter code sent via SMS to\n'
-                          : 'Enter code sent via email to\n',
+                      text: _lastSentMode != _verificationMode
+                          ? (_verificationMode == OtpVerificationMode.phone
+                              ? 'Tap "Send code" below to get a code via SMS at\n'
+                              : 'Tap "Send code" below to get a code via email at\n')
+                          : (_verificationMode == OtpVerificationMode.phone
+                              ? 'Enter code sent via SMS to\n'
+                              : 'Enter code sent via email to\n'),
                     ),
                     TextSpan(
                       text: activeTarget,
@@ -917,7 +927,20 @@ class _OtpVerViewState extends State<OtpVerView> {
                 ),
               ],
               const SizedBox(height: 24),
-              _canResend
+              _lastSentMode != null && _lastSentMode != _verificationMode
+                  ? TextButton(
+                onPressed: _resendCode,
+                child: Text(
+                  _verificationMode == OtpVerificationMode.email ? 'SEND CODE BY EMAIL' : 'SEND CODE BY SMS',
+                  style: const TextStyle(
+                    color: ResQTheme.primaryCrimson,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              )
+                  : _canResend
                   ? TextButton(
                 onPressed: _resendCode,
                 child: const Text(
@@ -936,6 +959,18 @@ class _OtpVerViewState extends State<OtpVerView> {
                   fontSize: 12,
                   color: ResQTheme.textMuted,
                   fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 6),
+              // SMS delivery through the gateway can lag, and testers who
+              // tapped Resend while waiting ended up with several codes —
+              // only the newest of which works.
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Codes can take up to a minute to arrive. If you request a new one, only the latest code will work.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: ResQTheme.textMuted, height: 1.4),
                 ),
               ),
               const SizedBox(height: 28),

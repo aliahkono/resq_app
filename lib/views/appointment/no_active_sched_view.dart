@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/home/eligible_home_view.dart' show EmergencyBloodRequest;
 
 class NoActiveSchedView extends StatelessWidget {
@@ -94,6 +95,8 @@ class NoActiveSchedView extends StatelessWidget {
                   _buildTipItem('Have at least 6–8 hours of restful sleep.'),
                   _buildTipItem('Drink 500 mL of water 30 minutes before donating.'),
                   _buildTipItem('Avoid fatty foods and alcohol prior to your session.'),
+                  _buildTipItem(
+                      'You can book one appointment at a time, and wait ${DecisionTreeClassifier.minDonationIntervalDays} days after a donation before booking again.'),
                 ],
               ),
             ),

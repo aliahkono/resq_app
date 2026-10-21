@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resq/utils/algo/decision_tree_class.dart';
 
 class ConfirmedAppointmentData {
   // Real appointments.id from the backend — needed so Cancel can call
@@ -139,7 +140,24 @@ class ActiveSchedView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            // Testers tried to book a second slot and weren't told why they
+            // couldn't — spell out the one-at-a-time rule and the wait after.
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF6B7280)),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'You can have one appointment at a time. After you donate, you can book again in '
+                    '${DecisionTreeClassifier.minDonationIntervalDays} days — your home screen will count down the days.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               height: 44,

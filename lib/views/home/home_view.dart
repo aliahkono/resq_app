@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:geolocator/geolocator.dart';
 import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/model/broadcast_notif_model.dart';
@@ -25,6 +26,7 @@ import 'package:resq/services/push_service.dart';
 import 'package:resq/services/local_prefs.dart';
 import 'package:resq/services/realtime_service.dart';
 import 'package:resq/services/location_service.dart';
+import 'package:resq/services/session_storage.dart';
 
 class HomeView extends StatefulWidget {
   final String donorName;
@@ -170,6 +172,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     NotificationService().addListener(_rebuildActiveRequests);
     NotificationService().refresh(widget.token);
     _registerPushIfEnabled();
+    _askForLocationOnce();
     // 30s fallback poll — see _pollTimer's own comment for why this is no
     // longer the only mechanism.
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBroadcastData());
@@ -185,6 +188,61 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
         : await LocalPrefs.getBool(widget.donorId, 'pushNotifications');
     if (enabled == false) return;
     PushService.instance.registerDevice(widget.token);
+  }
+
+  /// Asks once, on the first dashboard visit, whether ResQ may use the
+  /// donor's location — testers expected it to be on (or at least asked)
+  /// up front instead of buried in Settings. Saves the answer to the same
+  /// 'locationServices' pref the Settings toggle uses, so it's never asked
+  /// again and can still be changed there.
+  Future<void> _askForLocationOnce() async {
+    if (widget.donorId.isEmpty) return;
+    try {
+      if (await LocalPrefs.getBool(widget.donorId, 'locationServices') != null) return;
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        await LocalPrefs.setBool(widget.donorId, 'locationServices', true);
+        _loadOpenRequests();
+        return;
+      }
+
+      // Lets the dashboard (and the push permission prompt) settle first.
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+      final allow = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Use your location?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          content: const Text(
+            'ResQ uses your location to show the nearest hospitals with urgent blood requests. '
+            'You can change this anytime in Settings.',
+            style: TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Allow', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      if (allow == null) return; // dismissed — ask again next time
+
+      var granted = false;
+      if (allow) {
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        granted = permission == LocationPermission.whileInUse || permission == LocationPermission.always;
+      }
+      await LocalPrefs.setBool(widget.donorId, 'locationServices', granted);
+      if (granted) _loadOpenRequests();
+    } catch (e) {
+      debugPrint('HomeView._askForLocationOnce failed: $e');
+    }
   }
 
   /// Opens the notifications page (same as the bell) — used when the donor
@@ -474,6 +532,16 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final memberSince = memberSinceStr != null ? DateTime.tryParse(memberSinceStr) : null;
       final birthDateStr = profile['birthDate'] as String?;
       final birthDate = birthDateStr != null ? DateTime.tryParse(birthDateStr) : null;
+      final donorCode = profile['donorCode'] as String?;
+      if (donorCode != null && donorCode.isNotEmpty) {
+        SessionStorage.saveOfflinePass(OfflinePass(
+          donorCode: donorCode,
+          donorName: (profile['name'] as String?) ?? _donorName,
+          bloodType: (profile['bloodType'] as String?) ?? widget.bloodType,
+          isEligible: _effectiveResult.isEligible,
+          savedAt: DateTime.now(),
+        ));
+      }
       if (!mounted) return;
       setState(() {
         _completedDonations = completed;
@@ -835,6 +903,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   isFirstTimeDonor: _isFirstTime,
                   token: widget.token,
                   isVerified: _verificationStatus.isVerified,
+                  donorId: widget.donorId,
                   preselectedHospitalId: request.hospitalId.isNotEmpty ? request.hospitalId : null,
                   onBookingCompleted: (appointment) {
                     Navigator.pop(context);
@@ -876,6 +945,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                       isFirstTimeDonor: _isFirstTime,
                       token: widget.token,
                       isVerified: _verificationStatus.isVerified,
+                      donorId: widget.donorId,
                       preselectedHospitalId: hospitalId.isNotEmpty ? hospitalId : null,
                       onBookingCompleted: (appointment) {
                         Navigator.pop(context);

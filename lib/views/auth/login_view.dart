@@ -10,6 +10,7 @@ import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/forgot_password_view.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
 import 'package:resq/views/home/home_view.dart';
+import 'package:resq/views/profile/qr_pass_modal_view.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/session_storage.dart';
 import 'package:resq/services/eligibility_service.dart';
@@ -188,10 +189,16 @@ class _LoginViewState extends State<LoginView> {
   // Ensures the automatic prompt (below) only ever fires once per visit to
   // this screen, not on every rebuild.
   bool _autoPromptShown = false;
+  // The QR pass saved on this phone, if any — lets a donor with no internet
+  // (signing in needs the server) still show their pass at the hospital.
+  OfflinePass? _offlinePass;
 
   @override
   void initState() {
     super.initState();
+    SessionStorage.readOfflinePass().then((pass) {
+      if (mounted && pass != null) setState(() => _offlinePass = pass);
+    });
     SessionStorage.isBiometricEnabled().then((biometricOn) async {
       // Needs a session kept on this phone to sign back into (see
       // SessionStorage.signOut) — otherwise there's nothing to unlock.
@@ -908,6 +915,25 @@ class _LoginViewState extends State<LoginView> {
                   ],
 
                   const SizedBox(height: 10),
+
+                  if (_offlinePass != null) ...[
+                    TextButton.icon(
+                      onPressed: () => QrPassModalView.show(
+                        context,
+                        donorName: _offlinePass!.donorName,
+                        bloodType: _offlinePass!.bloodType,
+                        donorId: _offlinePass!.donorCode,
+                        isEligible: _offlinePass!.isEligible,
+                        savedAt: _offlinePass!.savedAt,
+                      ),
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 18, color: Color(0xFF9B1B20)),
+                      label: const Text(
+                        'No internet? Show my saved QR pass',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF9B1B20)),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
 
                   // Don't have an account? Sign Up
                   RichText(

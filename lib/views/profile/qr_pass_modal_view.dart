@@ -7,6 +7,10 @@ class QrPassModalView extends StatelessWidget {
   final String bloodType;
   final String donorId;
   final bool isEligible;
+  // Set when this is the pass saved on the phone (shown from the sign-in
+  // screen with no internet) — adds a note saying when it was saved, since
+  // the eligibility badge may have changed since then.
+  final DateTime? savedAt;
 
   const QrPassModalView({
     super.key,
@@ -14,6 +18,7 @@ class QrPassModalView extends StatelessWidget {
     required this.bloodType,
     required this.donorId,
     required this.isEligible,
+    this.savedAt,
   });
 
   static void show(
@@ -22,6 +27,7 @@ class QrPassModalView extends StatelessWidget {
         required String bloodType,
         required String donorId,
         required bool isEligible,
+        DateTime? savedAt,
       }) {
     showModalBottomSheet(
       context: context,
@@ -32,8 +38,18 @@ class QrPassModalView extends StatelessWidget {
         bloodType: bloodType,
         donorId: donorId,
         isEligible: isEligible,
+        savedAt: savedAt,
       ),
     );
+  }
+
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  static String _formatSavedAt(DateTime d) {
+    final local = d.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${_months[local.month - 1]} ${local.day}, ${local.year}, $hour:$minute ${local.hour < 12 ? 'AM' : 'PM'}';
   }
 
   @override
@@ -256,6 +272,24 @@ class QrPassModalView extends StatelessWidget {
               ],
             ),
           ),
+
+          if (savedAt != null) ...[
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.cloud_off_rounded, size: 15, color: ResQTheme.textMuted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Saved pass, shown without internet. Last updated ${_formatSavedAt(savedAt!)}. '
+                    'Staff will confirm your eligibility when they scan it.',
+                    style: const TextStyle(fontSize: 11.5, color: ResQTheme.textMuted, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: 20),
 

@@ -3,6 +3,7 @@ import 'package:resq/model/screening_input_model.dart';
 import 'package:resq/model/clinical_rec_model.dart';
 import 'package:resq/model/ver_stats_model.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/services/session_storage.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/utils/helpers/med_keyword_rules.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
@@ -122,7 +123,7 @@ class DonorProfileView extends StatelessWidget {
 
     // 2. Tattoo / Piercing Window Deferral
     if (status == EligibleStats.deferredTattsPierce || status.toString().toLowerCase().contains('tattoo')) {
-      final int remDays = days > 0 ? days : 180;
+      final int remDays = days > 0 ? days : DecisionTreeClassifier.tattooDeferralWindowDays;
       return _EligibilityInfo(
         mainText: 'In $remDays Days',
         subText: 'Tattoo/Piercing',
@@ -384,9 +385,12 @@ class DonorProfileView extends StatelessWidget {
                   final code = profile['donorCode'] as String?;
                   if (code != null && code.isNotEmpty) qrValue = code;
                 } catch (_) {
-                  // Falls back to `id` below — still shows a pass, just one
-                  // that won't resolve via the scan-to-lookup link if the
-                  // fetch failed.
+                  // Offline: use the donor code saved the last time the
+                  // dashboard loaded the profile. Only falls back to `id`
+                  // (a pass that won't resolve via the scan-to-lookup link)
+                  // if nothing was ever saved.
+                  final saved = await SessionStorage.readOfflinePass();
+                  if (saved != null) qrValue = saved.donorCode;
                 }
                 if (!context.mounted) return;
                 QrPassModalView.show(
