@@ -21,6 +21,7 @@ import 'package:resq/views/settings/settings_view.dart';
 import 'package:resq/widgets/custom_bot_nav_bar.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/services/api_service.dart';
+import 'package:resq/services/eligibility_service.dart';
 import 'package:resq/services/notif_service.dart';
 import 'package:resq/services/push_service.dart';
 import 'package:resq/services/local_prefs.dart';
@@ -532,18 +533,27 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       final memberSince = memberSinceStr != null ? DateTime.tryParse(memberSinceStr) : null;
       final birthDateStr = profile['birthDate'] as String?;
       final birthDate = birthDateStr != null ? DateTime.tryParse(birthDateStr) : null;
+      // Re-classified from the backend's copy of the screening on every
+      // fetch, so a change made elsewhere (an admin's Mark Eligible / Lock
+      // for 90 Days, a donation recorded at the hospital) shows up even if
+      // the realtime event was missed, without signing out and back in.
+      // Null when the profile has no complete screening — keep what we have.
+      final classified = classifyDonorFromProfile(profile);
+      final screeningModel = buildScreeningModelFromProfile(profile);
       final donorCode = profile['donorCode'] as String?;
       if (donorCode != null && donorCode.isNotEmpty) {
         SessionStorage.saveOfflinePass(OfflinePass(
           donorCode: donorCode,
           donorName: (profile['name'] as String?) ?? _donorName,
           bloodType: (profile['bloodType'] as String?) ?? widget.bloodType,
-          isEligible: _effectiveResult.isEligible,
+          isEligible: (classified ?? _effectiveResult).isEligible,
           savedAt: DateTime.now(),
         ));
       }
       if (!mounted) return;
       setState(() {
+        if (classified != null) _effectiveResult = classified;
+        if (screeningModel != null) _currentScreeningModel = screeningModel;
         _completedDonations = completed;
         _photoUrl = (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : _photoUrl;
         _signatureUrl = (signatureUrl != null && signatureUrl.isNotEmpty) ? signatureUrl : _signatureUrl;
