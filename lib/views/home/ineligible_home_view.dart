@@ -3,8 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:resq/model/screening_input_model.dart';
+import 'package:resq/services/api_service.dart';
+import 'package:resq/services/eligibility_service.dart';
 import 'package:resq/utils/algo/decision_tree_class.dart';
 import 'package:resq/views/auth/registration_wiz_view.dart';
+import 'package:resq/widgets/malaria_check_sheet.dart';
 import 'package:resq/widgets/resq_ui.dart';
 
 /// Which hero layout the deferred dashboard shows.
@@ -63,6 +66,11 @@ class IneligibleHomeView extends StatefulWidget {
 class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   static const double _minWeightKg = 50.0;
 
+  // The malaria health check pops up by itself once per app session when
+  // it's what stands between the donor and donating; after that it's the
+  // button on this screen.
+  static bool _malariaPromptShown = false;
+
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -74,6 +82,7 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   String _getReasonTitle(EligibleStats? status) {
     if (status == null) return 'Temporary health deferral';
     final s = status.toString().toLowerCase();
+    if (s.contains('malariacheck')) return 'Malaria health check needed';
     if (s.contains('weight')) return 'Weight below 50.0 kg (110 lbs)';
     if (s.contains('tatts') || s.contains('pierce')) return 'Recent tattoo or body piercing';
     if (s.contains('alcohol')) return 'Alcohol in the last 24 hours';
@@ -95,6 +104,9 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   String _getReasonDesc(EligibleStats? status) {
     if (status == null) return 'Your screening shows a temporary deferral.';
     final s = status.toString().toLowerCase();
+    if (s.contains('malariacheck')) {
+      return "Your malaria waiting period is over. Confirm you've had no fever, chills or flu-like illness since, and you can donate again.";
+    }
     if (s.contains('weight')) {
       return 'Giving blood under 50 kg can cause fainting and sudden drops in blood pressure. This rule keeps you safe.';
     }
@@ -121,6 +133,8 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
 
   String _getRecommendedAction(EligibleStats? status) {
     final s = (status ?? '').toString().toLowerCase();
+    if (s.contains('malariacheck')) return 'Answer the malaria health check below.';
+    if (s.contains('travel')) return 'Watch for fever or chills, and get checked if you feel unwell.';
     if (s.contains('weight')) return 'Eat protein- and iron-rich meals to safely reach 50 kg.';
     if (s.contains('alcohol')) return 'Skip alcohol for 24 hours and drink plenty of water.';
     if (s.contains('tatts') || s.contains('pierce')) return 'Wait for the healing window to finish.';
@@ -147,11 +161,10 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
         standard = DecisionTreeClassifier.transfusionSurgeryDefDays;
         break;
       case EligibleStats.deferredTravelNeedle:
-        // The smallest window that still fits what's left: a 3-month
-        // malaria visit, 12 months for needle-stick, or 3 years for living
-        // in a malaria area or past malaria.
+        // The smallest window that still fits what's left: 12 months for a
+        // malaria visit or needle-stick, or 3 years for living in a malaria
+        // area, past malaria or symptoms after an exposure.
         standard = [
-          DecisionTreeClassifier.malariaVisitDefDays,
           DecisionTreeClassifier.travelNeedleDefDays,
           DecisionTreeClassifier.malariaResidentDefDays,
         ].firstWhere((w) => w >= remaining, orElse: () => remaining);
@@ -180,6 +193,26 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     }
   }
 
+  bool get _hasMalariaExposure {
+    final npt = widget.screeningModel?.screensNPT;
+    return npt != null && DecisionTreeClassifier.malariaWait(npt) != null;
+  }
+
+  Future<void> _openMalariaCheck({required bool waitIsOver}) async {
+    final saved = await showMalariaCheckSheet(context, token: widget.token, waitIsOver: waitIsOver);
+    if (!saved || !mounted) return;
+    // Re-classify from the backend's updated screening, the same way a
+    // retake hands its result back to HomeView.
+    try {
+      final profile = await ApiService.getMyProfile(widget.token);
+      final result = classifyDonorFromProfile(profile);
+      final model = buildScreeningModelFromProfile(profile);
+      if (result != null && model != null) widget.onRetakeCompleted?.call(model, result);
+    } catch (e) {
+      debugPrint('IneligibleHomeView: could not refresh after the malaria check: $e');
+    }
+  }
+
   String get _firstName {
     final n = widget.donorName.trim();
     if (n.isEmpty) return 'there';
@@ -191,6 +224,13 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
     final status = widget.classificationResult?.status ?? EligibleStats.deferredWeight;
     final int days = widget.classificationResult?.daysRemaining ?? widget.daysRemaining;
     final kind = _kindFor(status, days);
+
+    if (status == EligibleStats.deferredMalariaCheck && !_malariaPromptShown && widget.token.isNotEmpty) {
+      _malariaPromptShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openMalariaCheck(waitIsOver: true);
+      });
+    }
 
     Widget hero;
     switch (kind) {
@@ -392,6 +432,8 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
       when = 'After the postpartum window';
     } else if (s.contains('mens')) {
       when = 'After your cycle ends';
+    } else if (s.contains('malariacheck')) {
+      when = 'After a quick health check';
     } else {
       when = 'When you feel ready';
     }
@@ -585,8 +627,24 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
             showDivider: false,
           ),
           const SizedBox(height: 10),
+          if (status == EligibleStats.deferredMalariaCheck) ...[
+            RQButton(
+              label: 'Answer the Health Check',
+              icon: Icons.health_and_safety_outlined,
+              onPressed: () => _openMalariaCheck(waitIsOver: true),
+            ),
+            const SizedBox(height: 10),
+          ] else if (status == EligibleStats.deferredTravelNeedle && _hasMalariaExposure) ...[
+            RQButton.secondary(
+              label: 'Report Fever or Other Symptoms',
+              icon: Icons.thermostat_outlined,
+              onPressed: () => _openMalariaCheck(waitIsOver: false),
+            ),
+            const SizedBox(height: 10),
+          ],
           RQButton(
             label: 'Update Health Assessment',
+            primary: status != EligibleStats.deferredMalariaCheck,
             onPressed: _openRetake,
           ),
         ],

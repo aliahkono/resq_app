@@ -251,6 +251,25 @@ class ApiService {
     return _patch('/donor/me', updates, token: token);
   }
 
+  /// POST /api/donor/me/malaria-check — the symptom check for a donor with
+  /// a malaria exposure on file. Returns { healthScreening, eligibility }.
+  static Future<Map<String, dynamic>> submitMalariaCheck(
+    String token, {
+    required bool hadSymptoms,
+    bool symptomsOngoing = false,
+    DateTime? symptomsEndDate,
+  }) {
+    return _post(
+      '/donor/me/malaria-check',
+      {
+        'hadSymptoms': hadSymptoms,
+        'symptomsOngoing': symptomsOngoing,
+        'symptomsEndDate': symptomsEndDate?.toIso8601String(),
+      },
+      token: token,
+    );
+  }
+
   /// POST /api/donor/me/photo — multipart upload of the donor's profile
   /// photo, returning the new hosted URL (e.g. { "photoUrl": "https://..." }).
   /// Stored server-side as bytea on the donor's row and served back via the

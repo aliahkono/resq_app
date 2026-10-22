@@ -78,6 +78,13 @@ class ScreenNPTModel {
             ? DateTime.tryParse(json['travel_or_needle_date'] as String)
             : null,
         travelOrNeedleDesc: json['travel_or_needle_desc'] as String?,
+        malariaCheckedAt: json['malaria_checked_at'] != null
+            ? DateTime.tryParse(json['malaria_checked_at'] as String)
+            : null,
+        malariaSymptomsEndDate: json['malaria_symptoms_end_date'] != null
+            ? DateTime.tryParse(json['malaria_symptoms_end_date'] as String)
+            : null,
+        malariaSymptomsOngoing: json['malaria_symptoms_ongoing'] as bool? ?? false,
         isPregOrNursing: json['is_preg_or_nursing'] as bool?,
         lastMensPeriodDate: json['last_menstrual_period_date'] != null
             ? DateTime.parse(json['last_menstrual_period_date'] as String)
@@ -114,6 +121,9 @@ class ScreenNPTModel {
       'has_travel_or_needle_stick': screensNPT.hasTravelOrNeedleStick,
       'travel_or_needle_date': screensNPT.travelOrNeedleDate?.toIso8601String(),
       'travel_or_needle_desc': screensNPT.travelOrNeedleDesc,
+      'malaria_checked_at': screensNPT.malariaCheckedAt?.toIso8601String(),
+      'malaria_symptoms_end_date': screensNPT.malariaSymptomsEndDate?.toIso8601String(),
+      'malaria_symptoms_ongoing': screensNPT.malariaSymptomsOngoing,
       'is_preg_or_nursing': screensNPT.isPregOrNursing,
       'last_menstrual_period_date':
       screensNPT.lastMensPeriodDate?.toIso8601String(),

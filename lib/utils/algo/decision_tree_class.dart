@@ -59,6 +59,13 @@ class DonorScreensNPT {
   final DateTime? travelOrNeedleDate;
   final String? travelOrNeedleDesc;
 
+  // Malaria symptom check (POST /api/donor/me/malaria-check), not asked by
+  // the screening wizard: when the donor last answered it, the latest date
+  // reported symptoms ended, and whether they're still unwell.
+  final DateTime? malariaCheckedAt;
+  final DateTime? malariaSymptomsEndDate;
+  final bool malariaSymptomsOngoing;
+
   // Female-Specific Screening Parameters
   final bool? isPregOrNursing;
   final DateTime? lastMensPeriodDate;
@@ -89,6 +96,9 @@ class DonorScreensNPT {
     this.hasTravelOrNeedleStick = false,
     this.travelOrNeedleDate,
     this.travelOrNeedleDesc,
+    this.malariaCheckedAt,
+    this.malariaSymptomsEndDate,
+    this.malariaSymptomsOngoing = false,
     this.isPregOrNursing,
     this.lastMensPeriodDate,
     this.hasHighRiskExpo,
@@ -109,6 +119,7 @@ enum EligibleStats {
   deferredMajorMedical, // Heart disease, asthma, diabetes, etc.
   deferredTransfusionSurgery, // Transfusion or surgery within last 12 months
   deferredTravelNeedle, // Travel or accidental needle stick within last 12 months
+  deferredMalariaCheck, // Malaria wait over; symptom check not answered yet
   deferredMaternal,
   deferredMensCycle,
   deferredMedical,
@@ -126,6 +137,18 @@ class ClassificationResult {
     required this.status,
     this.daysRemaining = 0,
   });
+}
+
+/// A malaria exposure's wait (see DecisionTreeClassifier.malariaWait).
+/// [endsAt] is null when there's no date to count from or symptoms are
+/// ongoing; [checkDone] means the donor answered the symptom check after
+/// the wait ended.
+class MalariaWait {
+  final MalariaExposure exposure;
+  final DateTime? endsAt;
+  final bool checkDone;
+
+  const MalariaWait({required this.exposure, this.endsAt, this.checkDone = false});
 }
 
 /// Engine of Decision Tree Classification for donor screening
@@ -152,12 +175,14 @@ class DecisionTreeClassifier {
   static const int travelNeedleDefDays = 365;
 
   /// Malaria waiting periods, counted from the date the donor gives:
-  /// 3 months after visiting a malaria area (e.g. rural Palawan, Mindoro,
+  /// 1 year after visiting a malaria area (e.g. rural Palawan, Mindoro,
   /// Romblon), 3 years after leaving one they lived in, and 3 years after
-  /// finishing malaria treatment.
-  static const int malariaVisitDefDays = 90;
+  /// finishing malaria treatment. Fever, chills or flu-like illness after
+  /// the exposure restarts the wait: 3 years after the symptoms end.
+  static const int malariaVisitDefDays = 365;
   static const int malariaResidentDefDays = 1095;
   static const int malariaTreatedDefDays = 1095;
+  static const int malariaSymptomDefDays = 1095;
 
   static int malariaWindowDays(MalariaExposure exposure) {
     switch (exposure) {
@@ -168,6 +193,33 @@ class DecisionTreeClassifier {
       case MalariaExposure.treated:
         return malariaTreatedDefDays;
     }
+  }
+
+  /// The malaria wait for a travel/needle-stick answer, or null when it
+  /// isn't a malaria exposure. Same rule as malariaWait() in the backend's
+  /// eligibilityClassifier.js.
+  static MalariaWait? malariaWait(DonorScreensNPT npt) {
+    if (!npt.hasTravelOrNeedleStick) return null;
+    final assessment = MedicalKeywordRules.assessTravelOrNeedleStick(npt.travelOrNeedleDesc);
+    final isMalaria = assessment.verdict == KeywordVerdict.deferred &&
+        assessment.matches.any((m) => m.conditionLabel == 'Malaria-Endemic Travel');
+    if (!isMalaria) return null;
+    final exposure = MedicalKeywordRules.malariaExposureOf(npt.travelOrNeedleDesc);
+    if (npt.travelOrNeedleDate == null || npt.malariaSymptomsOngoing) {
+      return MalariaWait(exposure: exposure);
+    }
+    var endsAt = npt.travelOrNeedleDate!.add(Duration(days: malariaWindowDays(exposure)));
+    final symptomsEnd = npt.malariaSymptomsEndDate;
+    if (symptomsEnd != null) {
+      final afterSymptoms = symptomsEnd.add(const Duration(days: malariaSymptomDefDays));
+      if (afterSymptoms.isAfter(endsAt)) endsAt = afterSymptoms;
+    }
+    final checkedAt = npt.malariaCheckedAt;
+    return MalariaWait(
+      exposure: exposure,
+      endsAt: endsAt,
+      checkDone: checkedAt != null && !checkedAt.isBefore(endsAt),
+    );
   }
 
   /// Evaluates donor parameters through rule-based decision tree nodes
@@ -187,8 +239,10 @@ class DecisionTreeClassifier {
       return ClassificationResult(status: EligibleStats.deferredWeight);
     }
 
-    // Node 4: Age Bracket Check (Standard 18-65)
-    if (npt.age < 18 || npt.age > 65) {
+    // Node 4: Minimum Age Check. No upper limit: a donor over 65 is
+    // eligible but evaluated by the hospital first (EligibleAppointView
+    // tells them when they book).
+    if (npt.age < 18) {
       return ClassificationResult(status: EligibleStats.deferredAge);
     }
 
@@ -300,16 +354,29 @@ class DecisionTreeClassifier {
     // Node 11: Travel or Needle Stick Check — assessed against the free-text
     // description (see medical_keyword_rules.dart) rather than a flat
     // toggle: travel to a non-endemic city is eligible per the guidance
-    // table; malaria defers 3 months after a visit or 3 years after living
-    // there or finishing treatment; needle-stick exposure or a commercial
-    // tattoo/piercing disclosed here defers 12 months.
-    if (npt.hasTravelOrNeedleStick) {
+    // table; malaria waits as in malariaWait() and then needs the symptom
+    // check; needle-stick exposure or a commercial tattoo/piercing
+    // disclosed here defers 12 months.
+    final malaria = malariaWait(npt);
+    if (malaria != null) {
+      final endsAt = malaria.endsAt;
+      if (endsAt == null) {
+        return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
+      }
+      final now = DateTime.now();
+      if (now.isBefore(endsAt)) {
+        return ClassificationResult(
+          status: EligibleStats.deferredTravelNeedle,
+          daysRemaining: (endsAt.difference(now).inMilliseconds / Duration.millisecondsPerDay).ceil(),
+        );
+      }
+      if (!malaria.checkDone) {
+        return ClassificationResult(status: EligibleStats.deferredMalariaCheck);
+      }
+    } else if (npt.hasTravelOrNeedleStick) {
       final assessment = MedicalKeywordRules.assessTravelOrNeedleStick(npt.travelOrNeedleDesc);
       if (assessment.verdict == KeywordVerdict.deferred) {
-        final isMalariaEndemic = assessment.matches.any((m) => m.conditionLabel == 'Malaria-Endemic Travel');
-        final windowDays = isMalariaEndemic
-            ? malariaWindowDays(MedicalKeywordRules.malariaExposureOf(npt.travelOrNeedleDesc))
-            : travelNeedleDefDays;
+        const windowDays = travelNeedleDefDays;
         if (npt.travelOrNeedleDate != null) {
           final daysSince = DateTime.now().difference(npt.travelOrNeedleDate!).inDays;
           if (daysSince >= windowDays) {

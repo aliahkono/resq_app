@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:resq/services/api_service.dart';
 import 'package:resq/services/location_service.dart';
+import 'package:resq/utils/helpers/eligibility_rules.dart';
 import 'package:resq/views/profile/get_ver_view.dart';
 import 'package:resq/widgets/app_notif_bell.dart';
 import 'package:resq/widgets/resq_ui.dart';
@@ -92,6 +93,10 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
   bool _booking = false;
   String? _bookingError;
 
+  // From the donor's profile. Donors over 65 are eligible, but the hospital
+  // evaluates them before they donate — they're told before booking.
+  int? _donorAge;
+
   // The backend has no slot-discovery endpoint — appointment capacity is
   // just "how many rows already exist for this exact hospital+timestamp"
   // (see bookAppointment, appointments.service.js) — so a fixed hourly
@@ -124,6 +129,40 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
     _selectedDate = _dateOptions.first;
     _loadHospitals();
     _loadDonorPosition();
+    _loadDonorAge();
+  }
+
+  Future<void> _loadDonorAge() async {
+    if (widget.token.isEmpty) return;
+    try {
+      final profile = await ApiService.getMyProfile(widget.token);
+      final age = profile['age'];
+      if (mounted && age is num) setState(() => _donorAge = age.toInt());
+    } catch (_) {
+      // Only used for the over-65 notice; booking works without it.
+    }
+  }
+
+  /// Tells a donor over 65 that the hospital evaluates them first. Returns
+  /// whether to go ahead with the booking.
+  Future<bool> _confirmSeniorEvaluation() async {
+    final age = _donorAge;
+    if (age == null || age <= EligibilityRules.seniorEvaluationAge) return true;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("You'll be evaluated first"),
+        content: const Text(
+          "Because you're over 65, the hospital's staff will check your health before you donate. "
+          'Your appointment still goes ahead, and they will tell you on the day if you can give blood.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Book appointment')),
+        ],
+      ),
+    );
+    return proceed == true;
   }
 
   Future<void> _loadDonorPosition() async {
@@ -208,6 +247,7 @@ class _EligibleAppointViewState extends State<EligibleAppointView> {
     final date = _selectedDate;
     final time = _selectedTime;
     if (hospitalId == null || date == null || time == null || _booking) return;
+    if (!await _confirmSeniorEvaluation() || !mounted) return;
 
     final (hour, minute) = _parseSlotStart(time);
     final scheduledAt = DateTime(date.year, date.month, date.day, hour, minute);

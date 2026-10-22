@@ -147,6 +147,13 @@ DonorScreensNPT? screensFromProfile(Map<String, dynamic> profile) {
         ? DateTime.tryParse(screening['travelOrNeedleDate'] as String)
         : null,
     travelOrNeedleDesc: screening['travelOrNeedleDesc'] as String?,
+    malariaCheckedAt: screening['malariaCheckedAt'] != null
+        ? DateTime.tryParse(screening['malariaCheckedAt'] as String)
+        : null,
+    malariaSymptomsEndDate: screening['malariaSymptomsEndDate'] != null
+        ? DateTime.tryParse(screening['malariaSymptomsEndDate'] as String)
+        : null,
+    malariaSymptomsOngoing: (screening['malariaSymptomsOngoing'] as bool?) ?? false,
     isPregOrNursing: screening['isPregOrNursing'] as bool?,
     lastMensPeriodDate: screening['lastMensPeriodDate'] != null
         ? DateTime.tryParse(screening['lastMensPeriodDate'] as String)

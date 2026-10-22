@@ -600,6 +600,12 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       hasTravelOrNeedleStick: _hasTravelOrNeedleStick,
       travelOrNeedleDate: _hasTravelOrNeedleStick ? _travelOrNeedleDate : null,
       travelOrNeedleDesc: _hasTravelOrNeedleStick ? _travelOrNeedleDesc : null,
+      // Not wizard questions — kept from the saved screening so a retake
+      // doesn't undo an answered malaria symptom check (the backend keeps
+      // them too, see updateMyProfile).
+      malariaCheckedAt: widget.initialScreening?.screensNPT.malariaCheckedAt,
+      malariaSymptomsEndDate: widget.initialScreening?.screensNPT.malariaSymptomsEndDate,
+      malariaSymptomsOngoing: widget.initialScreening?.screensNPT.malariaSymptomsOngoing ?? false,
       isPregOrNursing: _gender == BioSex.female ? isPregOrNursing : null,
       lastMensPeriodDate: _gender == BioSex.female ? _lastMensDate : null,
       hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,

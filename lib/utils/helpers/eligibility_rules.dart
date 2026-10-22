@@ -11,7 +11,9 @@ class EligibilityRules {
 
   static const double minWeight = 50.0;
   static const int minAge = 18;
-  static const int maxAge = 65;
+  // No upper age limit: donors over this age are eligible but evaluated by
+  // the hospital before donating.
+  static const int seniorEvaluationAge = 65;
 
   // Deferral & Rest Windows (in Days/Hours)
   static const int wholeBloodRestPeriodDays = 90; // Mandatory 90-day NVBSP recovery gap
@@ -53,6 +55,8 @@ class EligibilityRules {
         return "Recent Transfusion or Surgery";
       case EligibleStats.deferredTravelNeedle:
         return "Malaria or Needle Exposure";
+      case EligibleStats.deferredMalariaCheck:
+        return "Malaria Health Check Needed";
       case EligibleStats.deferredMaternal:
         return "Maternal Health Deferral";
       case EligibleStats.deferredMensCycle:
@@ -80,7 +84,7 @@ class EligibilityRules {
       case EligibleStats.deferredWeight:
         return "DOH standards require a minimum weight of $minWeight kg to ensure donor safety during standard volume donation.";
       case EligibleStats.deferredAge:
-        return "Donors must be between $minAge and $maxAge years old according to clinical safety protocols.";
+        return "Donors must be at least $minAge years old according to clinical safety protocols.";
       case EligibleStats.deferredInterval:
         return "NVBSP guidelines require a mandatory $wholeBloodRestPeriodDays-day recovery interval between whole blood donations. ${result.daysRemaining} days remaining.";
       case EligibleStats.deferredTattsPierce:
@@ -94,7 +98,9 @@ class EligibilityRules {
       case EligibleStats.deferredTransfusionSurgery:
         return "Blood transfusions or surgeries within the last 12 months ($transfusionSurgeryDefDays days) require a waiting period to ensure donor and recipient safety.";
       case EligibleStats.deferredTravelNeedle:
-        return "Malaria exposure or an accidental needle-stick requires a waiting period per blood safety protocols: 3 months after visiting a malaria area, 3 years after living in one or finishing malaria treatment, and 12 months ($travelNeedleDefDays days) after a needle-stick exposure.";
+        return "Malaria exposure or an accidental needle-stick requires a waiting period per blood safety protocols: 1 year after visiting a malaria area, 3 years after living in one, finishing malaria treatment, or the end of fever or other symptoms after an exposure, and 12 months ($travelNeedleDefDays days) after a needle-stick exposure.";
+      case EligibleStats.deferredMalariaCheck:
+        return "Your malaria waiting period is over. Answer a quick health check to confirm you've had no fever, chills or flu-like illness since, and you can donate again.";
       case EligibleStats.deferredMaternal:
         return "Pregnancy and breastfeeding temporarily defer donation to protect both mother and child iron levels.";
       case EligibleStats.deferredMensCycle:
