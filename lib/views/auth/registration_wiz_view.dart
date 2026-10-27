@@ -498,6 +498,17 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
         );
         return false;
       }
+      // "I've donated before" is the default, so without this a donor could
+      // continue as a repeat donor with no date — and the 90-day interval
+      // check (Node 5) only runs when there is a date, so it was skipped.
+      if (!_isFirstTimeDonor && _lastDonationDate == null && !widget.lockLastDonation) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please choose your last donation date, or select \"This is my first time\"."),
+          ),
+        );
+        return false;
+      }
     }
     return true;
   }
