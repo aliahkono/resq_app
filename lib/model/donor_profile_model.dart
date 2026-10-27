@@ -35,7 +35,7 @@ class DonorProfModel {
     return DonorProfModel(
         profId: json['profile_id'] as String,
         userId: json['user_id'] as String,
-        bloodType: json['blood_type'] as String,
+        bloodType: (json['blood_type'] as String?) ?? 'Unknown',
         gender: json['gender'] == 'female' ? BioSex.female : BioSex.male,
         weight: (json['weight_kg'] as num).toDouble(),
         age: json['age'] as int,

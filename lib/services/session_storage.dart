@@ -124,7 +124,7 @@ class OfflinePass {
   factory OfflinePass.fromJson(Map<String, dynamic> json) => OfflinePass(
         donorCode: json['donorCode'] as String,
         donorName: json['donorName'] as String,
-        bloodType: json['bloodType'] as String,
+        bloodType: (json['bloodType'] as String?) ?? 'Unknown',
         isEligible: json['isEligible'] as bool,
         savedAt: DateTime.parse(json['savedAt'] as String),
       );

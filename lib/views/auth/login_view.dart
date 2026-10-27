@@ -102,7 +102,7 @@ class AuthService {
         donorData: DonorProfileData(
           id: profile['id'] as String,
           name: profile['name'] as String,
-          bloodType: profile['bloodType'] as String,
+          bloodType: (profile['bloodType'] as String?) ?? 'Unknown',
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
           phone: (profile['phone'] as String?) ?? '',
@@ -136,7 +136,7 @@ class AuthService {
         donorData: DonorProfileData(
           id: profile['id'] as String,
           name: profile['name'] as String,
-          bloodType: profile['bloodType'] as String,
+          bloodType: (profile['bloodType'] as String?) ?? 'Unknown',
           isEligible: profile['isEligible'] as bool? ?? true,
           token: token,
           phone: (profile['phone'] as String?) ?? '',
