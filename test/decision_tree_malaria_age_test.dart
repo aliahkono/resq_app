@@ -78,4 +78,24 @@ void main() {
     expect(classify(donor(age: 80)).isEligible, isTrue);
     expect(classify(donor(age: 17)).status, EligibleStats.deferredAge);
   });
+
+  // Same case as the backend test: high-risk exposure used to be checked
+  // for male donors only.
+  test('high-risk exposure defers female donors too', () {
+    DonorScreensNPT female({required bool highRisk}) => DonorScreensNPT(
+          gender: BioSex.female,
+          weight: 55,
+          age: 25,
+          isFirstTimeDonor: true,
+          hasTattsOrPierce: false,
+          hasAlcoholPast24hr: false,
+          hasActiveInfectOrMeds: false,
+          hasHighRiskExpo: highRisk,
+          hasTravelOrNeedleStick: false,
+          isPregOrNursing: false,
+          lastMensPeriodDate: daysAgo(20),
+        );
+    expect(classify(female(highRisk: true)).status, EligibleStats.deferredClinicalRisk);
+    expect(classify(female(highRisk: false)).isEligible, isTrue);
+  });
 }

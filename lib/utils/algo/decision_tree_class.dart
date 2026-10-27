@@ -401,12 +401,18 @@ class DecisionTreeClassifier {
       return ClassificationResult(status: EligibleStats.deferredAlcohol);
     }
 
+    // High-risk exposure check — applies to every donor, so it runs before
+    // the sex-specific branch (it used to sit in the male branch only, so a
+    // female donor who reported high-risk exposure came out eligible).
+    if (npt.hasHighRiskExpo == true) {
+      return ClassificationResult(status: EligibleStats.deferredClinicalRisk);
+    }
+
     // Node 13: Gender-Specific Branching
     if (npt.gender == BioSex.female) {
       return _evalFemBranch(npt);
-    } else {
-      return _evalMaleBranch(npt);
     }
+    return ClassificationResult(status: EligibleStats.eligible);
   }
 
   /// Evaluates Female-Specific Decision Nodes
@@ -425,14 +431,6 @@ class DecisionTreeClassifier {
       }
     }
 
-    return ClassificationResult(status: EligibleStats.eligible);
-  }
-
-  /// Evaluates Male-Specific Decision Nodes
-  ClassificationResult _evalMaleBranch(DonorScreensNPT npt) {
-    if (npt.hasHighRiskExpo == true) {
-      return ClassificationResult(status: EligibleStats.deferredClinicalRisk);
-    }
     return ClassificationResult(status: EligibleStats.eligible);
   }
 }

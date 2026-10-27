@@ -586,7 +586,10 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     }
 
     final bool isPregOrNursing = _gender == BioSex.female && (_pregnancyStatusIndex != 0 || _isBreastfeeding);
-    final bool hasHighRiskExpo = _gender == BioSex.male ? (_hasStiHistory || _hasHighRiskContact || _msmHistoryIndex == 2) : false;
+    // STI history and high-risk contact are asked of every donor; the
+    // sexual-contact-with-men question is shown to male donors only.
+    final bool hasHighRiskExpo =
+        _hasStiHistory || _hasHighRiskContact || (_gender == BioSex.male && _msmHistoryIndex == 2);
 
     final DonorScreensNPT evaluatedParams = DonorScreensNPT(
       gender: _gender,
@@ -619,7 +622,7 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       malariaSymptomsOngoing: widget.initialScreening?.screensNPT.malariaSymptomsOngoing ?? false,
       isPregOrNursing: _gender == BioSex.female ? isPregOrNursing : null,
       lastMensPeriodDate: _gender == BioSex.female ? _lastMensDate : null,
-      hasHighRiskExpo: _gender == BioSex.male ? hasHighRiskExpo : null,
+      hasHighRiskExpo: hasHighRiskExpo,
     );
 
     final String timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
@@ -1799,33 +1802,36 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
               ],
             ),
           ),
-        ] else ...[
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _cardTitle('STI history', subtitle: 'Any sexually transmitted infection in the last 12 months?'),
-                const SizedBox(height: 12),
-                _yesNo(_hasStiHistory, (val) => setState(() => _hasStiHistory = val)),
-              ],
-            ),
-          ),
           const SizedBox(height: 14),
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _cardTitle('High-risk contact', subtitle: 'In the last 12 months'),
-                const SizedBox(height: 8),
-                const Text(
-                  'Sexual contact with anyone who has tested positive for HIV or injected non-prescribed drugs?',
-                  style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink),
-                ),
-                const SizedBox(height: 12),
-                _yesNo(_hasHighRiskContact, (val) => setState(() => _hasHighRiskContact = val)),
-              ],
-            ),
+        ],
+        // Asked of every donor (high-risk exposure defers any donor).
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('STI history', subtitle: 'Any sexually transmitted infection in the last 12 months?'),
+              const SizedBox(height: 12),
+              _yesNo(_hasStiHistory, (val) => setState(() => _hasStiHistory = val)),
+            ],
           ),
+        ),
+        const SizedBox(height: 14),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _cardTitle('High-risk contact', subtitle: 'In the last 12 months'),
+              const SizedBox(height: 8),
+              const Text(
+                'Sexual contact with anyone who has tested positive for HIV or injected non-prescribed drugs?',
+                style: TextStyle(fontSize: 14, height: 1.45, color: RQColors.ink),
+              ),
+              const SizedBox(height: 12),
+              _yesNo(_hasHighRiskContact, (val) => setState(() => _hasHighRiskContact = val)),
+            ],
+          ),
+        ),
+        if (!female) ...[
           const SizedBox(height: 14),
           _card(
             child: Column(
