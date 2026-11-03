@@ -103,6 +103,10 @@ class _SettingsViewState extends State<SettingsView> {
   DateTime? _birthDate;
   String _emergencyContactName = '';
   String _emergencyContactPhone = '';
+  // Set once the donor has used their one edit of the personal details
+  // above (migration 028) — after that they're read-only here and only
+  // staff can change them.
+  DateTime? _personalDetailsEditedAt;
 
   String _formatBirthDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -440,6 +444,8 @@ class _SettingsViewState extends State<SettingsView> {
         _birthDate = birthDateStr != null ? DateTime.tryParse(birthDateStr) : _birthDate;
         _emergencyContactName = (profile['emergencyContactName'] as String?) ?? _emergencyContactName;
         _emergencyContactPhone = (profile['emergencyContactPhone'] as String?) ?? _emergencyContactPhone;
+        final editedAtStr = profile['personalDetailsEditedAt'] as String?;
+        _personalDetailsEditedAt = editedAtStr != null ? DateTime.tryParse(editedAtStr) : null;
         _loadingPrefs = false;
       });
     } catch (_) {
@@ -1115,6 +1121,7 @@ class _SettingsViewState extends State<SettingsView> {
     DateTime? birthDate = _birthDate;
     bool saving = false;
     String? error;
+    final bool locked = _personalDetailsEditedAt != null;
 
     Future<void> save(BuildContext ctx, StateSetter setModalState) async {
       final newName = nameCtrl.text.trim();
@@ -1145,6 +1152,21 @@ class _SettingsViewState extends State<SettingsView> {
         return;
       }
 
+      final confirmed = await showDialog<bool>(
+        context: ctx,
+        builder: (dCtx) => AlertDialog(
+          title: const Text('Save personal details?'),
+          content: const Text(
+            "You can only edit your personal details once. After saving, you'll need to contact the blood bank to change them again.",
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Go back')),
+            TextButton(onPressed: () => Navigator.pop(dCtx, true), child: const Text('Save')),
+          ],
+        ),
+      );
+      if (confirmed != true || !ctx.mounted) return;
+
       setModalState(() {
         saving = true;
         error = null;
@@ -1171,6 +1193,8 @@ class _SettingsViewState extends State<SettingsView> {
           _emergencyContactPhone = updated.containsKey('emergencyContactPhone')
               ? (updated['emergencyContactPhone'] as String?) ?? ''
               : newEmergencyPhone;
+          final editedAtStr = updated['personalDetailsEditedAt'] as String?;
+          _personalDetailsEditedAt = (editedAtStr != null ? DateTime.tryParse(editedAtStr) : null) ?? DateTime.now();
         });
         widget.onProfileDetailsUpdated?.call(
           name: _name,
@@ -1206,7 +1230,9 @@ class _SettingsViewState extends State<SettingsView> {
         builder: (ctx, setModalState) => ResQSheet(
           title: 'Edit personal details',
           subtitle: 'So hospitals can reach you quickly',
-          footer: Row(
+          footer: locked
+              ? RQButton(label: 'Done', onPressed: () => Navigator.pop(ctx))
+              : Row(
             children: [
               Expanded(
                 child: RQButton.secondary(label: 'Cancel', onPressed: saving ? null : () => Navigator.pop(ctx)),
@@ -1250,10 +1276,31 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: RQColors.surface, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(locked ? Icons.lock_outline_rounded : Icons.info_outline_rounded,
+                        size: 18, color: RQColors.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        locked
+                            ? "You've already used your one edit. Contact the blood bank to change these details."
+                            : 'You can only save changes to these details once, so double-check them first.',
+                        style: const TextStyle(fontSize: 12, height: 1.4, color: RQColors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               const RQSectionLabel('Basic info'),
               const SizedBox(height: 10),
-              RQTextField(controller: nameCtrl, label: 'Full name', enabled: !saving),
+              RQTextField(controller: nameCtrl, label: 'Full name', enabled: !saving && !locked),
               const SizedBox(height: 18),
               const RQSectionLabel('Contact'),
               const SizedBox(height: 10),
@@ -1261,21 +1308,21 @@ class _SettingsViewState extends State<SettingsView> {
                 controller: phoneCtrl,
                 label: 'Mobile number',
                 keyboardType: TextInputType.phone,
-                enabled: !saving,
+                enabled: !saving && !locked,
               ),
               const SizedBox(height: 12),
               RQTextField(
                 controller: emailCtrl,
                 label: 'Email',
                 keyboardType: TextInputType.emailAddress,
-                enabled: !saving,
+                enabled: !saving && !locked,
               ),
               const SizedBox(height: 18),
               const RQSectionLabel('Digital Health Card'),
               const SizedBox(height: 10),
               InkWell(
                 borderRadius: BorderRadius.circular(12),
-                onTap: saving
+                onTap: saving || locked
                     ? null
                     : () async {
                         final picked = await showDatePicker(
@@ -1321,14 +1368,14 @@ class _SettingsViewState extends State<SettingsView> {
               RQTextField(
                 controller: emergencyNameCtrl,
                 label: 'Emergency contact name',
-                enabled: !saving,
+                enabled: !saving && !locked,
               ),
               const SizedBox(height: 12),
               RQTextField(
                 controller: emergencyPhoneCtrl,
                 label: 'Emergency contact phone',
                 keyboardType: TextInputType.phone,
-                enabled: !saving,
+                enabled: !saving && !locked,
               ),
               if (widget.bloodType.isNotEmpty) ...[
                 const SizedBox(height: 16),

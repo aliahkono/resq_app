@@ -185,6 +185,11 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     return (age != null && age > 0) ? age : null;
   }
 
+  // A retake only re-asks the health questions — blood type, age and sex
+  // are personal details, not something to re-answer on every update.
+  // They're still asked when there's no prior screening to take them from.
+  bool get _hidePersonalDetails => widget.isRetake && widget.initialScreening != null;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -647,9 +652,9 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
       // reads healthScreening straight from the backend).
       try {
         await ApiService.updateMyProfile(widget.token, {
-          'age': calculatedAge,
+          if (!_hidePersonalDetails) 'age': calculatedAge,
           'weightKg': weight,
-          'gender': _gender.name,
+          if (!_hidePersonalDetails) 'gender': _gender.name,
           'healthScreening': {
             'isFirstTimeDonor': evaluatedParams.isFirstTimeDonor,
             'lastDonationDate': evaluatedParams.lastDonationDate?.toIso8601String(),
@@ -1212,6 +1217,8 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // A retake never saves blood type (staff-only, see updateMyProfile).
+        if (!widget.isRetake) ...[
         _card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1241,13 +1248,16 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
           ),
         ),
         const SizedBox(height: 14),
+        ],
         _card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _cardTitle('About you'),
+              _cardTitle(_hidePersonalDetails ? 'Weight' : 'About you'),
               const SizedBox(height: 12),
-              if (!widget.isRetake)
+              if (_hidePersonalDetails)
+                const SizedBox.shrink()
+              else if (!widget.isRetake)
                 _dateField(
                   label: 'Date of birth',
                   value: _dob,
@@ -1264,15 +1274,17 @@ class _RegistrationWizViewState extends State<RegistrationWizView> {
                 // No real DOB is stored server-side (only a computed age), so a
                 // retake shows the donor's last-known age instead, editable.
                 RQTextField(controller: _ageController, label: 'Age', keyboardType: TextInputType.number),
-              const SizedBox(height: 14),
-              const Text('Biological sex', style: TextStyle(fontSize: 12, color: RQColors.muted)),
-              const SizedBox(height: 6),
-              _segmented(
-                labels: const ['Female', 'Male'],
-                selectedIndex: _gender == BioSex.female ? 0 : 1,
-                onChanged: (i) => setState(() => _gender = i == 0 ? BioSex.female : BioSex.male),
-              ),
-              const SizedBox(height: 14),
+              if (!_hidePersonalDetails) ...[
+                const SizedBox(height: 14),
+                const Text('Biological sex', style: TextStyle(fontSize: 12, color: RQColors.muted)),
+                const SizedBox(height: 6),
+                _segmented(
+                  labels: const ['Female', 'Male'],
+                  selectedIndex: _gender == BioSex.female ? 0 : 1,
+                  onChanged: (i) => setState(() => _gender = i == 0 ? BioSex.female : BioSex.male),
+                ),
+                const SizedBox(height: 14),
+              ],
               RQTextField(
                 controller: _weightController,
                 label: 'Weight',
