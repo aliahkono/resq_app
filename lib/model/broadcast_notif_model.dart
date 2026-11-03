@@ -45,14 +45,16 @@ class BloodBroadcastNotification {
 
   bool get isStillOpen => requestStatus == 'OPEN' || requestStatus == 'PARTIALLY_FULFILLED';
 
+  // The priority terms hospital blood request forms use; the backend still
+  // sends EMERGENCY / URGENT / NORMAL (request_priority, schema.sql).
   String get urgencyLabel {
     switch (urgency) {
       case UrgencyLevel.critical:
-        return 'EMERGENCY (CRITICAL)';
+        return 'STAT';
       case UrgencyLevel.urgent:
-        return 'URGENT';
+        return 'ASAP';
       case UrgencyLevel.normal:
-        return 'NORMAL ROUTINE';
+        return 'ROUTINE';
     }
   }
 

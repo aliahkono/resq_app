@@ -121,7 +121,7 @@ class NoActiveSchedView extends StatelessWidget {
         : urgent
             ? const Color(0xFFB45309)
             : const Color(0xFF2E7D32);
-    final String tagText = critical ? 'CRITICAL' : (urgent ? 'URGENT' : 'OPEN');
+    final String tagText = critical ? 'STAT' : (urgent ? 'ASAP' : 'ROUTINE');
     final details = [request.timeAgo].where((s) => s.trim().isNotEmpty && s != '—').join(' · ');
 
     return Container(

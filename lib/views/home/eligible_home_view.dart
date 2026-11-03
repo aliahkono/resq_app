@@ -408,13 +408,13 @@ class EligibleHomeView extends StatelessWidget {
   Widget _urgencyTag(String urgency) {
     final u = urgency.toLowerCase();
     if (u.contains('crit') || u.contains('emerg')) {
-      return const RQPill(label: 'CRITICAL', background: RQColors.blood, color: Colors.white, uppercase: true, radius: 6);
+      return const RQPill(label: 'STAT', background: RQColors.blood, color: Colors.white, uppercase: true, radius: 6);
     }
     if (u.contains('urg') || u.contains('high')) {
-      return const RQPill(label: 'URGENT', background: RQColors.warningTint, color: RQColors.warning, uppercase: true, radius: 6);
+      return const RQPill(label: 'ASAP', background: RQColors.warningTint, color: RQColors.warning, uppercase: true, radius: 6);
     }
-    return RQPill(
-      label: urgency.isNotEmpty ? urgency.toUpperCase() : 'OPEN',
+    return const RQPill(
+      label: 'ROUTINE',
       background: RQColors.successTint,
       color: RQColors.success,
       uppercase: true,

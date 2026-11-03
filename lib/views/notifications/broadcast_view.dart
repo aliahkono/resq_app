@@ -236,8 +236,8 @@ class _BroadcastsViewState extends State<BroadcastsView> {
                   child: Row(
                     children: [
                       _chip('All · ${all.length}', _BroadcastFilter.all),
-                      _chip('Critical · $critical', _BroadcastFilter.critical),
-                      _chip('Urgent · $urgent', _BroadcastFilter.urgent),
+                      _chip('STAT · $critical', _BroadcastFilter.critical),
+                      _chip('ASAP · $urgent', _BroadcastFilter.urgent),
                       _chip('Unread · $unread', _BroadcastFilter.unread),
                     ],
                   ),
@@ -351,9 +351,9 @@ class _BroadcastsViewState extends State<BroadcastsView> {
   Widget _urgencyTag(UrgencyLevel level) {
     switch (level) {
       case UrgencyLevel.critical:
-        return const RQPill(label: 'CRITICAL', background: RQColors.blood, color: Colors.white, uppercase: true, radius: 6);
+        return const RQPill(label: 'STAT', background: RQColors.blood, color: Colors.white, uppercase: true, radius: 6);
       case UrgencyLevel.urgent:
-        return const RQPill(label: 'URGENT', background: RQColors.warningTint, color: RQColors.warning, uppercase: true, radius: 6);
+        return const RQPill(label: 'ASAP', background: RQColors.warningTint, color: RQColors.warning, uppercase: true, radius: 6);
       case UrgencyLevel.normal:
         return const RQPill(label: 'ROUTINE', background: RQColors.successTint, color: RQColors.success, uppercase: true, radius: 6);
     }
