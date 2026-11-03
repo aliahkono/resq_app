@@ -1,7 +1,7 @@
 name: resq
 description: "A blood donation management and emergency response app."
 publish_to: 'none' # Prevents accidental publishing to pub.dev
-version: 1.0.0+6
+version: 1.0.0+7
 
 environment:
   sdk: '^3.7.0'
