@@ -25,7 +25,7 @@ class GetVerifiedView extends StatefulWidget {
   // Set when this screen is shown as the last step of registration (right
   // after OTP/complete-profile, see otp_ver_view.dart) rather than opened
   // later from the Profile screen. Changes two things: a "Skip for now"
-  // option appears (verification is still optional, just surfaced earlier),
+  // option appears (verification is required only before booking),
   // and finishing — whether by skipping or by completing/checking status —
   // calls this instead of popping, since there's no previous screen in this
   // flow worth returning to.
@@ -139,8 +139,8 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
         ),
         centerTitle: true,
         // Registration-time flow only: there's nothing to go "back" to here
-        // (the account is already created), and verification stays
-        // optional at this stage — so Skip replaces the back arrow instead
+        // (the account is already created), and verification isn't needed
+        // until the donor books (the server refuses booking without it) — so Skip replaces the back arrow instead
         // of leaving the donor stuck with no way off this screen.
         actions: widget.onFinished == null
             ? null
@@ -300,7 +300,7 @@ class _GetVerifiedViewState extends State<GetVerifiedView> {
                   child: TextButton(
                     onPressed: widget.onFinished,
                     child: const Text(
-                      'Skip for now — verify later from your profile',
+                      'Skip for now — you must verify before booking',
                       style: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5, fontWeight: FontWeight.w600),
                     ),
                   ),
