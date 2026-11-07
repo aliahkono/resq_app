@@ -192,6 +192,10 @@ class RegistrationSummaryView extends StatelessWidget {
                 _buildDataRow('Active Infection / Meds', screens.hasActiveInfectOrMeds ? 'Reported' : 'Clear'),
                 const Divider(height: 1),
                 _buildReasonRow(EligibilityRules.getStatsDesc(classificationResult)),
+                for (final other in classificationResult.otherReasons) ...[
+                  const Divider(height: 1),
+                  _buildReasonRow('Also: ${EligibilityRules.getStatsDesc(other)}'),
+                ],
               ]),
 
               const SizedBox(height: 18),

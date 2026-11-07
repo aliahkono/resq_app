@@ -521,6 +521,8 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
   // Supporting cards
   // ---------------------------------------------------------------------------
 
+  List<ClassificationResult> get _otherReasons => widget.classificationResult?.otherReasons ?? const [];
+
   Widget _buildReasonCard(EligibleStats status, _DeferralKind kind) {
     final bool review = kind == _DeferralKind.review;
     return _card(
@@ -551,6 +553,22 @@ class _IneligibleHomeViewState extends State<IneligibleHomeView> {
           ),
           const SizedBox(height: 12),
           Text(_getReasonDesc(status), style: const TextStyle(fontSize: 13, height: 1.55, color: RQColors.body)),
+          // Other rules the donor also failed. The hero shows the strictest
+          // one; these still apply after it clears.
+          if (_otherReasons.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('Also applies',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: RQColors.ink)),
+            const SizedBox(height: 4),
+            for (final r in _otherReasons)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '• ${_getReasonTitle(r.status)}${r.daysRemaining > 0 ? ' (${r.daysRemaining} ${r.daysRemaining == 1 ? 'day' : 'days'} left)' : ''}',
+                  style: const TextStyle(fontSize: 13, height: 1.45, color: RQColors.body),
+                ),
+              ),
+          ],
           const SizedBox(height: 4),
           InkWell(
             onTap: () => _showScreeningDetailsSheet(status),

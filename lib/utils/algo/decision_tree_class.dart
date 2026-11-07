@@ -126,16 +126,21 @@ enum EligibleStats {
   deferredClinicalRisk,
 }
 
-/// Result payload containing status and days remaining for deferral tracking
+/// Result payload containing status and days remaining for deferral tracking.
+/// [status] and [daysRemaining] are the strictest finding (see
+/// DecisionTreeClassifier.strictest); [otherReasons] are the rest of the
+/// rules the donor also failed, in tree order.
 class ClassificationResult {
   final EligibleStats status;
   final int daysRemaining;
+  final List<ClassificationResult> otherReasons;
 
   bool get isEligible => status == EligibleStats.eligible;
 
   ClassificationResult({
     required this.status,
     this.daysRemaining = 0,
+    this.otherReasons = const [],
   });
 }
 
@@ -222,52 +227,101 @@ class DecisionTreeClassifier {
     );
   }
 
-  /// Evaluates donor parameters through rule-based decision tree nodes
-  ClassificationResult classify(DonorScreensNPT npt) {
-    // Node 1: Immediate Wellness Check
-    if (!npt.feelsWellToday) {
-      return ClassificationResult(status: EligibleStats.deferredNotWell);
+  /// Reasons that need a clinician's judgment, not a fixed wait.
+  static const Set<EligibleStats> clinicalReviewReasons = {
+    EligibleStats.deferredMedical,
+    EligibleStats.deferredClinicalRisk,
+    EligibleStats.deferredMajorMedical,
+  };
+
+  /// Reasons that clear the same day or with one quick action.
+  static const Set<EligibleStats> sameDayReasons = {
+    EligibleStats.deferredNotWell,
+    EligibleStats.deferredFasting,
+    EligibleStats.deferredAlcohol,
+    EligibleStats.deferredMalariaCheck,
+  };
+
+  /// How strict a finding is (higher wins), same as strictness() in the
+  /// backend's eligibilityClassifier.js:
+  ///   3  needs clinical review
+  ///   2  deferred with no date to count down to (under 50 kg, under 18,
+  ///      pregnant/nursing, or a date the rules need is missing)
+  ///   1  deferred with a countdown; the longest countdown wins
+  ///   0  clears the same day or with one quick action
+  static int strictness(ClassificationResult r) {
+    if (clinicalReviewReasons.contains(r.status)) return 3;
+    if (r.daysRemaining > 0) return 1;
+    if (sameDayReasons.contains(r.status)) return 0;
+    return 2;
+  }
+
+  /// The strictest of [findings] (ties keep tree order), or null when empty.
+  static ClassificationResult? strictest(List<ClassificationResult> findings) {
+    ClassificationResult? best;
+    for (final f in findings) {
+      if (best == null) {
+        best = f;
+        continue;
+      }
+      final a = strictness(f);
+      final b = strictness(best);
+      if (a > b || (a == 1 && b == 1 && f.daysRemaining > best.daysRemaining)) best = f;
     }
+    return best;
+  }
+
+  /// Runs every decision-tree node and reports the strictest outcome, with
+  /// the other matching reasons in [ClassificationResult.otherReasons]. The
+  /// tree used to stop at the first match, so a donor with two risks was
+  /// told about only one, and the countdown could be shorter than the real
+  /// wait (e.g. a recent donation hiding a surgery deferral).
+  ClassificationResult classify(DonorScreensNPT npt) {
+    final findings = evaluateAll(npt);
+    final best = strictest(findings);
+    if (best == null) return ClassificationResult(status: EligibleStats.eligible);
+    return ClassificationResult(
+      status: best.status,
+      daysRemaining: best.daysRemaining,
+      otherReasons: [for (final f in findings) if (!identical(f, best)) f],
+    );
+  }
+
+  /// Every rule the donor fails, in tree order (empty = eligible).
+  List<ClassificationResult> evaluateAll(DonorScreensNPT npt) {
+    final found = <ClassificationResult>[];
+    void add(EligibleStats status, [int daysRemaining = 0]) =>
+        found.add(ClassificationResult(status: status, daysRemaining: daysRemaining));
+    final now = DateTime.now();
+
+    // Node 1: Immediate Wellness Check
+    if (!npt.feelsWellToday) add(EligibleStats.deferredNotWell);
 
     // Node 2: Meal / Fluid Intake Check (last 4-6 hrs)
-    if (!npt.hasEatenRecently) {
-      return ClassificationResult(status: EligibleStats.deferredFasting);
-    }
+    if (!npt.hasEatenRecently) add(EligibleStats.deferredFasting);
 
     // Node 3: Weight Threshold Check (DOH Standard >= 50kg)
-    if (npt.weight < 50.0) {
-      return ClassificationResult(status: EligibleStats.deferredWeight);
-    }
+    if (npt.weight < 50.0) add(EligibleStats.deferredWeight);
 
     // Node 4: Minimum Age Check. No upper limit: a donor over 65 is
     // eligible but evaluated by the hospital first (EligibleAppointView
     // tells them when they book).
-    if (npt.age < 18) {
-      return ClassificationResult(status: EligibleStats.deferredAge);
-    }
+    if (npt.age < 18) add(EligibleStats.deferredAge);
 
     // Node 5: Last Donation Interval Check (90-Day Deferral Window for returning donors)
     if (!npt.isFirstTimeDonor && npt.lastDonationDate != null) {
-      final daysSinceLastDonation =
-          DateTime.now().difference(npt.lastDonationDate!).inDays;
-      if (daysSinceLastDonation < minDonationIntervalDays) {
-        final remainingDays = minDonationIntervalDays - daysSinceLastDonation;
-        return ClassificationResult(
-          status: EligibleStats.deferredInterval,
-          daysRemaining: remainingDays,
-        );
+      final daysSince = now.difference(npt.lastDonationDate!).inDays;
+      if (daysSince < minDonationIntervalDays) {
+        add(EligibleStats.deferredInterval, minDonationIntervalDays - daysSince);
       }
     }
 
     // Node 6: Medical / Active Infection Check
-    if (npt.hasActiveInfectOrMeds) {
-      return ClassificationResult(status: EligibleStats.deferredMedical);
-    }
+    if (npt.hasActiveInfectOrMeds) add(EligibleStats.deferredMedical);
 
-    // Node 6b: Recent Minor Medications/Procedures Check (4-week window per
-    // chip — uses whichever selected procedure's date is most recent so a
-    // donor who, say, took antibiotics 3 weeks ago and had dental work 2
-    // months ago is judged against the antibiotics date, not cleared early).
+    // Node 6b: Recent Minor Medications/Procedures Check (4-week window,
+    // judged against the most recent selected item; any item without a date
+    // defers since the window can't be verified).
     if (npt.recentMedProcedures.isNotEmpty) {
       DateTime? mostRecentDate;
       bool anyMissingDate = false;
@@ -277,160 +331,95 @@ class DecisionTreeClassifier {
           anyMissingDate = true;
           continue;
         }
-        if (mostRecentDate == null || date.isAfter(mostRecentDate)) {
-          mostRecentDate = date;
-        }
+        if (mostRecentDate == null || date.isAfter(mostRecentDate)) mostRecentDate = date;
       }
       if (anyMissingDate || mostRecentDate == null) {
-        // No date on file for at least one selected procedure — can't verify
-        // the window has elapsed, so defer.
-        return ClassificationResult(status: EligibleStats.deferredRecentProcedure);
+        add(EligibleStats.deferredRecentProcedure);
+      } else {
+        final daysSince = now.difference(mostRecentDate).inDays;
+        if (daysSince < recentProcedureDefDays) {
+          add(EligibleStats.deferredRecentProcedure, recentProcedureDefDays - daysSince);
+        }
       }
-      final daysSinceProcedure = DateTime.now().difference(mostRecentDate).inDays;
-      if (daysSinceProcedure < recentProcedureDefDays) {
-        return ClassificationResult(
-          status: EligibleStats.deferredRecentProcedure,
-          daysRemaining: recentProcedureDefDays - daysSinceProcedure,
-        );
-      }
-      // Window has passed for every selected procedure — fall through.
     }
 
     // Node 6c: Major Medical History Check — assessed against the free-text
-    // description (see medical_keyword_rules.dart) rather than a blanket
-    // defer: asthma/diabetes can be eligible when the description indicates
-    // the condition is controlled (oral meds/diet), while heart disease,
-    // epilepsy/seizures, blood/bleeding disorders, severe skin conditions,
-    // and autoimmune disorders always defer regardless of detail.
-    if (npt.hasMajorMedicalHistory) {
-      final assessment = MedicalKeywordRules.assessMajorMedicalHistory(npt.majorMedicalHistoryDesc);
-      if (assessment.verdict == KeywordVerdict.deferred) {
-        return ClassificationResult(status: EligibleStats.deferredMajorMedical);
-      }
-      // Otherwise the description indicates a controlled/manageable
-      // condition (e.g. "asthma, well controlled, no recent attacks") —
-      // fall through instead of deferring just because the toggle was set.
+    // description (see medical_keyword_rules.dart): controlled asthma or
+    // diabetes doesn't defer; heart disease, epilepsy, bleeding disorders,
+    // severe skin conditions and autoimmune disorders always do.
+    if (npt.hasMajorMedicalHistory &&
+        MedicalKeywordRules.assessMajorMedicalHistory(npt.majorMedicalHistoryDesc).verdict ==
+            KeywordVerdict.deferred) {
+      add(EligibleStats.deferredMajorMedical);
     }
 
-    // Node 5: Tattoo / Piercing Window Check
+    // Node 7: Tattoo / Piercing Window Check (12 months; no date defers)
     if (npt.hasTattsOrPierce) {
       if (npt.tattooDate != null) {
-        final daysSinceProcedure =
-            DateTime.now().difference(npt.tattooDate!).inDays;
-        if (daysSinceProcedure >= tattooDeferralWindowDays) {
-          // Window has passed — fall through, no longer deferred for this.
-        } else {
-          return ClassificationResult(
-            status: EligibleStats.deferredTattsPierce,
-            daysRemaining: tattooDeferralWindowDays - daysSinceProcedure,
-          );
+        final daysSince = now.difference(npt.tattooDate!).inDays;
+        if (daysSince < tattooDeferralWindowDays) {
+          add(EligibleStats.deferredTattsPierce, tattooDeferralWindowDays - daysSince);
         }
       } else {
-        // No date on file to verify the window has elapsed — defer.
-        return ClassificationResult(status: EligibleStats.deferredTattsPierce);
+        add(EligibleStats.deferredTattsPierce);
       }
     }
 
-    // Node 10: Transfusion or Surgery Check (12-month window, using the
-    // actual event date collected in the follow-up screen — same pattern
-    // as the tattoo check above, rather than deferring forever just
-    // because the toggle was once set to "yes").
+    // Node 10: Transfusion or Surgery Check (12 months from the event date)
     if (npt.hasTransfusionOrSurgery) {
       if (npt.transfusionOrSurgeryDate != null) {
-        final daysSince = DateTime.now().difference(npt.transfusionOrSurgeryDate!).inDays;
-        if (daysSince >= transfusionSurgeryDefDays) {
-          // Window has passed — fall through, no longer deferred for this.
-        } else {
-          return ClassificationResult(
-            status: EligibleStats.deferredTransfusionSurgery,
-            daysRemaining: transfusionSurgeryDefDays - daysSince,
-          );
+        final daysSince = now.difference(npt.transfusionOrSurgeryDate!).inDays;
+        if (daysSince < transfusionSurgeryDefDays) {
+          add(EligibleStats.deferredTransfusionSurgery, transfusionSurgeryDefDays - daysSince);
         }
       } else {
-        return ClassificationResult(status: EligibleStats.deferredTransfusionSurgery);
+        add(EligibleStats.deferredTransfusionSurgery);
       }
     }
 
     // Node 11: Travel or Needle Stick Check — assessed against the free-text
-    // description (see medical_keyword_rules.dart) rather than a flat
-    // toggle: travel to a non-endemic city is eligible per the guidance
-    // table; malaria waits as in malariaWait() and then needs the symptom
-    // check; needle-stick exposure or a commercial tattoo/piercing
-    // disclosed here defers 12 months.
+    // description: non-endemic travel doesn't defer; malaria waits as in
+    // malariaWait() and then needs the symptom check; needle-stick exposure
+    // or a commercial tattoo/piercing disclosed here defers 12 months.
     final malaria = malariaWait(npt);
     if (malaria != null) {
       final endsAt = malaria.endsAt;
       if (endsAt == null) {
-        return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
+        add(EligibleStats.deferredTravelNeedle);
+      } else if (now.isBefore(endsAt)) {
+        add(EligibleStats.deferredTravelNeedle,
+            (endsAt.difference(now).inMilliseconds / Duration.millisecondsPerDay).ceil());
+      } else if (!malaria.checkDone) {
+        add(EligibleStats.deferredMalariaCheck);
       }
-      final now = DateTime.now();
-      if (now.isBefore(endsAt)) {
-        return ClassificationResult(
-          status: EligibleStats.deferredTravelNeedle,
-          daysRemaining: (endsAt.difference(now).inMilliseconds / Duration.millisecondsPerDay).ceil(),
-        );
-      }
-      if (!malaria.checkDone) {
-        return ClassificationResult(status: EligibleStats.deferredMalariaCheck);
-      }
-    } else if (npt.hasTravelOrNeedleStick) {
-      final assessment = MedicalKeywordRules.assessTravelOrNeedleStick(npt.travelOrNeedleDesc);
-      if (assessment.verdict == KeywordVerdict.deferred) {
-        const windowDays = travelNeedleDefDays;
-        if (npt.travelOrNeedleDate != null) {
-          final daysSince = DateTime.now().difference(npt.travelOrNeedleDate!).inDays;
-          if (daysSince >= windowDays) {
-            // Window has passed — fall through, no longer deferred for this.
-          } else {
-            return ClassificationResult(
-              status: EligibleStats.deferredTravelNeedle,
-              daysRemaining: windowDays - daysSince,
-            );
-          }
-        } else {
-          return ClassificationResult(status: EligibleStats.deferredTravelNeedle);
+    } else if (npt.hasTravelOrNeedleStick &&
+        MedicalKeywordRules.assessTravelOrNeedleStick(npt.travelOrNeedleDesc).verdict ==
+            KeywordVerdict.deferred) {
+      if (npt.travelOrNeedleDate != null) {
+        final daysSince = now.difference(npt.travelOrNeedleDate!).inDays;
+        if (daysSince < travelNeedleDefDays) {
+          add(EligibleStats.deferredTravelNeedle, travelNeedleDefDays - daysSince);
         }
+      } else {
+        add(EligibleStats.deferredTravelNeedle);
       }
-      // Otherwise the description indicates non-endemic travel with no
-      // needle-stick/tattoo exposure mentioned — fall through instead of
-      // deferring just because the toggle was set.
     }
 
     // Node 12: Alcohol Intake Check (< 24 hrs)
-    if (npt.hasAlcoholPast24hr) {
-      return ClassificationResult(status: EligibleStats.deferredAlcohol);
-    }
+    if (npt.hasAlcoholPast24hr) add(EligibleStats.deferredAlcohol);
 
-    // High-risk exposure check — applies to every donor, so it runs before
-    // the sex-specific branch (it used to sit in the male branch only, so a
-    // female donor who reported high-risk exposure came out eligible).
-    if (npt.hasHighRiskExpo == true) {
-      return ClassificationResult(status: EligibleStats.deferredClinicalRisk);
-    }
+    // High-risk exposure applies to every donor, so it runs before the
+    // sex-specific checks.
+    if (npt.hasHighRiskExpo == true) add(EligibleStats.deferredClinicalRisk);
 
-    // Node 13: Gender-Specific Branching
+    // Node 13: Female-specific checks
     if (npt.gender == BioSex.female) {
-      return _evalFemBranch(npt);
-    }
-    return ClassificationResult(status: EligibleStats.eligible);
-  }
-
-  /// Evaluates Female-Specific Decision Nodes
-  ClassificationResult _evalFemBranch(DonorScreensNPT npt) {
-    // Maternal Health Check
-    if (npt.isPregOrNursing == true) {
-      return ClassificationResult(status: EligibleStats.deferredMaternal);
-    }
-
-    // Menstrual Cycle Check (< 7 days window)
-    if (npt.lastMensPeriodDate != null) {
-      final daysSinceLmp =
-          DateTime.now().difference(npt.lastMensPeriodDate!).inDays;
-      if (daysSinceLmp < 7) {
-        return ClassificationResult(status: EligibleStats.deferredMensCycle);
+      if (npt.isPregOrNursing == true) add(EligibleStats.deferredMaternal);
+      if (npt.lastMensPeriodDate != null) {
+        final daysSinceLmp = now.difference(npt.lastMensPeriodDate!).inDays;
+        if (daysSinceLmp < 7) add(EligibleStats.deferredMensCycle, 7 - daysSinceLmp);
       }
     }
-
-    return ClassificationResult(status: EligibleStats.eligible);
+    return found;
   }
 }
